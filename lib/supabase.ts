@@ -1,19 +1,36 @@
 /**
- * Supabase Client Setup
- * Coordinator Agent: Zentrale DB-Verbindung für alle Features.
- * 
- * TODO: Ersetze die Platzhalter mit echten Supabase-Credentials.
- * Erstelle ein Supabase-Projekt unter https://supabase.com
+ * Supabase Client & Storage Helpers
+ *
+ * SETUP: Erstelle ein Supabase-Projekt unter https://supabase.com
+ * und setze die Environment-Variablen:
+ *   EXPO_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+ *   EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
+ *
+ * Lokal: Erstelle eine .env Datei im Projekt-Root
+ * Vercel: Setze die Vars unter Project Settings → Environment Variables
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient } from '@supabase/supabase-js';
 
-// Placeholder — replace with real values from your Supabase project
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// Supabase client will be initialized when credentials are provided
-// For now, all features use AsyncStorage as local-first storage
-export { SUPABASE_ANON_KEY, SUPABASE_URL };
+// Only create client if credentials are available
+export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+            storage: AsyncStorage as any,
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: false, // Expo does not support URL-based auth
+        },
+    })
+    : null;
+
+export const isSupabaseConfigured = !!supabase;
+
+// Admin email — gets admin privileges
+export const ADMIN_EMAIL = 'fabiank5@hotmail.com';
 
 /**
  * Generic AsyncStorage helper for CRUD operations.
