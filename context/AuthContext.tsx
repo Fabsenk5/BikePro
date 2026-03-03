@@ -2,7 +2,7 @@
  * Auth Context — Manages user authentication state
  * Uses Supabase Auth when configured, falls back to offline mode.
  */
-import { ADMIN_EMAIL, isSupabaseConfigured, supabase } from '@/lib/supabase';
+import { ADMIN_EMAIL, getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
     useEffect(() => {
+        const supabase = getSupabase();
+
         if (isSupabaseConfigured && supabase) {
             // Supabase mode — listen for auth changes
             supabase.auth.getSession().then(({ data: { session } }) => {
@@ -74,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signIn = async (email: string, password: string): Promise<{ error: string | null }> => {
+        const supabase = getSupabase();
         if (isSupabaseConfigured && supabase) {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) return { error: error.message };
@@ -97,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signUp = async (email: string, password: string): Promise<{ error: string | null }> => {
+        const supabase = getSupabase();
         if (isSupabaseConfigured && supabase) {
             const { data, error } = await supabase.auth.signUp({ email, password });
             if (error) return { error: error.message };
@@ -107,12 +111,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(data.session);
             return { error: null };
         } else {
-            // Offline: just sign in directly
             return signIn(email, password);
         }
     };
 
     const signOut = async () => {
+        const supabase = getSupabase();
         if (isSupabaseConfigured && supabase) {
             await supabase.auth.signOut();
         }

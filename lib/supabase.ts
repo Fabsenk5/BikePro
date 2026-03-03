@@ -10,24 +10,30 @@
  * Vercel: Setze die Vars unter Project Settings → Environment Variables
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// Only create client if credentials are available
-export const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-            storage: AsyncStorage as any,
-            autoRefreshToken: true,
-            persistSession: true,
-            detectSessionInUrl: false, // Expo does not support URL-based auth
-        },
-    })
-    : null;
+export const isSupabaseConfigured = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 
-export const isSupabaseConfigured = !!supabase;
+// Lazy-init: Don't create client at module load (breaks static export in Node.js)
+let _supabase: SupabaseClient | null = null;
+
+export function getSupabase(): SupabaseClient | null {
+    if (!isSupabaseConfigured) return null;
+    if (!_supabase) {
+        _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: {
+                storage: AsyncStorage as any,
+                autoRefreshToken: true,
+                persistSession: true,
+                detectSessionInUrl: false,
+            },
+        });
+    }
+    return _supabase;
+}
 
 // Admin email — gets admin privileges
 export const ADMIN_EMAIL = 'fabiank5@hotmail.com';
