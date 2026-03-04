@@ -1,10 +1,6 @@
-/**
- * BPSlider — Neon-styled slider component
- * UI Supervisor: Glowing neon track, tactile feel for bike setups
- */
 import { theme } from '@/constants/Colors';
 import React, { useCallback } from 'react';
-import { StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 interface BPSliderProps {
     label?: string;
@@ -33,12 +29,12 @@ export default function BPSlider({
 
     const handleIncrement = useCallback(() => {
         const next = Math.min(max, value + step);
-        onValueChange(Math.round(next * 10) / 10);
+        onValueChange(Math.round(next * 100) / 100);
     }, [value, max, step, onValueChange]);
 
     const handleDecrement = useCallback(() => {
         const next = Math.max(min, value - step);
-        onValueChange(Math.round(next * 10) / 10);
+        onValueChange(Math.round(next * 100) / 100);
     }, [value, min, step, onValueChange]);
 
     return (
@@ -54,12 +50,13 @@ export default function BPSlider({
 
             <View style={styles.sliderRow}>
                 {/* Minus button */}
-                <Text
+                <TouchableOpacity
                     style={[styles.stepButton, { borderColor: accentColor }]}
                     onPress={handleDecrement}
+                    activeOpacity={0.6}
                 >
-                    −
-                </Text>
+                    <Text style={styles.stepButtonText}>−</Text>
+                </TouchableOpacity>
 
                 {/* Track */}
                 <View style={styles.track}>
@@ -84,12 +81,13 @@ export default function BPSlider({
                 </View>
 
                 {/* Plus button */}
-                <Text
+                <TouchableOpacity
                     style={[styles.stepButton, { borderColor: accentColor }]}
                     onPress={handleIncrement}
+                    activeOpacity={0.6}
                 >
-                    +
-                </Text>
+                    <Text style={styles.stepButtonText}>+</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.rangeRow}>
@@ -132,13 +130,15 @@ const styles = StyleSheet.create({
         height: 36,
         borderRadius: 18,
         borderWidth: 1.5,
+        backgroundColor: theme.colors.elevated,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    stepButtonText: {
         color: theme.colors.text,
         fontSize: 20,
         fontWeight: '600',
-        textAlign: 'center',
-        lineHeight: 34,
-        backgroundColor: theme.colors.elevated,
-        overflow: 'hidden',
+        lineHeight: 22,
     },
     track: {
         flex: 1,
