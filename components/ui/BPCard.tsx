@@ -4,12 +4,12 @@
  */
 import { theme } from '@/constants/Colors';
 import React from 'react';
-import { StyleSheet, View, ViewStyle } from 'react-native';
+import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 interface BPCardProps {
     children: React.ReactNode;
     accentColor?: string;
-    style?: ViewStyle;
+    style?: StyleProp<ViewStyle>;
     noPadding?: boolean;
 }
 

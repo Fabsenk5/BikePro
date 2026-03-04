@@ -3,6 +3,7 @@
  * Uses Supabase Auth when configured, falls back to offline mode.
  */
 import { ADMIN_EMAIL, getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { migrateLocalToCloud } from '@/lib/sync';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, User } from '@supabase/supabase-js';
 import React, { createContext, useContext, useEffect, useState } from 'react';

@@ -482,7 +482,7 @@ export default function SetupGuideScreen() {
                             onPress={() => toggleArticle(article.id)}
                             activeOpacity={0.85}
                         >
-                            <BPCard style={[styles.articleCard, expanded && styles.articleExpanded]}>
+                            <BPCard style={[styles.articleCard, expanded ? styles.articleExpanded : undefined]}>
                                 <View style={styles.articleHeader}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.articleTitle}>{article.title}</Text>

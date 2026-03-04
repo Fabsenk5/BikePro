@@ -5,6 +5,7 @@
 import { BPButton, BPCard } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { syncLoadPreference, syncLoadTable } from '@/lib/sync';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -57,7 +58,7 @@ export default function ProfileScreen() {
                         <BPButton
                             title="🔐 Anmelden / Registrieren"
                             onPress={() => router.push('/auth')}
-                            accentColor={ACCENT}
+                            color={ACCENT}
                         />
                     </View>
                 </View>
@@ -136,7 +137,9 @@ export default function ProfileScreen() {
                     <BPButton
                         title="🚪 Ausloggen"
                         onPress={handleLogout}
-                        accentColor="#F44336"
+                        color="#F44336"
+                        variant="secondary"
+                        fullWidth
                     />
                 </View>
             </ScrollView>

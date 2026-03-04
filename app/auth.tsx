@@ -106,7 +106,7 @@ export default function AuthScreen() {
                             value={email}
                             onChangeText={(t) => { setEmail(t); setError(null); }}
                             keyboardType="email-address"
-                            accentColor={ACCENT}
+                            selectionColor={ACCENT}
                         />
 
                         <BPInput
@@ -115,7 +115,7 @@ export default function AuthScreen() {
                             value={password}
                             onChangeText={(t) => { setPassword(t); setError(null); }}
                             secureTextEntry
-                            accentColor={ACCENT}
+                            selectionColor={ACCENT}
                         />
 
                         {error && (
@@ -137,7 +137,7 @@ export default function AuthScreen() {
                                 <BPButton
                                     title={isLogin ? '🔐 Einloggen' : '🚀 Registrieren'}
                                     onPress={handleSubmit}
-                                    accentColor={ACCENT}
+                                    color={ACCENT}
                                 />
                             )}
                         </View>
