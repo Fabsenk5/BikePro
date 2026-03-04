@@ -190,7 +190,13 @@
         "current_km": "Current km",
         "interval_km": "Service Interval",
         "last_service": "Last Service",
-        "notes": "Notes"
+        "notes": "Notes",
+        "import_from_tracker": "📥 Import from Component Tracker",
+        "import_title": "Import Component",
+        "import_select_bike": "Select Bike",
+        "import_select_component": "Select Component",
+        "import_no_bikes": "No bikes in Component Tracker",
+        "import_btn": "→ Import"
     },
     "ridelog": {
         "title": "📖 Ride Log",

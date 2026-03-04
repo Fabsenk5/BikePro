@@ -9,7 +9,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPProgressBar } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
+import { syncLoadBikes, syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -120,6 +120,44 @@ export default function ShredCheckScreen() {
     const [serviceIntervalKm, setServiceIntervalKm] = useState('500');
     const [lastServiceDate, setLastServiceDate] = useState(getTodayISO());
     const [notes, setNotes] = useState('');
+
+    // --- Import from Component Tracker ---
+    const [importModalVisible, setImportModalVisible] = useState(false);
+    const [importBikes, setImportBikes] = useState<any[]>([]);
+    const [importSelectedBikeId, setImportSelectedBikeId] = useState<string>('');
+
+    const openImport = async () => {
+        const bikes = await syncLoadBikes();
+        setImportBikes(bikes);
+        setImportSelectedBikeId(bikes.length > 0 ? bikes[0].id : '');
+        setImportModalVisible(true);
+    };
+
+    const importSelectedBike = importBikes.find(b => b.id === importSelectedBikeId);
+
+    // Map tracker type -> shred type (best-effort match)
+    const trackerToShredType: Record<string, string> = {
+        fork: 'fork_small', shock: 'shock_small', chain: 'chain',
+        wheel_front: 'tire_front', wheel_rear: 'tire_rear',
+        brake_front: 'brake_front', brake_rear: 'brake_rear',
+        cassette: 'cassette', derailleur: 'derailleur', other: 'other',
+    };
+
+    const handleImportComp = (comp: any) => {
+        const shredType = trackerToShredType[comp.type] ?? 'other';
+        const compData: BikeComponent = {
+            id: Date.now().toString(),
+            name: `${comp.brand ?? ''} ${comp.model ?? ''}`.trim() || getTypeName(shredType),
+            type: shredType,
+            currentKm: 0,
+            serviceIntervalKm: defaultIntervals[shredType] ?? 500,
+            lastServiceDate: getTodayISO(),
+            installedDate: getTodayISO(),
+            notes: comp.notes ?? '',
+        };
+        persist([compData, ...components]);
+        setImportModalVisible(false);
+    };
 
     useEffect(() => {
         syncLoadPreference<BikeComponent[]>('shred_check', STORAGE_KEY).then(data => setComponents(data ?? []));
@@ -269,13 +307,23 @@ export default function ShredCheckScreen() {
                     </BPCard>
                 )}
 
-                <BPButton
-                    title={t('shred.add_component')}
-                    onPress={openNew}
-                    color={ACCENT}
-                    fullWidth
-                    size="lg"
-                />
+                <View style={{ flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
+                    <BPButton
+                        title={t('shred.add_component')}
+                        onPress={openNew}
+                        color={ACCENT}
+                        size="lg"
+                        style={{ flex: 1 }}
+                    />
+                    <BPButton
+                        title={t('shred.import_from_tracker')}
+                        onPress={openImport}
+                        variant="secondary"
+                        color={ACCENT}
+                        size="lg"
+                        style={{ flex: 1 }}
+                    />
+                </View>
 
                 {sorted.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -417,6 +465,59 @@ export default function ShredCheckScreen() {
                         size="lg"
                     />
                 </View>
+            </BPModal>
+
+            {/* Import Modal */}
+            <BPModal
+                visible={importModalVisible}
+                onClose={() => setImportModalVisible(false)}
+                title={t('shred.import_title')}
+            >
+                {importBikes.length === 0 ? (
+                    <Text style={{ color: theme.colors.textMuted, textAlign: 'center', paddingVertical: theme.spacing.lg }}>
+                        {t('shred.import_no_bikes')}
+                    </Text>
+                ) : (
+                    <>
+                        <BPPicker
+                            label={t('shred.import_select_bike')}
+                            options={importBikes.map(b => ({ label: `${b.name}`, value: b.id }))}
+                            value={importSelectedBikeId}
+                            onValueChange={setImportSelectedBikeId}
+                            accentColor={ACCENT}
+                        />
+                        <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                            {t('shred.import_select_component')}
+                        </Text>
+                        <ScrollView style={{ maxHeight: 320 }}>
+                            {importSelectedBike?.components?.map((comp: any) => (
+                                <TouchableOpacity
+                                    key={comp.id}
+                                    style={{
+                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                                        padding: 12, backgroundColor: theme.colors.elevated,
+                                        borderRadius: theme.radius.md, marginBottom: 6,
+                                        borderWidth: 1, borderColor: theme.colors.border,
+                                    }}
+                                    onPress={() => handleImportComp(comp)}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700' }}>
+                                            {comp.brand} {comp.model}
+                                        </Text>
+                                        <Text style={{ color: theme.colors.textMuted, fontSize: 11 }}>
+                                            {comp.type}
+                                        </Text>
+                                    </View>
+                                    <Text style={{ color: ACCENT, fontSize: 13, fontWeight: '700' }}>
+                                        {t('shred.import_btn')}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </>
+                )}
             </BPModal>
         </View>
     );

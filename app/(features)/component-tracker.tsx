@@ -405,51 +405,43 @@ export default function ComponentTrackerScreen() {
                     </View>
                 )}
 
-                <View style={styles.compGrid}>
-                    {selectedBike?.components.map((comp) => (
-                        <TouchableOpacity
-                            key={comp.id}
-                            onPress={() => openEditComp(comp)}
-                            activeOpacity={0.8}
-                            style={styles.compCardWrapper}
-                        >
-                            <BPCard style={styles.compCard}>
-                                <View style={styles.compHeader}>
-                                    <Text style={styles.compTypeLabel}>{getTypeLabel(comp.type)}</Text>
-                                    <TouchableOpacity onPress={() => deleteComp(comp.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                        <Text style={{ fontSize: 16 }}>🗑</Text>
-                                    </TouchableOpacity>
-                                </View>
-                                {(comp.brand || comp.model) && (
-                                    <Text style={styles.compBrandModel}>
-                                        {comp.brand} {comp.model}
+                {selectedBike?.components.map((comp) => (
+                    <TouchableOpacity
+                        key={comp.id}
+                        onPress={() => openEditComp(comp)}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.compRow}>
+                            <View style={styles.compRowLeft}>
+                                <Text style={styles.compRowType}>{getTypeLabel(comp.type)}</Text>
+                                {(comp.brand || comp.model) ? (
+                                    <Text style={styles.compRowBrand} numberOfLines={1}>
+                                        {comp.brand} {comp.model}{comp.weight ? ` · ${comp.weight}g` : ''}
                                     </Text>
-                                )}
-                                {comp.weight ? (
-                                    <Text style={styles.compWeight}>{comp.weight}g</Text>
                                 ) : null}
-
-                                {/* Setup values */}
-                                {comp.setupValues.length > 0 && (
-                                    <View style={styles.setupGrid}>
-                                        {comp.setupValues.map((sv, i) => (
-                                            <View key={i} style={styles.setupChip}>
-                                                <Text style={styles.setupKey}>{sv.key}</Text>
-                                                <Text style={[styles.setupVal, { color: ACCENT }]}>
-                                                    {sv.value}{sv.unit}
-                                                </Text>
-                                            </View>
-                                        ))}
-                                    </View>
-                                )}
-
-                                {comp.notes ? (
-                                    <Text style={styles.compNotes}>{comp.notes}</Text>
-                                ) : null}
-                            </BPCard>
-                        </TouchableOpacity>
-                    ))}
-                </View>
+                            </View>
+                            {comp.setupValues.length > 0 && (
+                                <View style={styles.compRowChips}>
+                                    {comp.setupValues.slice(0, 3).map((sv, i) => (
+                                        <Text key={i} style={styles.compRowChip}>
+                                            <Text style={styles.compRowChipKey}>{sv.key} </Text>
+                                            <Text style={[styles.compRowChipVal, { color: ACCENT }]}>{sv.value}{sv.unit}</Text>
+                                        </Text>
+                                    ))}
+                                    {comp.setupValues.length > 3 && (
+                                        <Text style={styles.compRowChipMore}>+{comp.setupValues.length - 3}</Text>
+                                    )}
+                                </View>
+                            )}
+                            {comp.notes ? (
+                                <Text style={styles.compRowNotes} numberOfLines={1}>{comp.notes}</Text>
+                            ) : null}
+                            <TouchableOpacity onPress={() => deleteComp(comp.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.compRowDelete}>
+                                <Text style={{ fontSize: 14 }}>🗑</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                ))}
             </ScrollView>
 
             {/* Bike Modal */}
@@ -546,29 +538,41 @@ const styles = StyleSheet.create({
     emptyIcon: { fontSize: 48, marginBottom: theme.spacing.md },
     emptyTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '700' },
     emptySubtitle: { color: theme.colors.textMuted, fontSize: 14, marginTop: 8 },
-    compGrid: {
+    compRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radius.md,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        marginBottom: 6,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        gap: 10,
+        flexWrap: 'wrap',
+    },
+    compRowLeft: {
+        minWidth: 140,
+    },
+    compRowType: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
+    compRowBrand: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 1 },
+    compRowChips: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        marginHorizontal: -6,
+        gap: 4,
+        flex: 1,
     },
-    compCardWrapper: {
-        width: '100%',
-        minWidth: 320,
-        flexGrow: 1,
-        flexShrink: 1,
-        paddingHorizontal: 6,
-        marginBottom: 12,
+    compRowChip: {
+        backgroundColor: theme.colors.elevated,
+        borderRadius: theme.radius.sm,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
     },
-    compCard: { flex: 1, padding: theme.spacing.md },
-    compHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    compTypeLabel: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
-    compBrandModel: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 4 },
-    compWeight: { color: theme.colors.textMuted, fontSize: 11, marginTop: 2 },
-    setupGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: theme.spacing.sm },
-    setupChip: { backgroundColor: theme.colors.elevated, borderRadius: theme.radius.sm, paddingHorizontal: 10, paddingVertical: 5, flexDirection: 'row', gap: 4, alignItems: 'center' },
-    setupKey: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-    setupVal: { fontSize: 13, fontWeight: '800' },
-    compNotes: { color: theme.colors.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: theme.spacing.sm },
+    compRowChipKey: { color: theme.colors.textMuted, fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
+    compRowChipVal: { fontSize: 11, fontWeight: '800' },
+    compRowChipMore: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600', alignSelf: 'center' },
+    compRowNotes: { color: theme.colors.textMuted, fontSize: 10, fontStyle: 'italic', flex: 1 },
+    compRowDelete: { padding: 4 },
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     setupSection: { marginTop: theme.spacing.sm, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md },
     setupSectionTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
