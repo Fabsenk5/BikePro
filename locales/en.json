@@ -157,6 +157,7 @@
         "tire_rear_placeholder": "e.g. Maxxis Minion DHR II",
         "pressure": "Air Pressure",
         "travel": "Travel",
+        "stroke": "Stroke (Piston)",
         "rebound": "Rebound",
         "rebound_hsls": "HS/LS Settings",
         "compression": "Compression",

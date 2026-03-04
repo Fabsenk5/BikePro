@@ -41,6 +41,7 @@ interface SuspensionValues {
     psi: number;
     sagPercent: number;
     travel: number;
+    stroke?: number;  // shock-only: actual piston stroke in mm
     // Rebound
     reboundClicks: number;    // clicks-only mode
     reboundLSR: number;       // HS/LS mode
@@ -99,7 +100,7 @@ const defaultFork: SuspensionValues = {
 };
 
 const defaultShock: SuspensionValues = {
-    psi: 200, sagPercent: 30, travel: 165,
+    psi: 200, sagPercent: 30, travel: 140, stroke: 57,
     reboundClicks: 8, reboundLSR: 8, reboundHSR: 3,
     compressionClicks: 8, compressionLever: 'open',
     compressionLSC: 8, compressionHSC: 2,
@@ -324,10 +325,10 @@ export default function DialedInScreen() {
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.shock.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
-                                            {setup.shock.travel && setup.shock.sagPercent ? (
+                                            {setup.shock.stroke && setup.shock.sagPercent ? (
                                                 <Text>
                                                     <Text style={[styles.valueNum, { color: theme.colors.text }]}>
-                                                        {Math.round(setup.shock.travel * (setup.shock.sagPercent / 100))}
+                                                        {Math.round(setup.shock.stroke * (setup.shock.sagPercent / 100))}
                                                     </Text>
                                                     <Text style={styles.valueLabel}> mm </Text>
                                                     <Text style={[styles.valueLabel, { fontStyle: 'italic', fontSize: 10 }]}>
@@ -401,6 +402,9 @@ export default function DialedInScreen() {
                                 <BPSlider label={t('dialed.travel')} value={activeSuspension.travel} min={80} max={220} step={5} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('travel', v)} />
                             </View>
                         </View>
+                        {activeTab === 'shock' && (
+                            <BPSlider label={t('dialed.stroke')} value={activeSuspension.stroke ?? 57} min={30} max={90} step={1} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('stroke', v)} />
+                        )}
 
                         {/* ─── REBOUND CONFIG ─── */}
                         <View style={styles.configSection}>

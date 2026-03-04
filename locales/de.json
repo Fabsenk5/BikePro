@@ -290,6 +290,7 @@
         "tire_rear_placeholder": "z.B. Maxxis Minion DHR II",
         "pressure": "Luftdruck",
         "travel": "Federweg",
+        "stroke": "Hub (Kolben)",
         "rebound": "Zugstufe (Rebound)",
         "rebound_hsls": "HS/LS Einstellungen",
         "compression": "Druckstufe (Compression)",
