@@ -293,8 +293,22 @@ export default function DialedInScreen() {
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.fork.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
-                                            <Text style={styles.valueNum}>{setup.fork.sagPercent}</Text>
-                                            <Text style={styles.valueLabel}>% SAG</Text>
+                                            {setup.fork.travel && setup.fork.sagPercent ? (
+                                                <Text>
+                                                    <Text style={[styles.valueNum, { color: theme.colors.text }]}>
+                                                        {Math.round(setup.fork.travel * (setup.fork.sagPercent / 100))}
+                                                    </Text>
+                                                    <Text style={styles.valueLabel}> mm </Text>
+                                                    <Text style={[styles.valueLabel, { fontStyle: 'italic', fontSize: 10 }]}>
+                                                        ({setup.fork.sagPercent}%)
+                                                    </Text>
+                                                </Text>
+                                            ) : (
+                                                <Text>
+                                                    <Text style={styles.valueNum}>{setup.fork.sagPercent}</Text>
+                                                    <Text style={styles.valueLabel}>% SAG</Text>
+                                                </Text>
+                                            )}
                                         </Text>
                                         <Text style={styles.valueRow}>
                                             <Text style={styles.valueSmall}>{reboundDisplay(setup.fork)}</Text>
@@ -310,8 +324,22 @@ export default function DialedInScreen() {
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.shock.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
-                                            <Text style={styles.valueNum}>{setup.shock.sagPercent}</Text>
-                                            <Text style={styles.valueLabel}>% SAG</Text>
+                                            {setup.shock.travel && setup.shock.sagPercent ? (
+                                                <Text>
+                                                    <Text style={[styles.valueNum, { color: theme.colors.text }]}>
+                                                        {Math.round(setup.shock.travel * (setup.shock.sagPercent / 100))}
+                                                    </Text>
+                                                    <Text style={styles.valueLabel}> mm </Text>
+                                                    <Text style={[styles.valueLabel, { fontStyle: 'italic', fontSize: 10 }]}>
+                                                        ({setup.shock.sagPercent}%)
+                                                    </Text>
+                                                </Text>
+                                            ) : (
+                                                <Text>
+                                                    <Text style={styles.valueNum}>{setup.shock.sagPercent}</Text>
+                                                    <Text style={styles.valueLabel}>% SAG</Text>
+                                                </Text>
+                                            )}
                                         </Text>
                                         <Text style={styles.valueRow}>
                                             <Text style={styles.valueSmall}>{reboundDisplay(setup.shock)}</Text>

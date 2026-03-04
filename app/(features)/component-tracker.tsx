@@ -405,48 +405,51 @@ export default function ComponentTrackerScreen() {
                     </View>
                 )}
 
-                {selectedBike?.components.map((comp) => (
-                    <TouchableOpacity
-                        key={comp.id}
-                        onPress={() => openEditComp(comp)}
-                        activeOpacity={0.8}
-                    >
-                        <BPCard style={styles.compCard}>
-                            <View style={styles.compHeader}>
-                                <Text style={styles.compTypeLabel}>{getTypeLabel(comp.type)}</Text>
-                                <TouchableOpacity onPress={() => deleteComp(comp.id)}>
-                                    <Text style={{ fontSize: 14 }}>🗑</Text>
-                                </TouchableOpacity>
-                            </View>
-                            {(comp.brand || comp.model) && (
-                                <Text style={styles.compBrandModel}>
-                                    {comp.brand} {comp.model}
-                                </Text>
-                            )}
-                            {comp.weight && (
-                                <Text style={styles.compWeight}>{comp.weight}g</Text>
-                            )}
-
-                            {/* Setup values */}
-                            {comp.setupValues.length > 0 && (
-                                <View style={styles.setupGrid}>
-                                    {comp.setupValues.map((sv, i) => (
-                                        <View key={i} style={styles.setupChip}>
-                                            <Text style={styles.setupKey}>{sv.key}</Text>
-                                            <Text style={[styles.setupVal, { color: ACCENT }]}>
-                                                {sv.value}{sv.unit}
-                                            </Text>
-                                        </View>
-                                    ))}
+                <View style={styles.compGrid}>
+                    {selectedBike?.components.map((comp) => (
+                        <TouchableOpacity
+                            key={comp.id}
+                            onPress={() => openEditComp(comp)}
+                            activeOpacity={0.8}
+                            style={styles.compCardWrapper}
+                        >
+                            <BPCard style={styles.compCard}>
+                                <View style={styles.compHeader}>
+                                    <Text style={styles.compTypeLabel}>{getTypeLabel(comp.type)}</Text>
+                                    <TouchableOpacity onPress={() => deleteComp(comp.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                        <Text style={{ fontSize: 16 }}>🗑</Text>
+                                    </TouchableOpacity>
                                 </View>
-                            )}
+                                {(comp.brand || comp.model) && (
+                                    <Text style={styles.compBrandModel}>
+                                        {comp.brand} {comp.model}
+                                    </Text>
+                                )}
+                                {comp.weight ? (
+                                    <Text style={styles.compWeight}>{comp.weight}g</Text>
+                                ) : null}
 
-                            {comp.notes ? (
-                                <Text style={styles.compNotes}>{comp.notes}</Text>
-                            ) : null}
-                        </BPCard>
-                    </TouchableOpacity>
-                ))}
+                                {/* Setup values */}
+                                {comp.setupValues.length > 0 && (
+                                    <View style={styles.setupGrid}>
+                                        {comp.setupValues.map((sv, i) => (
+                                            <View key={i} style={styles.setupChip}>
+                                                <Text style={styles.setupKey}>{sv.key}</Text>
+                                                <Text style={[styles.setupVal, { color: ACCENT }]}>
+                                                    {sv.value}{sv.unit}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+
+                                {comp.notes ? (
+                                    <Text style={styles.compNotes}>{comp.notes}</Text>
+                                ) : null}
+                            </BPCard>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </ScrollView>
 
             {/* Bike Modal */}
@@ -543,7 +546,20 @@ const styles = StyleSheet.create({
     emptyIcon: { fontSize: 48, marginBottom: theme.spacing.md },
     emptyTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '700' },
     emptySubtitle: { color: theme.colors.textMuted, fontSize: 14, marginTop: 8 },
-    compCard: { marginBottom: theme.spacing.sm, padding: theme.spacing.md },
+    compGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginHorizontal: -6,
+    },
+    compCardWrapper: {
+        width: '100%',
+        minWidth: 320,
+        flexGrow: 1,
+        flexShrink: 1,
+        paddingHorizontal: 6,
+        marginBottom: 12,
+    },
+    compCard: { flex: 1, padding: theme.spacing.md },
     compHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     compTypeLabel: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
     compBrandModel: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 4 },
