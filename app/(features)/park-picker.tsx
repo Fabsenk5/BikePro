@@ -8,8 +8,9 @@
  */
 import { BPCard, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Linking,
     RefreshControl,
@@ -22,6 +23,7 @@ import {
 } from 'react-native';
 
 const ACCENT = '#A8E10C'; // Park-Picker accent
+const FAVORITES_KEY = '@bikepro_park_favorites';
 
 // --- Bikepark data ---
 interface Bikepark {
@@ -582,18 +584,38 @@ function getGoLabel(score: number): { label: string; color: string } {
 export default function ParkPickerScreen() {
     const [region, setRegion] = useState('all');
     const [refreshing, setRefreshing] = useState(false);
+    const [favorites, setFavorites] = useState<string[]>([]);
 
-    const filtered =
-        region === 'all'
+    useEffect(() => {
+        AsyncStorage.getItem(FAVORITES_KEY).then(data => {
+            if (data) setFavorites(JSON.parse(data));
+        });
+    }, []);
+
+    const toggleFavorite = async (parkId: string) => {
+        const updated = favorites.includes(parkId)
+            ? favorites.filter(id => id !== parkId)
+            : [...favorites, parkId];
+        setFavorites(updated);
+        await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+    };
+
+    const filtered = region === 'favorites'
+        ? bikeparks.filter(p => favorites.includes(p.id))
+        : region === 'all'
             ? bikeparks
             : bikeparks.filter((p) => countryMap[p.country] === region);
 
-    // Sort by Go-Score desc
-    const sorted = [...filtered].sort((a, b) => getGoScore(b) - getGoScore(a));
+    // Sort: favorites first, then by Go-Score desc
+    const sorted = [...filtered].sort((a, b) => {
+        const aFav = favorites.includes(a.id) ? 1 : 0;
+        const bFav = favorites.includes(b.id) ? 1 : 0;
+        if (bFav !== aFav) return bFav - aFav;
+        return getGoScore(b) - getGoScore(a);
+    });
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
-        // TODO: Fetch live weather data from OpenWeatherMap API
         setTimeout(() => setRefreshing(false), 1000);
     }, []);
 
@@ -618,7 +640,10 @@ export default function ParkPickerScreen() {
                 {/* Region filter */}
                 <BPPicker
                     label="Region"
-                    options={regionFilter}
+                    options={[
+                        { label: '⭐ Favoriten (' + favorites.length + ')', value: 'favorites' },
+                        ...regionFilter,
+                    ]}
                     value={region}
                     onValueChange={setRegion}
                     accentColor={ACCENT}
@@ -649,6 +674,15 @@ export default function ParkPickerScreen() {
                                         </Text>
                                         <Text style={styles.parkRegion}>{park.region}</Text>
                                     </View>
+                                    <TouchableOpacity
+                                        onPress={(e) => { e.stopPropagation?.(); toggleFavorite(park.id); }}
+                                        style={styles.favBtn}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    >
+                                        <Text style={styles.favIcon}>
+                                            {favorites.includes(park.id) ? '❤️' : '🤍'}
+                                        </Text>
+                                    </TouchableOpacity>
                                     <View style={[styles.goBadge, { backgroundColor: go.color + '20', borderColor: go.color }]}>
                                         <Text style={[styles.goText, { color: go.color }]}>{go.label}</Text>
                                     </View>
@@ -805,5 +839,12 @@ const styles = StyleSheet.create({
         color: ACCENT,
         fontSize: 12,
         fontWeight: '700',
+    },
+    favBtn: {
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+    },
+    favIcon: {
+        fontSize: 20,
     },
 });

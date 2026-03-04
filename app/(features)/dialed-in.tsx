@@ -1,16 +1,16 @@
 /**
- * F1: Dialed-In — Fahrwerks-Log (Enhanced V2)
- * Agent Manifest: f1_dialed_in.md
+ * F1: Dialed-In — Fahrwerks-Log (V3)
  *
- * CRUD für Fahrwerks-Setups mit erweiterten Parametern:
- * - PSI, SAG%, Federweg
- * - Rebound (Low-Speed / High-Speed)
- * - Compression (Low-Speed / High-Speed)
- * - Volume Spacer / Tokens
- * - Reifendruck (Front/Rear)
+ * Flexible Suspension Settings:
+ * - Rebound: Clicks-only OR Low-Speed/High-Speed
+ * - Compression: Clicks-only OR Lever (Open/Mid/Closed) OR Low-Speed/High-Speed
+ * - PSI, SAG%, Travel, Tokens
+ * - Tire setup (Front/Rear)
+ * - Bike integration with Component Tracker
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
+import { loadFromStorage } from '@/lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ import {
     ScrollView,
     StatusBar,
     StyleSheet,
+    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -26,16 +27,32 @@ import {
 
 const ACCENT = '#FF6B2C';
 const STORAGE_KEY = '@bikepro_setups';
+const BIKES_KEY = '@bikepro_bikes';
 
 // --- Types ---
+type ReboundMode = 'clicks' | 'hsls';
+type CompressionMode = 'clicks' | 'lever' | 'hsls';
+
+interface SuspensionConfig {
+    reboundMode: ReboundMode;
+    compressionMode: CompressionMode;
+}
+
 interface SuspensionValues {
     psi: number;
     sagPercent: number;
     travel: number;
-    reboundLSR: number;
-    reboundHSR: number;
-    compressionLSC: number;
-    compressionHSC: number;
+    // Rebound
+    reboundClicks: number;    // clicks-only mode
+    reboundLSR: number;       // HS/LS mode
+    reboundHSR: number;       // HS/LS mode
+    // Compression
+    compressionClicks: number; // clicks-only mode
+    compressionLever: string;  // lever mode: 'open' | 'mid' | 'closed'
+    compressionLSC: number;    // HS/LS mode
+    compressionHSC: number;    // HS/LS mode
+    // Config
+    config: SuspensionConfig;
     tokens: number;
 }
 
@@ -52,7 +69,8 @@ interface Setup {
     id: string;
     name: string;
     location: string;
-    bikeType: string;
+    bikeId: string;       // linked to Component Tracker bike
+    bikeName: string;     // display name (cached)
     fork: SuspensionValues;
     shock: SuspensionValues;
     tires: TireSetup;
@@ -60,72 +78,101 @@ interface Setup {
     createdAt: string;
 }
 
+// Bike type from Component Tracker
+interface TrackerBike {
+    id: string;
+    name: string;
+    type: string;
+    model: string;
+    year: string;
+    size: string;
+    components: any[];
+}
+
+const defaultConfig: SuspensionConfig = { reboundMode: 'clicks', compressionMode: 'clicks' };
+
 const defaultFork: SuspensionValues = {
     psi: 80, sagPercent: 20, travel: 170,
-    reboundLSR: 10, reboundHSR: 5,
+    reboundClicks: 10, reboundLSR: 10, reboundHSR: 5,
+    compressionClicks: 10, compressionLever: 'open',
     compressionLSC: 10, compressionHSC: 3,
-    tokens: 1,
+    config: { ...defaultConfig }, tokens: 1,
 };
 
 const defaultShock: SuspensionValues = {
     psi: 200, sagPercent: 30, travel: 165,
-    reboundLSR: 8, reboundHSR: 3,
+    reboundClicks: 8, reboundLSR: 8, reboundHSR: 3,
+    compressionClicks: 8, compressionLever: 'open',
     compressionLSC: 8, compressionHSC: 2,
-    tokens: 1,
+    config: { ...defaultConfig }, tokens: 1,
 };
 
 const defaultTires: TireSetup = {
-    frontBar: 1.7, rearBar: 1.9,
-    frontWidth: '2.5', rearWidth: '2.4',
+    frontBar: 1.7, rearBar: 1.9, frontWidth: '2.5', rearWidth: '2.4',
     frontTire: '', rearTire: '',
 };
 
 const tokenOptions = [
-    { label: '0', value: '0' },
-    { label: '1', value: '1' },
-    { label: '2', value: '2' },
-    { label: '3', value: '3' },
-    { label: '4', value: '4' },
-    { label: '5', value: '5' },
+    { label: '0', value: '0' }, { label: '1', value: '1' }, { label: '2', value: '2' },
+    { label: '3', value: '3' }, { label: '4', value: '4' }, { label: '5', value: '5' },
 ];
 
-const bikeTypeOptions = [
-    { label: '🚵 Enduro', value: 'enduro' },
-    { label: '⛰️ Downhill', value: 'downhill' },
-    { label: '🌲 Trail', value: 'trail' },
-    { label: '⚡ E-MTB', value: 'emtb' },
-    { label: '🏁 XC', value: 'xc' },
+const leverOptions = [
+    { label: '🟢 Offen', value: 'open' },
+    { label: '🟡 Mitte', value: 'mid' },
+    { label: '🔴 Geschlossen', value: 'closed' },
 ];
 
 const tireWidthOptions = [
-    { label: '2.3"', value: '2.3' },
-    { label: '2.35"', value: '2.35' },
-    { label: '2.4"', value: '2.4' },
-    { label: '2.5"', value: '2.5' },
-    { label: '2.6"', value: '2.6' },
+    { label: '2.3"', value: '2.3' }, { label: '2.35"', value: '2.35' },
+    { label: '2.4"', value: '2.4' }, { label: '2.5"', value: '2.5' }, { label: '2.6"', value: '2.6' },
 ];
+
+// Helper: render rebound display text for card
+function reboundDisplay(sus: SuspensionValues): string {
+    const cfg = sus.config ?? defaultConfig;
+    if (cfg.reboundMode === 'hsls') return `LSR ${sus.reboundLSR}  HSR ${sus.reboundHSR}`;
+    return `Rebound ${sus.reboundClicks} Clicks`;
+}
+
+// Helper: render compression display text for card
+function compDisplay(sus: SuspensionValues): string {
+    const cfg = sus.config ?? defaultConfig;
+    if (cfg.compressionMode === 'hsls') return `LSC ${sus.compressionLSC}  HSC ${sus.compressionHSC}`;
+    if (cfg.compressionMode === 'lever') {
+        const lbl = leverOptions.find(l => l.value === sus.compressionLever)?.label ?? sus.compressionLever;
+        return `Comp: ${lbl}`;
+    }
+    return `Comp ${sus.compressionClicks} Clicks`;
+}
 
 export default function DialedInScreen() {
     const [setups, setSetups] = useState<Setup[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
+    const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
 
     const [name, setName] = useState('');
     const [location, setLocation] = useState('');
-    const [bikeType, setBikeType] = useState('enduro');
+    const [bikeId, setBikeId] = useState('');
     const [notes, setNotes] = useState('');
     const [fork, setFork] = useState<SuspensionValues>({ ...defaultFork });
     const [shock, setShock] = useState<SuspensionValues>({ ...defaultShock });
     const [tires, setTires] = useState<TireSetup>({ ...defaultTires });
     const [activeTab, setActiveTab] = useState<'fork' | 'shock' | 'tires'>('fork');
 
-    useEffect(() => { loadSetups(); }, []);
+    useEffect(() => { loadSetups(); loadBikes(); }, []);
 
     const loadSetups = async () => {
         try {
             const data = await AsyncStorage.getItem(STORAGE_KEY);
             if (data) setSetups(JSON.parse(data));
         } catch (e) { console.warn('Failed to load setups:', e); }
+    };
+
+    const loadBikes = async () => {
+        const bikes = await loadFromStorage<TrackerBike>(BIKES_KEY);
+        setTrackerBikes(bikes);
     };
 
     const saveSetups = async (updated: Setup[]) => {
@@ -135,10 +182,24 @@ export default function DialedInScreen() {
         } catch (e) { console.warn('Failed to save setups:', e); }
     };
 
+    const bikeOptions = [
+        { label: '— Kein Bike zugeordnet —', value: '' },
+        ...trackerBikes.map(b => ({
+            label: `${b.name} (${b.size ?? ''} ${b.model})`,
+            value: b.id,
+        })),
+    ];
+
+    const getSelectedBikeName = () => {
+        if (!bikeId) return '';
+        return trackerBikes.find(b => b.id === bikeId)?.name ?? '';
+    };
+
     const openNewSetup = () => {
         setEditingSetup(null);
-        setName(''); setLocation(''); setNotes(''); setBikeType('enduro');
-        setFork({ ...defaultFork }); setShock({ ...defaultShock });
+        setName(''); setLocation(''); setNotes(''); setBikeId('');
+        setFork({ ...defaultFork, config: { ...defaultConfig } });
+        setShock({ ...defaultShock, config: { ...defaultConfig } });
         setTires({ ...defaultTires }); setActiveTab('fork');
         setModalVisible(true);
     };
@@ -146,9 +207,9 @@ export default function DialedInScreen() {
     const openEditSetup = (setup: Setup) => {
         setEditingSetup(setup);
         setName(setup.name); setLocation(setup.location);
-        setNotes(setup.notes); setBikeType(setup.bikeType || 'enduro');
-        setFork({ ...defaultFork, ...setup.fork });
-        setShock({ ...defaultShock, ...setup.shock });
+        setNotes(setup.notes); setBikeId(setup.bikeId || '');
+        setFork({ ...defaultFork, ...setup.fork, config: { ...defaultConfig, ...setup.fork?.config } });
+        setShock({ ...defaultShock, ...setup.shock, config: { ...defaultConfig, ...setup.shock?.config } });
         setTires({ ...defaultTires, ...setup.tires });
         setActiveTab('fork');
         setModalVisible(true);
@@ -158,7 +219,8 @@ export default function DialedInScreen() {
         if (!name.trim()) return;
         const setupData: Setup = {
             id: editingSetup?.id ?? Date.now().toString(),
-            name: name.trim(), location: location.trim(), bikeType,
+            name: name.trim(), location: location.trim(),
+            bikeId, bikeName: getSelectedBikeName(),
             fork, shock, tires, notes: notes.trim(),
             createdAt: editingSetup?.createdAt ?? new Date().toISOString(),
         };
@@ -182,9 +244,20 @@ export default function DialedInScreen() {
     const activeSuspension = activeTab === 'fork' ? fork : activeTab === 'shock' ? shock : null;
     const setActiveSuspension = activeTab === 'fork' ? setFork : setShock;
 
-    const updateSusValue = (key: keyof SuspensionValues, val: number) => {
-        if (activeSuspension) setActiveSuspension(prev => ({ ...prev, [key]: val }));
+    const updateSusValue = (key: keyof SuspensionValues, val: any) => {
+        if (activeSuspension) setActiveSuspension((prev: SuspensionValues) => ({ ...prev, [key]: val }));
     };
+
+    const updateConfig = (key: keyof SuspensionConfig, val: any) => {
+        if (activeSuspension) {
+            setActiveSuspension((prev: SuspensionValues) => ({
+                ...prev,
+                config: { ...prev.config, [key]: val },
+            }));
+        }
+    };
+
+    const activeConfig = activeSuspension?.config ?? defaultConfig;
 
     return (
         <View style={styles.container}>
@@ -207,6 +280,9 @@ export default function DialedInScreen() {
                                 <View style={styles.cardHeader}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.cardTitle}>{setup.name}</Text>
+                                        {setup.bikeName ? (
+                                            <Text style={styles.cardBike}>🚵 {setup.bikeName}</Text>
+                                        ) : null}
                                         {setup.location ? <Text style={styles.cardLocation}>📍 {setup.location}</Text> : null}
                                     </View>
                                     <TouchableOpacity onPress={() => handleDelete(setup.id)}>
@@ -221,23 +297,15 @@ export default function DialedInScreen() {
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.fork.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
-                                            <Text style={styles.valueNum}>{setup.fork.sagPercent ?? '?'}</Text>
+                                            <Text style={styles.valueNum}>{setup.fork.sagPercent}</Text>
                                             <Text style={styles.valueLabel}>% SAG</Text>
                                         </Text>
                                         <Text style={styles.valueRow}>
-                                            <Text style={styles.valueLabel}>LSR </Text>
-                                            <Text style={styles.valueNum}>{setup.fork.reboundLSR ?? setup.fork.reboundClicks ?? '—'}</Text>
-                                            <Text style={styles.valueLabel}>  LSC </Text>
-                                            <Text style={styles.valueNum}>{setup.fork.compressionLSC ?? setup.fork.compressionClicks ?? '—'}</Text>
+                                            <Text style={styles.valueSmall}>{reboundDisplay(setup.fork)}</Text>
                                         </Text>
-                                        {(setup.fork.reboundHSR > 0 || setup.fork.compressionHSC > 0) && (
-                                            <Text style={styles.valueRow}>
-                                                <Text style={styles.valueLabel}>HSR </Text>
-                                                <Text style={styles.valueNum}>{setup.fork.reboundHSR}</Text>
-                                                <Text style={styles.valueLabel}>  HSC </Text>
-                                                <Text style={styles.valueNum}>{setup.fork.compressionHSC}</Text>
-                                            </Text>
-                                        )}
+                                        <Text style={styles.valueRow}>
+                                            <Text style={styles.valueSmall}>{compDisplay(setup.fork)}</Text>
+                                        </Text>
                                     </View>
 
                                     {/* Shock */}
@@ -246,27 +314,18 @@ export default function DialedInScreen() {
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.shock.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
-                                            <Text style={styles.valueNum}>{setup.shock.sagPercent ?? '?'}</Text>
+                                            <Text style={styles.valueNum}>{setup.shock.sagPercent}</Text>
                                             <Text style={styles.valueLabel}>% SAG</Text>
                                         </Text>
                                         <Text style={styles.valueRow}>
-                                            <Text style={styles.valueLabel}>LSR </Text>
-                                            <Text style={styles.valueNum}>{setup.shock.reboundLSR ?? setup.shock.reboundClicks ?? '—'}</Text>
-                                            <Text style={styles.valueLabel}>  LSC </Text>
-                                            <Text style={styles.valueNum}>{setup.shock.compressionLSC ?? setup.shock.compressionClicks ?? '—'}</Text>
+                                            <Text style={styles.valueSmall}>{reboundDisplay(setup.shock)}</Text>
                                         </Text>
-                                        {(setup.shock.reboundHSR > 0 || setup.shock.compressionHSC > 0) && (
-                                            <Text style={styles.valueRow}>
-                                                <Text style={styles.valueLabel}>HSR </Text>
-                                                <Text style={styles.valueNum}>{setup.shock.reboundHSR}</Text>
-                                                <Text style={styles.valueLabel}>  HSC </Text>
-                                                <Text style={styles.valueNum}>{setup.shock.compressionHSC}</Text>
-                                            </Text>
-                                        )}
+                                        <Text style={styles.valueRow}>
+                                            <Text style={styles.valueSmall}>{compDisplay(setup.shock)}</Text>
+                                        </Text>
                                     </View>
                                 </View>
 
-                                {/* Tire pressures */}
                                 {setup.tires && (
                                     <View style={styles.tiresRow}>
                                         <Text style={styles.tireText}>🛞 VR: {setup.tires.frontBar?.toFixed(1) ?? '?'} bar</Text>
@@ -285,7 +344,9 @@ export default function DialedInScreen() {
             <BPModal visible={modalVisible} onClose={() => setModalVisible(false)} title={editingSetup ? 'Setup bearbeiten' : 'Neues Setup'}>
                 <BPInput label="Setup-Name" placeholder="z.B. Winterberg Enduro" value={name} onChangeText={setName} accentColor={ACCENT} />
                 <BPInput label="Location / Trail" placeholder="z.B. Winterberg DH1" value={location} onChangeText={setLocation} accentColor={ACCENT} />
-                <BPPicker label="Bike-Typ" options={bikeTypeOptions} value={bikeType} onValueChange={setBikeType} accentColor={ACCENT} />
+
+                {/* Bike Integration */}
+                <BPPicker label="🚵 Bike (Component Tracker)" options={bikeOptions} value={bikeId} onValueChange={setBikeId} accentColor={ACCENT} />
 
                 {/* Component Tab */}
                 <BPPicker
@@ -317,24 +378,66 @@ export default function DialedInScreen() {
                             </View>
                         </View>
 
-                        <Text style={styles.subSectionTitle}>Zugstufe (Rebound)</Text>
-                        <View style={styles.inputRow}>
-                            <View style={{ flex: 1 }}>
-                                <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
+                        {/* ─── REBOUND CONFIG ─── */}
+                        <View style={styles.configSection}>
+                            <Text style={styles.subSectionTitle}>Zugstufe (Rebound)</Text>
+                            <View style={styles.configToggle}>
+                                <Text style={styles.configLabel}>HS/LS Einstellungen</Text>
+                                <Switch
+                                    value={activeConfig.reboundMode === 'hsls'}
+                                    onValueChange={v => updateConfig('reboundMode', v ? 'hsls' : 'clicks')}
+                                    trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
+                                    thumbColor={activeConfig.reboundMode === 'hsls' ? ACCENT : theme.colors.textMuted}
+                                />
                             </View>
-                            <View style={{ flex: 1 }}>
-                                <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={15} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
-                            </View>
+
+                            {activeConfig.reboundMode === 'clicks' ? (
+                                <BPSlider label="Rebound Clicks" value={activeSuspension.reboundClicks} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundClicks', v)} />
+                            ) : (
+                                <View style={styles.inputRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={15} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
+                                    </View>
+                                </View>
+                            )}
                         </View>
 
-                        <Text style={styles.subSectionTitle}>Druckstufe (Compression)</Text>
-                        <View style={styles.inputRow}>
-                            <View style={{ flex: 1 }}>
-                                <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={15} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
-                            </View>
+                        {/* ─── COMPRESSION CONFIG ─── */}
+                        <View style={styles.configSection}>
+                            <Text style={styles.subSectionTitle}>Druckstufe (Compression)</Text>
+                            <BPPicker
+                                label="Einstellungsart"
+                                options={[
+                                    { label: '🔢 Clicks', value: 'clicks' },
+                                    { label: '🔀 Lever (Auf/Zu)', value: 'lever' },
+                                    { label: '⚙️ HS / LS', value: 'hsls' },
+                                ]}
+                                value={activeConfig.compressionMode}
+                                onValueChange={v => updateConfig('compressionMode', v)}
+                                accentColor={ACCENT}
+                            />
+
+                            {activeConfig.compressionMode === 'clicks' && (
+                                <BPSlider label="Compression Clicks" value={activeSuspension.compressionClicks} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionClicks', v)} />
+                            )}
+
+                            {activeConfig.compressionMode === 'lever' && (
+                                <BPPicker label="Lever-Position" options={leverOptions} value={activeSuspension.compressionLever} onValueChange={v => updateSusValue('compressionLever', v)} accentColor={ACCENT} />
+                            )}
+
+                            {activeConfig.compressionMode === 'hsls' && (
+                                <View style={styles.inputRow}>
+                                    <View style={{ flex: 1 }}>
+                                        <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={15} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
+                                    </View>
+                                </View>
+                            )}
                         </View>
 
                         <BPPicker label="Volume Spacer / Tokens" options={tokenOptions} value={activeSuspension.tokens.toString()} onValueChange={v => updateSusValue('tokens', parseInt(v, 10))} accentColor={ACCENT} />
@@ -388,18 +491,23 @@ const styles = StyleSheet.create({
     setupCard: { marginTop: theme.spacing.md, padding: theme.spacing.md },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     cardTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '700', flex: 1 },
+    cardBike: { color: ACCENT, fontSize: 12, fontWeight: '700', marginTop: 2 },
     deleteBtn: { fontSize: 18, padding: 4 },
-    cardLocation: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 4 },
+    cardLocation: { color: theme.colors.textSecondary, fontSize: 13, marginTop: 2 },
     valuesGrid: { flexDirection: 'row', marginTop: theme.spacing.md, gap: theme.spacing.sm },
     valueCol: { flex: 1, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: theme.spacing.sm },
     valueColTitle: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, textAlign: 'center' },
     valueRow: { textAlign: 'center', marginVertical: 2 },
     valueLabel: { color: theme.colors.textMuted, fontSize: 11, fontWeight: '600' },
     valueNum: { color: theme.colors.text, fontSize: 13, fontWeight: '800' },
+    valueSmall: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600' },
     tiresRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: theme.spacing.sm },
     tireText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
     cardNotes: { color: theme.colors.textMuted, fontSize: 12, fontStyle: 'italic', marginTop: theme.spacing.sm },
     modalActions: { marginTop: theme.spacing.lg },
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     subSectionTitle: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginTop: theme.spacing.md, marginBottom: 4 },
+    configSection: { backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: theme.spacing.sm, marginTop: theme.spacing.sm },
+    configToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm },
+    configLabel: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
 });
