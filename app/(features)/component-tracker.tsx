@@ -47,6 +47,7 @@ interface Bike {
     type: string;
     model: string;
     year: string;
+    size: string;
     components: Component[];
 }
 
@@ -57,6 +58,15 @@ const bikeTypeOptions = [
     { label: '⚡ E-MTB', value: 'emtb' },
     { label: '🏁 XC / Race', value: 'xc' },
     { label: '🦘 Dirt / Slopestyle', value: 'dirt' },
+];
+
+const bikeSizeOptions = [
+    { label: 'XS', value: 'XS' },
+    { label: 'S', value: 'S' },
+    { label: 'M', value: 'M' },
+    { label: 'L', value: 'L' },
+    { label: 'XL', value: 'XL' },
+    { label: 'XXL', value: 'XXL' },
 ];
 
 const componentTypes = [
@@ -170,6 +180,7 @@ export default function ComponentTrackerScreen() {
     const [bikeType, setBikeType] = useState('enduro');
     const [bikeModel, setBikeModel] = useState('');
     const [bikeYear, setBikeYear] = useState('2024');
+    const [bikeSize, setBikeSize] = useState('L');
 
     // Component form
     const [compType, setCompType] = useState('handlebar');
@@ -178,6 +189,7 @@ export default function ComponentTrackerScreen() {
     const [compWeight, setCompWeight] = useState('');
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
+    const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
 
     useEffect(() => {
         loadFromStorage<Bike>(BIKES_KEY).then((data) => {
@@ -200,6 +212,7 @@ export default function ComponentTrackerScreen() {
         setBikeType('enduro');
         setBikeModel('');
         setBikeYear('2024');
+        setBikeSize('L');
         setBikeModalVisible(true);
     };
 
@@ -209,6 +222,7 @@ export default function ComponentTrackerScreen() {
         setBikeType(bike.type);
         setBikeModel(bike.model);
         setBikeYear(bike.year);
+        setBikeSize(bike.size ?? 'L');
         setBikeModalVisible(true);
     };
 
@@ -220,6 +234,7 @@ export default function ComponentTrackerScreen() {
             type: bikeType,
             model: bikeModel.trim(),
             year: bikeYear,
+            size: bikeSize,
             components: editingBike?.components ?? [],
         };
         let updated: Bike[];
@@ -257,6 +272,7 @@ export default function ComponentTrackerScreen() {
         setCompWeight('');
         setCompNotes('');
         setCompSetup(defaultSetupKeys['handlebar']?.map(s => ({ ...s })) ?? []);
+        setCompMoveToBikeId('');
         setCompModalVisible(true);
     };
 
@@ -268,6 +284,7 @@ export default function ComponentTrackerScreen() {
         setCompWeight(comp.weight);
         setCompNotes(comp.notes);
         setCompSetup(comp.setupValues.map(s => ({ ...s })));
+        setCompMoveToBikeId('');
         setCompModalVisible(true);
     };
 
@@ -295,16 +312,36 @@ export default function ComponentTrackerScreen() {
             notes: compNotes.trim(),
         };
 
-        const updatedBike = { ...selectedBike };
-        if (editingComp) {
-            updatedBike.components = updatedBike.components.map(c =>
-                c.id === editingComp.id ? compData : c
+        let updatedBikes = [...bikes];
+
+        // Move to different bike?
+        if (editingComp && compMoveToBikeId && compMoveToBikeId !== selectedBike.id) {
+            // Remove from current bike
+            updatedBikes = updatedBikes.map(b =>
+                b.id === selectedBike.id
+                    ? { ...b, components: b.components.filter(c => c.id !== editingComp.id) }
+                    : b
+            );
+            // Add to target bike
+            updatedBikes = updatedBikes.map(b =>
+                b.id === compMoveToBikeId
+                    ? { ...b, components: [...b.components, compData] }
+                    : b
             );
         } else {
-            updatedBike.components = [...updatedBike.components, compData];
+            // Normal save (edit or create on current bike)
+            const updatedBike = { ...selectedBike };
+            if (editingComp) {
+                updatedBike.components = updatedBike.components.map(c =>
+                    c.id === editingComp.id ? compData : c
+                );
+            } else {
+                updatedBike.components = [...updatedBike.components, compData];
+            }
+            updatedBikes = updatedBikes.map(b => b.id === selectedBike.id ? updatedBike : b);
         }
 
-        persist(bikes.map(b => b.id === selectedBike.id ? updatedBike : b));
+        persist(updatedBikes);
         setCompModalVisible(false);
     };
 
@@ -382,7 +419,7 @@ export default function ComponentTrackerScreen() {
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.bikeName}>{selectedBike.name}</Text>
                                 <Text style={styles.bikeInfo}>
-                                    {selectedBike.model} • {selectedBike.year} • {bikeTypeOptions.find(t => t.value === selectedBike.type)?.label}
+                                    {selectedBike.model} • {selectedBike.year} • Gr. {selectedBike.size ?? '–'} • {bikeTypeOptions.find(t => t.value === selectedBike.type)?.label}
                                 </Text>
                             </View>
                             <View style={styles.bikeActions}>
@@ -469,7 +506,10 @@ export default function ComponentTrackerScreen() {
             >
                 <BPInput label="Bike-Name" placeholder="z.B. Canyon Torque" value={bikeName} onChangeText={setBikeName} accentColor={ACCENT} />
                 <BPPicker label="Typ" options={bikeTypeOptions} value={bikeType} onValueChange={setBikeType} accentColor={ACCENT} />
-                <BPInput label="Modell" placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} />
+                <View style={styles.inputRow}>
+                    <BPInput label="Modell" placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 2 }} />
+                    <BPPicker label="Größe" options={bikeSizeOptions} value={bikeSize} onValueChange={setBikeSize} accentColor={ACCENT} />
+                </View>
                 <BPInput label="Baujahr" placeholder="2024" value={bikeYear} onChangeText={setBikeYear} keyboardType="numeric" accentColor={ACCENT} />
                 <View style={{ marginTop: theme.spacing.lg }}>
                     <BPButton title="Speichern" onPress={saveBike} color={ACCENT} fullWidth size="lg" disabled={!bikeName.trim()} />
@@ -508,6 +548,27 @@ export default function ComponentTrackerScreen() {
                 )}
 
                 <BPInput label="Notizen" placeholder="..." value={compNotes} onChangeText={setCompNotes} multiline numberOfLines={2} accentColor={ACCENT} />
+
+                {/* Move to different bike (only when editing and >1 bike exists) */}
+                {editingComp && bikes.length > 1 && (
+                    <View style={styles.moveSection}>
+                        <Text style={styles.moveSectionTitle}>🔄 An anderes Bike verschieben</Text>
+                        <BPPicker
+                            label="Ziel-Bike"
+                            options={[
+                                { label: `📌 Aktuell: ${selectedBike?.name}`, value: '' },
+                                ...bikes.filter(b => b.id !== selectedBikeId).map(b => ({
+                                    label: `→ ${b.name} (${b.size ?? ''})`,
+                                    value: b.id,
+                                })),
+                            ]}
+                            value={compMoveToBikeId}
+                            onValueChange={setCompMoveToBikeId}
+                            accentColor={ACCENT}
+                        />
+                    </View>
+                )}
+
                 <View style={{ marginTop: theme.spacing.lg }}>
                     <BPButton title="Speichern" onPress={saveComp} color={ACCENT} fullWidth size="lg" />
                 </View>
@@ -544,4 +605,6 @@ const styles = StyleSheet.create({
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     setupSection: { marginTop: theme.spacing.sm, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md },
     setupSectionTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
+    moveSection: { marginTop: theme.spacing.md, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, borderWidth: 1, borderColor: ACCENT + '40' },
+    moveSectionTitle: { color: ACCENT, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
 });
