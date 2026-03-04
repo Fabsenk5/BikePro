@@ -7,7 +7,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { loadFromStorage, saveToStorage } from '@/lib/supabase';
+import { syncLoadBikes, syncSaveBikes } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -21,7 +21,6 @@ import {
 } from 'react-native';
 
 const ACCENT = '#26A69A';
-const BIKES_KEY = '@bikepro_bikes';
 
 // --- Types ---
 interface SetupValue {
@@ -192,14 +191,14 @@ export default function ComponentTrackerScreen() {
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
 
     useEffect(() => {
-        loadFromStorage<Bike>(BIKES_KEY).then((data) => {
+        syncLoadBikes().then((data) => {
             setBikes(data);
             if (data.length > 0) setSelectedBikeId(data[0].id);
         });
     }, []);
 
     const persist = async (updated: Bike[]) => {
-        await saveToStorage(BIKES_KEY, updated);
+        await syncSaveBikes(updated);
         setBikes(updated);
     };
 

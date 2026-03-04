@@ -5,7 +5,6 @@
 import { BPButton, BPCard } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
-import { loadFromStorage } from '@/lib/supabase';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -26,10 +25,9 @@ export default function ProfileScreen() {
     const [componentCount, setComponentCount] = useState(0);
 
     useEffect(() => {
-        // Load stats from local storage
-        loadFromStorage('@bikepro_rides').then((d) => setRideCount(d.length));
-        loadFromStorage('@bikepro_setups').then((d) => setSetupCount(d.length));
-        loadFromStorage('@bikepro_components').then((d) => setComponentCount(d.length));
+        syncLoadTable('rides', '@bikepro_rides').then((d) => setRideCount(d.length));
+        syncLoadTable('suspension_setups', '@bikepro_setups').then((d) => setSetupCount(d.length));
+        syncLoadPreference<any[]>('shred_check', '@bikepro_components').then((d) => setComponentCount(d?.length ?? 0));
     }, [user]);
 
     const handleLogout = async () => {

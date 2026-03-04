@@ -8,7 +8,7 @@
  */
 import { BPCard, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -587,8 +587,8 @@ export default function ParkPickerScreen() {
     const [favorites, setFavorites] = useState<string[]>([]);
 
     useEffect(() => {
-        AsyncStorage.getItem(FAVORITES_KEY).then(data => {
-            if (data) setFavorites(JSON.parse(data));
+        syncLoadPreference<string[]>('park_favorites', FAVORITES_KEY).then(data => {
+            if (data) setFavorites(data);
         });
     }, []);
 
@@ -597,7 +597,7 @@ export default function ParkPickerScreen() {
             ? favorites.filter(id => id !== parkId)
             : [...favorites, parkId];
         setFavorites(updated);
-        await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(updated));
+        await syncSavePreference('park_favorites', FAVORITES_KEY, updated);
     };
 
     const filtered = region === 'favorites'

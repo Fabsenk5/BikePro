@@ -1,7 +1,7 @@
 import FeatureTile from '@/components/FeatureTile';
 import { theme } from '@/constants/Colors';
 import { Feature, features as defaultFeatures } from '@/constants/Features';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -21,18 +21,14 @@ export default function HomeScreen() {
   const [orderedFeatures, setOrderedFeatures] = useState<Feature[]>(defaultFeatures);
   const [selectedTile, setSelectedTile] = useState<number | null>(null);
 
-  // Load saved tile order
   useEffect(() => {
-    AsyncStorage.getItem(TILE_ORDER_KEY).then((data) => {
-      if (data) {
-        const order: string[] = JSON.parse(data);
-        // Reorder based on saved IDs, append any new features at the end
+    syncLoadPreference<string[]>('tile_order', TILE_ORDER_KEY).then((order) => {
+      if (order) {
         const reordered: Feature[] = [];
         order.forEach((id) => {
           const feature = defaultFeatures.find((f) => f.id === id);
           if (feature) reordered.push(feature);
         });
-        // Add any features not in the saved order (new ones)
         defaultFeatures.forEach((f) => {
           if (!reordered.find((r) => r.id === f.id)) reordered.push(f);
         });
@@ -43,7 +39,7 @@ export default function HomeScreen() {
 
   const saveOrder = useCallback(async (features: Feature[]) => {
     const order = features.map((f) => f.id);
-    await AsyncStorage.setItem(TILE_ORDER_KEY, JSON.stringify(order));
+    await syncSavePreference('tile_order', TILE_ORDER_KEY, order);
   }, []);
 
   const handleTilePress = (route: string, ready: boolean, index: number) => {

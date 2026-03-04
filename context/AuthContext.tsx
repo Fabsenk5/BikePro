@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setSession(session);
                 setUser(session?.user ?? null);
                 setIsLoading(false);
+                if (session?.user) migrateLocalToCloud();
             });
 
             const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (error) return { error: error.message };
             setUser(data.user);
             setSession(data.session);
+            migrateLocalToCloud();
             return { error: null };
         } else {
             // Offline mode: simple email/password stored locally

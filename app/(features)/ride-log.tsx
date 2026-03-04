@@ -8,7 +8,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { loadFromStorage, saveToStorage } from '@/lib/supabase';
+import { syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -124,11 +124,11 @@ export default function RideLogScreen() {
     const [notes, setNotes] = useState('');
 
     useEffect(() => {
-        loadFromStorage<Ride>(STORAGE_KEY).then(setRides);
+        syncLoadTable<Ride>('rides', STORAGE_KEY).then(setRides);
     }, []);
 
     const persist = async (updated: Ride[]) => {
-        await saveToStorage(STORAGE_KEY, updated);
+        await syncSaveTable('rides', STORAGE_KEY, updated);
         setRides(updated);
     };
 

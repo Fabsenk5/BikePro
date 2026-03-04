@@ -9,7 +9,6 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPProgressBar } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { loadFromStorage, saveToStorage } from '@/lib/supabase';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -120,11 +119,11 @@ export default function ShredCheckScreen() {
     const [notes, setNotes] = useState('');
 
     useEffect(() => {
-        loadFromStorage<BikeComponent>(STORAGE_KEY).then(setComponents);
+        syncLoadPreference<BikeComponent[]>('shred_check', STORAGE_KEY).then(data => setComponents(data ?? []));
     }, []);
 
     const persist = async (updated: BikeComponent[]) => {
-        await saveToStorage(STORAGE_KEY, updated);
+        await syncSavePreference('shred_check', STORAGE_KEY, updated);
         setComponents(updated);
     };
 

@@ -10,8 +10,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { loadFromStorage } from '@/lib/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncLoadBikes, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -26,8 +25,7 @@ import {
 } from 'react-native';
 
 const ACCENT = '#FF6B2C';
-const STORAGE_KEY = '@bikepro_setups';
-const BIKES_KEY = '@bikepro_bikes';
+const SETUPS_KEY = '@bikepro_setups';
 
 // --- Types ---
 type ReboundMode = 'clicks' | 'hsls';
@@ -164,22 +162,18 @@ export default function DialedInScreen() {
     useEffect(() => { loadSetups(); loadBikes(); }, []);
 
     const loadSetups = async () => {
-        try {
-            const data = await AsyncStorage.getItem(STORAGE_KEY);
-            if (data) setSetups(JSON.parse(data));
-        } catch (e) { console.warn('Failed to load setups:', e); }
+        const data = await syncLoadTable<Setup>('suspension_setups', SETUPS_KEY);
+        setSetups(data);
     };
 
     const loadBikes = async () => {
-        const bikes = await loadFromStorage<TrackerBike>(BIKES_KEY);
+        const bikes = await syncLoadBikes();
         setTrackerBikes(bikes);
     };
 
     const saveSetups = async (updated: Setup[]) => {
-        try {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-            setSetups(updated);
-        } catch (e) { console.warn('Failed to save setups:', e); }
+        await syncSaveTable('suspension_setups', SETUPS_KEY, updated);
+        setSetups(updated);
     };
 
     const bikeOptions = [
