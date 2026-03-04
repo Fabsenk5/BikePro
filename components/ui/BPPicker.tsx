@@ -5,12 +5,11 @@
 import { theme } from '@/constants/Colors';
 import React from 'react';
 import {
-    ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     View,
-    ViewStyle,
+    ViewStyle
 } from 'react-native';
 
 interface BPPickerOption {
@@ -38,11 +37,7 @@ export default function BPPicker({
     return (
         <View style={[styles.container, containerStyle]}>
             {label && <Text style={styles.label}>{label}</Text>}
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.optionsRow}
-            >
+            <View style={styles.optionsRow}>
                 {options.map((option) => {
                     const active = option.value === value;
                     return (
@@ -66,7 +61,7 @@ export default function BPPicker({
                         </TouchableOpacity>
                     );
                 })}
-            </ScrollView>
+            </View>
         </View>
     );
 }
@@ -85,6 +80,7 @@ const styles = StyleSheet.create({
     },
     optionsRow: {
         flexDirection: 'row',
+        flexWrap: 'wrap',
         gap: 8,
     },
     chip: {

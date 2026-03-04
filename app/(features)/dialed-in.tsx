@@ -122,7 +122,7 @@ const tireWidthOptions = [
 ];
 
 export default function DialedInScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [setups, setSetups] = useState<Setup[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
@@ -324,8 +324,8 @@ export default function DialedInScreen() {
 
                                 {setup.tires && (
                                     <View style={styles.tiresRow}>
-                                        <Text style={styles.tireText}>🛞 VR: {setup.tires.frontBar?.toFixed(1) ?? '?'} bar</Text>
-                                        <Text style={styles.tireText}>🛞 HR: {setup.tires.rearBar?.toFixed(1) ?? '?'} bar</Text>
+                                        <Text style={styles.tireText}>🛞 VR: {setup.tires.frontBar?.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? '?'} bar</Text>
+                                        <Text style={styles.tireText}>🛞 HR: {setup.tires.rearBar?.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? '?'} bar</Text>
                                     </View>
                                 )}
 

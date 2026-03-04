@@ -69,106 +69,10 @@ const bikeSizeOptions = [
     { label: 'XXL', value: 'XXL' },
 ];
 
-const componentTypes = [
-    { label: '🔩 Lenker', value: 'handlebar' },
-    { label: '🛑 Bremse VR', value: 'brake_front' },
-    { label: '🛑 Bremse HR', value: 'brake_rear' },
-    { label: '🪑 Sattel', value: 'saddle' },
-    { label: '🏋️ Sattelstütze', value: 'seatpost' },
-    { label: '✊ Griffe', value: 'grips' },
-    { label: '👟 Pedale', value: 'pedals' },
-    { label: '🔱 Gabel', value: 'fork' },
-    { label: '🔩 Dämpfer', value: 'shock' },
-    { label: '🛞 Laufrad VR', value: 'wheel_front' },
-    { label: '🛞 Laufrad HR', value: 'wheel_rear' },
-    { label: '⛓️ Kette', value: 'chain' },
-    { label: '⚙️ Kassette', value: 'cassette' },
-    { label: '🔗 Schaltwerk', value: 'derailleur' },
-    { label: '🎯 Vorbau', value: 'stem' },
-    { label: '🔧 Andere', value: 'other' },
-];
-
-// Default setup keys per component type
-const defaultSetupKeys: Record<string, SetupValue[]> = {
-    handlebar: [
-        { key: 'Breite', value: '', unit: 'mm' },
-        { key: 'Rise', value: '', unit: 'mm' },
-        { key: 'Backsweep', value: '', unit: '°' },
-        { key: 'Upsweep', value: '', unit: '°' },
-    ],
-    brake_front: [
-        { key: 'Scheibengröße', value: '', unit: 'mm' },
-        { key: 'Hebelweite', value: '', unit: 'mm' },
-        { key: 'Drehmoment Adapter', value: '', unit: 'Nm' },
-    ],
-    brake_rear: [
-        { key: 'Scheibengröße', value: '', unit: 'mm' },
-        { key: 'Hebelweite', value: '', unit: 'mm' },
-        { key: 'Drehmoment Adapter', value: '', unit: 'Nm' },
-    ],
-    saddle: [
-        { key: 'Neigung', value: '', unit: '°' },
-        { key: 'Höhe', value: '', unit: 'mm' },
-        { key: 'Setback', value: '', unit: 'mm' },
-    ],
-    seatpost: [
-        { key: 'Hub', value: '', unit: 'mm' },
-        { key: 'Durchmesser', value: '', unit: 'mm' },
-        { key: 'Drehmoment Klemme', value: '', unit: 'Nm' },
-    ],
-    grips: [
-        { key: 'Drehmoment', value: '', unit: 'Nm' },
-    ],
-    pedals: [
-        { key: 'Drehmoment', value: '', unit: 'Nm' },
-        { key: 'Plattformgröße', value: '', unit: 'mm' },
-    ],
-    stem: [
-        { key: 'Länge', value: '', unit: 'mm' },
-        { key: 'Winkel', value: '', unit: '°' },
-        { key: 'Drehmoment Lenker', value: '', unit: 'Nm' },
-        { key: 'Drehmoment Steuerrohr', value: '', unit: 'Nm' },
-    ],
-    fork: [
-        { key: 'Federweg', value: '', unit: 'mm' },
-        { key: 'Offset', value: '', unit: 'mm' },
-    ],
-    shock: [
-        { key: 'Federweg', value: '', unit: 'mm' },
-        { key: 'Einbaulänge', value: '', unit: 'mm' },
-        { key: 'Hub', value: '', unit: 'mm' },
-    ],
-    wheel_front: [
-        { key: 'Größe', value: '', unit: '"' },
-        { key: 'Reifen', value: '', unit: '' },
-        { key: 'Druck', value: '', unit: 'bar' },
-    ],
-    wheel_rear: [
-        { key: 'Größe', value: '', unit: '"' },
-        { key: 'Reifen', value: '', unit: '' },
-        { key: 'Druck', value: '', unit: 'bar' },
-    ],
-    chain: [
-        { key: 'Glieder', value: '', unit: '' },
-        { key: 'Typ', value: '', unit: '' },
-    ],
-    cassette: [
-        { key: 'Abstufung', value: '', unit: '' },
-        { key: 'Zähne', value: '', unit: '' },
-    ],
-    derailleur: [
-        { key: 'Max. Zähne', value: '', unit: '' },
-        { key: 'Kettenblatt', value: '', unit: 'T' },
-    ],
-    other: [],
-};
-
-function getTypeLabel(type: string): string {
-    return componentTypes.find(t => t.value === type)?.label ?? '🔧 Andere';
-}
-
 export default function ComponentTrackerScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isGerman = i18n.language.startsWith('de');
+    const tirePressureUnit = isGerman ? 'bar' : 'psi';
     const [bikes, setBikes] = useState<Bike[]>([]);
     const [selectedBikeId, setSelectedBikeId] = useState<string | null>(null);
     const [bikeModalVisible, setBikeModalVisible] = useState(false);
@@ -191,6 +95,52 @@ export default function ComponentTrackerScreen() {
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
+
+    const componentTypes = [
+        { label: t('tracker.type_handlebar'), value: 'handlebar' },
+        { label: t('tracker.type_brake_front'), value: 'brake_front' },
+        { label: t('tracker.type_brake_rear'), value: 'brake_rear' },
+        { label: t('tracker.type_saddle'), value: 'saddle' },
+        { label: t('tracker.type_seatpost'), value: 'seatpost' },
+        { label: t('tracker.type_grips'), value: 'grips' },
+        { label: t('tracker.type_pedals'), value: 'pedals' },
+        { label: t('tracker.type_fork'), value: 'fork' },
+        { label: t('tracker.type_shock'), value: 'shock' },
+        { label: t('tracker.type_wheel_front'), value: 'wheel_front' },
+        { label: t('tracker.type_wheel_rear'), value: 'wheel_rear' },
+        { label: t('tracker.type_chain'), value: 'chain' },
+        { label: t('tracker.type_cassette'), value: 'cassette' },
+        { label: t('tracker.type_derailleur'), value: 'derailleur' },
+        { label: t('tracker.type_stem'), value: 'stem' },
+        { label: t('tracker.type_battery'), value: 'battery' },
+        { label: t('tracker.type_motor'), value: 'motor' },
+        { label: t('tracker.type_other'), value: 'other' },
+    ];
+
+    const defaultSetupKeys: Record<string, SetupValue[]> = {
+        handlebar: [{ key: 'Breite', value: '', unit: 'mm' }, { key: 'Rise', value: '', unit: 'mm' }, { key: 'Backsweep', value: '', unit: '°' }, { key: 'Upsweep', value: '', unit: '°' }],
+        brake_front: [{ key: 'Scheibengröße', value: '', unit: 'mm' }, { key: 'Hebelweite', value: '', unit: 'mm' }, { key: 'Drehmoment Adapter', value: '', unit: 'Nm' }],
+        brake_rear: [{ key: 'Scheibengröße', value: '', unit: 'mm' }, { key: 'Hebelweite', value: '', unit: 'mm' }, { key: 'Drehmoment Adapter', value: '', unit: 'Nm' }],
+        saddle: [{ key: 'Neigung', value: '', unit: '°' }, { key: 'Höhe', value: '', unit: 'mm' }, { key: 'Setback', value: '', unit: 'mm' }],
+        seatpost: [{ key: 'Hub', value: '', unit: 'mm' }, { key: 'Durchmesser', value: '', unit: 'mm' }, { key: 'Drehmoment Klemme', value: '', unit: 'Nm' }],
+        grips: [{ key: 'Drehmoment', value: '', unit: 'Nm' }],
+        pedals: [{ key: 'Drehmoment', value: '', unit: 'Nm' }, { key: 'Plattformgröße', value: '', unit: 'mm' }],
+        stem: [{ key: 'Länge', value: '', unit: 'mm' }, { key: 'Winkel', value: '', unit: '°' }, { key: 'Drehmoment Lenker', value: '', unit: 'Nm' }, { key: 'Drehmoment Steuerrohr', value: '', unit: 'Nm' }],
+        fork: [{ key: 'Federweg', value: '', unit: 'mm' }, { key: 'Offset', value: '', unit: 'mm' }],
+        shock: [{ key: 'Federweg', value: '', unit: 'mm' }, { key: 'Einbaulänge', value: '', unit: 'mm' }, { key: 'Hub', value: '', unit: 'mm' }],
+        wheel_front: [{ key: 'Größe', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'Druck', value: '', unit: tirePressureUnit }],
+        wheel_rear: [{ key: 'Größe', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'Druck', value: '', unit: tirePressureUnit }],
+        chain: [{ key: 'Glieder', value: '', unit: '' }, { key: 'Typ', value: '', unit: '' }],
+        cassette: [{ key: 'Abstufung', value: '', unit: '' }, { key: 'Zähne', value: '', unit: '' }],
+        derailleur: [{ key: 'Max. Zähne', value: '', unit: '' }, { key: 'Kettenblatt', value: '', unit: 'T' }],
+        battery: [{ key: 'Kapazität', value: '', unit: 'Wh' }, { key: 'Ladezyklen', value: '', unit: '' }],
+        motor: [{ key: 'Max. Drehmoment', value: '', unit: 'Nm' }, { key: 'Leistung', value: '', unit: 'W' }],
+        other: [],
+    };
+
+    function getTypeLabel(type: string): string {
+        return componentTypes.find(t => t.value === type)?.label ?? t('tracker.type_other');
+    }
 
     useEffect(() => {
         syncLoadBikes().then((data) => {

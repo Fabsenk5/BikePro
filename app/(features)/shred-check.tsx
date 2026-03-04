@@ -97,21 +97,21 @@ function getTypeName(type: string): string {
     return componentTypes.find((t) => t.value === type)?.label.split(' ').slice(1).join(' ') ?? type;
 }
 
-function formatDate(iso: string): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
 function getTodayISO(): string {
     return new Date().toISOString().split('T')[0];
 }
 
 export default function ShredCheckScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [components, setComponents] = useState<BikeComponent[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingComp, setEditingComp] = useState<BikeComponent | null>(null);
+
+    const formatDate = (iso: string): string => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleDateString(i18n.language, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
 
     // Form state
     const [name, setName] = useState('');

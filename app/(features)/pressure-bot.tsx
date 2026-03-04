@@ -22,7 +22,9 @@ import {
 const ACCENT = '#FFD600';
 
 export default function PressureBotScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const isGerman = i18n.language.startsWith('de');
+    const tirePressureUnit = isGerman ? 'bar' : 'psi';
 
     const [riderWeight, setRiderWeight] = useState(80);
     const [bikeWeight, setBikeWeight] = useState(15);
@@ -232,18 +234,18 @@ export default function PressureBotScreen() {
                         <View style={styles.resultItem}>
                             <Text style={styles.resultLabel}>{t('pressure_bot.front')}</Text>
                             <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                {result.front.toFixed(2)}
+                                {result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Text>
-                            <Text style={styles.resultUnit}>bar</Text>
+                            <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
                             <Text style={styles.resultPSI}>{frontPSI} PSI</Text>
                         </View>
                         <View style={styles.resultDivider} />
                         <View style={styles.resultItem}>
                             <Text style={styles.resultLabel}>{t('pressure_bot.rear')}</Text>
                             <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                {result.rear.toFixed(2)}
+                                {result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </Text>
-                            <Text style={styles.resultUnit}>bar</Text>
+                            <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
                             <Text style={styles.resultPSI}>{rearPSI} PSI</Text>
                         </View>
                     </View>

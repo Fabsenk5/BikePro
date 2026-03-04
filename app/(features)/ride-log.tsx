@@ -50,7 +50,7 @@ function getTodayISO(): string {
 }
 
 export default function RideLogScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [rides, setRides] = useState<Ride[]>([]);
 
     const conditionOptions = [
@@ -198,7 +198,7 @@ export default function RideLogScreen() {
 
     const formatDate = (dateString: string) => {
         const d = new Date(dateString);
-        return d.toLocaleDateString();
+        return d.toLocaleDateString(i18n.language);
     };
 
     const confirmDelete = (rideId: string) => {
@@ -241,7 +241,7 @@ export default function RideLogScreen() {
                         <Text style={styles.statLabel}>{t('ridelog.stats_rides')}</Text>
                     </View>
                     <View style={styles.statItem}>
-                        <Text style={[styles.statValue, { color: ACCENT }]}>{totalKm.toFixed(1)}</Text>
+                        <Text style={[styles.statValue, { color: ACCENT }]}>{totalKm.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</Text>
                         <Text style={styles.statLabel}>{t('ridelog.stats_km')}</Text>
                     </View>
                     <View style={styles.statItem}>
@@ -297,7 +297,7 @@ export default function RideLogScreen() {
                                 <View style={styles.metricsRow}>
                                     {ride.distanceKm > 0 && (
                                         <View style={styles.metric}>
-                                            <Text style={styles.metricValue}>{ride.distanceKm}</Text>
+                                            <Text style={styles.metricValue}>{ride.distanceKm.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</Text>
                                             <Text style={styles.metricLabel}>km</Text>
                                         </View>
                                     )}
