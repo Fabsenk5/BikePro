@@ -1,6 +1,7 @@
 import { theme } from '@/constants/Colors';
 import type { Feature } from '@/constants/Features';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Dimensions,
     StyleSheet,
@@ -27,6 +28,7 @@ interface FeatureTileProps {
 }
 
 export default function FeatureTile({ feature, onPress, index }: FeatureTileProps) {
+    const { t } = useTranslation();
     const scale = useSharedValue(1);
 
     const animatedStyle = useAnimatedStyle(() => ({
@@ -69,16 +71,16 @@ export default function FeatureTile({ feature, onPress, index }: FeatureTileProp
 
             {/* Title & subtitle */}
             <Text style={styles.title} numberOfLines={1}>
-                {feature.title}
+                {t(`features.${feature.id}.title`, { defaultValue: feature.title })}
             </Text>
             <Text style={[styles.subtitle, { color: feature.accentColor }]} numberOfLines={1}>
-                {feature.subtitle}
+                {t(`features.${feature.id}.subtitle`, { defaultValue: feature.subtitle })}
             </Text>
 
             {/* Coming Soon badge */}
             {!feature.ready && (
                 <View style={styles.badge}>
-                    <Text style={styles.badgeText}>SOON</Text>
+                    <Text style={styles.badgeText}>{t('common.coming_soon', { defaultValue: 'SOON' }).toUpperCase()}</Text>
                 </View>
             )}
         </AnimatedTouchable>

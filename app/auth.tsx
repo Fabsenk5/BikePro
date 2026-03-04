@@ -7,6 +7,7 @@ import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { Stack, router } from 'expo-router';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -23,6 +24,7 @@ const ACCENT = theme.colors.accent;
 
 export default function AuthScreen() {
     const { signIn, signUp, isConfigured } = useAuth();
+    const { t } = useTranslation();
     const [isLogin, setIsLogin] = useState(true);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -32,11 +34,11 @@ export default function AuthScreen() {
 
     const handleSubmit = async () => {
         if (!email.trim() || !password.trim()) {
-            setError('Bitte E-Mail und Passwort eingeben.');
+            setError(t('auth.error_missing'));
             return;
         }
         if (password.length < 6) {
-            setError('Passwort muss mindestens 6 Zeichen lang sein.');
+            setError(t('auth.error_short'));
             return;
         }
 
@@ -54,7 +56,7 @@ export default function AuthScreen() {
             setError(result.error);
         } else {
             if (!isLogin && isConfigured) {
-                setSuccess('Registrierung erfolgreich! Prüfe deine E-Mail zur Bestätigung.');
+                setSuccess(t('auth.success_register'));
             } else {
                 router.replace('/(tabs)/profile');
             }
@@ -65,7 +67,7 @@ export default function AuthScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: '🔐 Anmeldung',
+                    title: `🔐 ${t('auth.title')}`,
                     headerStyle: { backgroundColor: theme.colors.surface },
                     headerTintColor: theme.colors.text,
                 }}
@@ -85,7 +87,7 @@ export default function AuthScreen() {
                         <Text style={styles.logoEmoji}>🚵</Text>
                         <Text style={styles.logoTitle}>BikePro</Text>
                         <Text style={styles.logoSub}>
-                            {isLogin ? 'Willkommen zurück!' : 'Erstelle deinen Account'}
+                            {isLogin ? t('auth.welcome_back') : t('auth.create_account')}
                         </Text>
                     </View>
 
@@ -93,7 +95,7 @@ export default function AuthScreen() {
                     {!isConfigured && (
                         <View style={styles.offlineBanner}>
                             <Text style={styles.offlineText}>
-                                ⚡ Offline-Modus — Daten werden lokal gespeichert
+                                {t('auth.offline_mode')}
                             </Text>
                         </View>
                     )}
@@ -101,8 +103,8 @@ export default function AuthScreen() {
                     {/* Form */}
                     <BPCard style={styles.formCard}>
                         <BPInput
-                            label="E-Mail"
-                            placeholder="deine@email.de"
+                            label={t('auth.email_label')}
+                            placeholder={t('auth.email_placeholder')}
                             value={email}
                             onChangeText={(t) => { setEmail(t); setError(null); }}
                             keyboardType="email-address"
@@ -110,8 +112,8 @@ export default function AuthScreen() {
                         />
 
                         <BPInput
-                            label="Passwort"
-                            placeholder="••••••••"
+                            label={t('auth.password_label')}
+                            placeholder={t('auth.password_placeholder')}
                             value={password}
                             onChangeText={(t) => { setPassword(t); setError(null); }}
                             secureTextEntry
@@ -135,7 +137,7 @@ export default function AuthScreen() {
                                 <ActivityIndicator color={ACCENT} size="large" />
                             ) : (
                                 <BPButton
-                                    title={isLogin ? '🔐 Einloggen' : '🚀 Registrieren'}
+                                    title={isLogin ? t('auth.btn_login') : t('auth.btn_register')}
                                     onPress={handleSubmit}
                                     color={ACCENT}
                                 />
@@ -148,8 +150,8 @@ export default function AuthScreen() {
                         >
                             <Text style={styles.toggleText}>
                                 {isLogin
-                                    ? 'Noch kein Account? → Registrieren'
-                                    : 'Schon registriert? → Einloggen'}
+                                    ? t('auth.toggle_to_register')
+                                    : t('auth.toggle_to_login')}
                             </Text>
                         </TouchableOpacity>
                     </BPCard>

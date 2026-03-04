@@ -7,6 +7,7 @@ import 'react-native-reanimated';
 
 import { theme } from '@/constants/Colors';
 import { AuthProvider } from '@/context/AuthContext';
+import '@/lib/i18n';
 
 export {
   ErrorBoundary

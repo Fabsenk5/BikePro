@@ -16,7 +16,7 @@ export interface Feature {
 export const features: Feature[] = [
     {
         id: 'dialed-in',
-        title: 'Dialed-In',
+        title: 'Dialed In',
         subtitle: 'Fahrwerks-Log',
         icon: '⚙️',
         route: '/(features)/dialed-in',
@@ -25,8 +25,8 @@ export const features: Feature[] = [
     },
     {
         id: 'shred-check',
-        title: 'Shred-Check',
-        subtitle: 'Komponenten-Tracker',
+        title: 'Shred Check',
+        subtitle: 'Wear & Tear Tracker',
         icon: '🔧',
         route: '/(features)/shred-check',
         accentColor: '#FF5252',
@@ -34,7 +34,7 @@ export const features: Feature[] = [
     },
     {
         id: 'park-picker',
-        title: 'Park-Picker Pro',
+        title: 'Park Picker',
         subtitle: 'Bikepark-Aggregator',
         icon: '🏔️',
         route: '/(features)/park-picker',
@@ -43,7 +43,7 @@ export const features: Feature[] = [
     },
     {
         id: 'trail-video',
-        title: 'Trail-Video',
+        title: 'Trail Video',
         subtitle: 'Edits of the Week',
         icon: '🎬',
         route: '/(features)/trail-video',
@@ -52,7 +52,7 @@ export const features: Feature[] = [
     },
     {
         id: 'jump-analyzer',
-        title: 'Jump-Analyzer',
+        title: 'Jump Analyzer',
         subtitle: 'Airtime & Stil',
         icon: '🚀',
         route: '/(features)/jump-analyzer',
@@ -61,7 +61,7 @@ export const features: Feature[] = [
     },
     {
         id: 'pressure-bot',
-        title: 'Pressure-Bot',
+        title: 'Pressure Bot',
         subtitle: 'Reifendruck-Rechner',
         icon: '💨',
         route: '/(features)/pressure-bot',
@@ -70,7 +70,7 @@ export const features: Feature[] = [
     },
     {
         id: 'ride-log',
-        title: 'Ride-Log',
+        title: 'Ride Log',
         subtitle: 'Dein Fahrtenbuch',
         icon: '📖',
         route: '/(features)/ride-log',

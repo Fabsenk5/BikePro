@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { syncLoadPreference, syncLoadTable } from '@/lib/sync';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
     ScrollView,
@@ -21,9 +22,15 @@ const ACCENT = theme.colors.accent;
 
 export default function ProfileScreen() {
     const { user, isAdmin, isLoading, isConfigured, signOut } = useAuth();
+    const { t, i18n } = useTranslation();
     const [rideCount, setRideCount] = useState(0);
     const [setupCount, setSetupCount] = useState(0);
     const [componentCount, setComponentCount] = useState(0);
+
+    const toggleLanguage = () => {
+        const nextLang = i18n.language.startsWith('de') ? 'en' : 'de';
+        i18n.changeLanguage(nextLang);
+    };
 
     useEffect(() => {
         syncLoadTable('rides', '@bikepro_rides').then((d) => setRideCount(d.length));
@@ -50,13 +57,13 @@ export default function ProfileScreen() {
                 <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
                 <View style={styles.center}>
                     <Text style={styles.avatar}>🔒</Text>
-                    <Text style={styles.title}>Nicht angemeldet</Text>
+                    <Text style={styles.title}>{t('profile.not_logged_in.title')}</Text>
                     <Text style={styles.subtitle}>
-                        Melde dich an, um dein Profil und deine Daten zu verwalten.
+                        {t('profile.not_logged_in.subtitle')}
                     </Text>
                     <View style={{ marginTop: theme.spacing.xl, width: '80%' }}>
                         <BPButton
-                            title="🔐 Anmelden / Registrieren"
+                            title={`🔐 ${t('common.login_register')}`}
                             onPress={() => router.push('/auth')}
                             color={ACCENT}
                         />
@@ -94,19 +101,19 @@ export default function ProfileScreen() {
 
                 {/* Stats */}
                 <BPCard style={styles.statsCard}>
-                    <Text style={styles.sectionTitle}>📊 Deine Statistiken</Text>
+                    <Text style={styles.sectionTitle}>📊 {t('profile.stats.title')}</Text>
                     <View style={styles.statsRow}>
                         <View style={styles.statCard}>
                             <Text style={[styles.statValue, { color: theme.colors.accentLime }]}>{rideCount}</Text>
-                            <Text style={styles.statLabel}>Rides</Text>
+                            <Text style={styles.statLabel}>{t('profile.stats.rides')}</Text>
                         </View>
                         <View style={styles.statCard}>
                             <Text style={[styles.statValue, { color: theme.colors.accentCyan }]}>{setupCount}</Text>
-                            <Text style={styles.statLabel}>Setups</Text>
+                            <Text style={styles.statLabel}>{t('profile.stats.setups')}</Text>
                         </View>
                         <View style={styles.statCard}>
                             <Text style={[styles.statValue, { color: theme.colors.accentOrange }]}>{componentCount}</Text>
-                            <Text style={styles.statLabel}>Teile</Text>
+                            <Text style={styles.statLabel}>{t('profile.stats.parts')}</Text>
                         </View>
                     </View>
                 </BPCard>
@@ -132,10 +139,24 @@ export default function ProfileScreen() {
                     </View>
                 </BPCard>
 
+                {/* Settings & Language */}
+                <BPCard style={styles.infoCard}>
+                    <Text style={styles.sectionTitle}>🌐 {t('profile.language')}</Text>
+                    <View style={{ marginTop: theme.spacing.sm }}>
+                        <BPButton
+                            title={i18n.language.startsWith('de') ? t('profile.german') : t('profile.english')}
+                            onPress={toggleLanguage}
+                            variant="secondary"
+                            color={ACCENT}
+                            fullWidth
+                        />
+                    </View>
+                </BPCard>
+
                 {/* Logout */}
                 <View style={{ marginTop: theme.spacing.lg }}>
                     <BPButton
-                        title="🚪 Ausloggen"
+                        title={`🚪 ${t('common.logout')}`}
                         onPress={handleLogout}
                         color="#F44336"
                         variant="secondary"

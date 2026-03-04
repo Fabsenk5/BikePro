@@ -11,6 +11,7 @@ import { theme } from '@/constants/Colors';
 import { syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
     ScrollView,
@@ -44,66 +45,63 @@ interface Ride {
     createdAt: string;
 }
 
-const conditionOptions = [
-    { label: '☀️ Trocken', value: 'dry' },
-    { label: '⛅ Teilweise bewölkt', value: 'partly_cloudy' },
-    { label: '🌦️ Leicht feucht', value: 'damp' },
-    { label: '🌧️ Nass', value: 'wet' },
-    { label: '⛈️ Starkregen', value: 'heavy_rain' },
-    { label: '💧 Matsch', value: 'muddy' },
-    { label: '❄️ Schnee / Eis', value: 'snow' },
-    { label: '🥵 Heiß (>30°C)', value: 'hot' },
-    { label: '🌫️ Nebel', value: 'fog' },
-];
-
-const moodOptions = [
-    { label: '🔥 Mega!', value: 'fire' },
-    { label: '😎 Gut', value: 'good' },
-    { label: '😐 OK', value: 'ok' },
-    { label: '😤 Anstrengend', value: 'tough' },
-    { label: '🤕 Verletzung', value: 'injury' },
-    { label: '💀 Crash', value: 'crash' },
-    { label: '🤒 Krank', value: 'sick' },
-];
-
-const terrainTypeOptions = [
-    { label: '🏗️ Bikepark', value: 'bikepark' },
-    { label: '🌲 Trail / Singletrail', value: 'trail' },
-    { label: '⛰️ Enduro', value: 'enduro' },
-    { label: '🏔️ Downhill', value: 'downhill' },
-    { label: '🌿 Flowtrail', value: 'flow' },
-    { label: '🦘 Dirt / Pumptrack', value: 'dirt' },
-    { label: '🚵 Tour / XC', value: 'tour' },
-    { label: '🏙️ Urban / Street', value: 'urban' },
-];
-
-const difficultyOptions = [
-    { label: '🟢 Leicht (S0–S1)', value: 'easy' },
-    { label: '🔵 Mittel (S1–S2)', value: 'medium' },
-    { label: '🔴 Schwer (S2–S3)', value: 'hard' },
-    { label: '⚫ Extrem (S3+)', value: 'extreme' },
-];
-
-const bikeTypeRideOptions = [
-    { label: '🚵 Enduro', value: 'enduro' },
-    { label: '⛰️ Downhill', value: 'downhill' },
-    { label: '🌲 Trail', value: 'trail' },
-    { label: '⚡ E-MTB', value: 'emtb' },
-    { label: '🏁 XC', value: 'xc' },
-    { label: '🦘 Dirt / Slopestyle', value: 'dirt' },
-];
-
-function formatDate(iso: string): string {
-    const d = new Date(iso);
-    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
 function getTodayISO(): string {
     return new Date().toISOString().split('T')[0];
 }
 
 export default function RideLogScreen() {
+    const { t } = useTranslation();
     const [rides, setRides] = useState<Ride[]>([]);
+
+    const conditionOptions = [
+        { label: t('ridelog.cond_dry'), value: 'dry' },
+        { label: t('ridelog.cond_partly_cloudy'), value: 'partly_cloudy' },
+        { label: t('ridelog.cond_damp'), value: 'damp' },
+        { label: t('ridelog.cond_wet'), value: 'wet' },
+        { label: t('ridelog.cond_heavy_rain'), value: 'heavy_rain' },
+        { label: t('ridelog.cond_muddy'), value: 'muddy' },
+        { label: t('ridelog.cond_snow'), value: 'snow' },
+        { label: t('ridelog.cond_hot'), value: 'hot' },
+        { label: t('ridelog.cond_fog'), value: 'fog' },
+    ];
+
+    const moodOptions = [
+        { label: t('ridelog.mood_fire'), value: 'fire' },
+        { label: t('ridelog.mood_good'), value: 'good' },
+        { label: t('ridelog.mood_ok'), value: 'ok' },
+        { label: t('ridelog.mood_tough'), value: 'tough' },
+        { label: t('ridelog.mood_injury'), value: 'injury' },
+        { label: t('ridelog.mood_crash'), value: 'crash' },
+        { label: t('ridelog.mood_sick'), value: 'sick' },
+    ];
+
+    const terrainTypeOptions = [
+        { label: t('ridelog.terr_bikepark'), value: 'bikepark' },
+        { label: t('ridelog.terr_trail'), value: 'trail' },
+        { label: t('ridelog.terr_enduro'), value: 'enduro' },
+        { label: t('ridelog.terr_downhill'), value: 'downhill' },
+        { label: t('ridelog.terr_flow'), value: 'flow' },
+        { label: t('ridelog.terr_dirt'), value: 'dirt' },
+        { label: t('ridelog.terr_tour'), value: 'tour' },
+        { label: t('ridelog.terr_urban'), value: 'urban' },
+    ];
+
+    const difficultyOptions = [
+        { label: t('ridelog.diff_easy'), value: 'easy' },
+        { label: t('ridelog.diff_medium'), value: 'medium' },
+        { label: t('ridelog.diff_hard'), value: 'hard' },
+        { label: t('ridelog.diff_extreme'), value: 'extreme' },
+    ];
+
+    const bikeTypeRideOptions = [
+        { label: t('ridelog.bike_enduro'), value: 'enduro' },
+        { label: t('ridelog.bike_downhill'), value: 'downhill' },
+        { label: t('ridelog.bike_trail'), value: 'trail' },
+        { label: t('ridelog.bike_emtb'), value: 'emtb' },
+        { label: t('ridelog.bike_xc'), value: 'xc' },
+        { label: t('ridelog.bike_dirt'), value: 'dirt' },
+    ];
+
     const [modalVisible, setModalVisible] = useState(false);
     const [editingRide, setEditingRide] = useState<Ride | null>(null);
 
@@ -198,13 +196,18 @@ export default function RideLogScreen() {
         resetForm();
     };
 
-    const handleDelete = (id: string) => {
-        Alert.alert('Ride löschen?', 'Das kann nicht rückgängig gemacht werden.', [
-            { text: 'Abbrechen', style: 'cancel' },
+    const formatDate = (dateString: string) => {
+        const d = new Date(dateString);
+        return d.toLocaleDateString();
+    };
+
+    const confirmDelete = (rideId: string) => {
+        Alert.alert(t('ridelog.delete_prompt_title'), t('ridelog.delete_prompt_msg'), [
+            { text: t('common.cancel'), style: 'cancel' },
             {
                 text: 'Löschen',
                 style: 'destructive',
-                onPress: () => persist(rides.filter((r) => r.id !== id)),
+                onPress: () => persist(rides.filter((r) => r.id !== rideId)),
             },
         ]);
     };
@@ -220,7 +223,7 @@ export default function RideLogScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: '📖 Ride-Log',
+                    title: t('ridelog.title'),
                     headerStyle: { backgroundColor: theme.colors.surface },
                     headerTintColor: theme.colors.text,
                 }}
@@ -235,29 +238,29 @@ export default function RideLogScreen() {
                 <View style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: ACCENT }]}>{totalRides}</Text>
-                        <Text style={styles.statLabel}>RIDES</Text>
+                        <Text style={styles.statLabel}>{t('ridelog.stats_rides')}</Text>
                     </View>
                     <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: ACCENT }]}>{totalKm.toFixed(1)}</Text>
-                        <Text style={styles.statLabel}>KM</Text>
+                        <Text style={styles.statLabel}>{t('ridelog.stats_km')}</Text>
                     </View>
                     <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: ACCENT }]}>{totalElevation}</Text>
-                        <Text style={styles.statLabel}>HM ↑</Text>
+                        <Text style={styles.statLabel}>{t('ridelog.stats_hm_up')}</Text>
                     </View>
                     <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: ACCENT }]}>{totalDescent}</Text>
-                        <Text style={styles.statLabel}>HM ↓</Text>
+                        <Text style={styles.statLabel}>{t('ridelog.stats_hm_down')}</Text>
                     </View>
                     <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: ACCENT }]}>{Math.round(totalTime / 60)}h</Text>
-                        <Text style={styles.statLabel}>ZEIT</Text>
+                        <Text style={styles.statLabel}>{t('ridelog.stats_time')}</Text>
                     </View>
                 </View>
 
                 {/* Add button */}
                 <BPButton
-                    title="+ Neuen Ride loggen"
+                    title={t('ridelog.add_ride')}
                     onPress={openNew}
                     color={ACCENT}
                     fullWidth
@@ -268,8 +271,8 @@ export default function RideLogScreen() {
                 {rides.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>📖</Text>
-                        <Text style={styles.emptyTitle}>Noch keine Rides</Text>
-                        <Text style={styles.emptySubtitle}>Logge deinen ersten Trail-Tag!</Text>
+                        <Text style={styles.emptyTitle}>{t('ridelog.no_rides')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('ridelog.log_first')}</Text>
                     </View>
                 ) : (
                     rides.map((ride) => (
@@ -328,7 +331,7 @@ export default function RideLogScreen() {
 
                                 <TouchableOpacity
                                     style={styles.deleteBtn}
-                                    onPress={() => handleDelete(ride.id)}
+                                    onPress={() => confirmDelete(ride.id)}
                                 >
                                     <Text style={styles.deleteBtnText}>🗑</Text>
                                 </TouchableOpacity>
@@ -342,49 +345,49 @@ export default function RideLogScreen() {
             <BPModal
                 visible={modalVisible}
                 onClose={() => setModalVisible(false)}
-                title={editingRide ? 'Ride bearbeiten' : 'Neuer Ride'}
+                title={editingRide ? t('ridelog.edit_ride') : t('ridelog.new_ride')}
             >
                 <BPInput
-                    label="Datum"
+                    label={t('ridelog.date')}
                     placeholder="YYYY-MM-DD"
                     value={date}
                     onChangeText={setDate}
                     accentColor={ACCENT}
                 />
                 <BPInput
-                    label="Ort / Bikepark"
-                    placeholder="z.B. Winterberg"
+                    label={t('ridelog.location')}
+                    placeholder={t('ridelog.location_placeholder')}
                     value={location}
                     onChangeText={setLocation}
                     accentColor={ACCENT}
                 />
                 <BPInput
-                    label="Trail / Strecke"
-                    placeholder="z.B. DH1, Freeride"
+                    label={t('ridelog.trail')}
+                    placeholder={t('ridelog.trail_placeholder')}
                     value={trail}
                     onChangeText={setTrail}
                     accentColor={ACCENT}
                 />
 
                 <View style={styles.inputRow}>
-                    <BPInput label="Distanz" placeholder="0" value={distanceKm} onChangeText={setDistanceKm} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                    <BPInput label="Dauer" placeholder="0" value={durationMin} onChangeText={setDurationMin} keyboardType="numeric" suffix="min" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('ridelog.distance')} placeholder="0" value={distanceKm} onChangeText={setDistanceKm} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('ridelog.duration')} placeholder="0" value={durationMin} onChangeText={setDurationMin} keyboardType="numeric" suffix="min" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
                 <View style={styles.inputRow}>
-                    <BPInput label="Höhenmeter ↑" placeholder="0" value={elevationM} onChangeText={setElevationM} keyboardType="numeric" suffix="hm" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                    <BPInput label="Abfahrt ↓" placeholder="0" value={descentM} onChangeText={setDescentM} keyboardType="numeric" suffix="hm" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                    <BPInput label="Max Speed" placeholder="0" value={maxSpeedKmh} onChangeText={setMaxSpeedKmh} keyboardType="numeric" suffix="km/h" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('ridelog.elevation_up')} placeholder="0" value={elevationM} onChangeText={setElevationM} keyboardType="numeric" suffix="hm" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('ridelog.elevation_down')} placeholder="0" value={descentM} onChangeText={setDescentM} keyboardType="numeric" suffix="hm" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('ridelog.max_speed')} placeholder="0" value={maxSpeedKmh} onChangeText={setMaxSpeedKmh} keyboardType="numeric" suffix="km/h" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
 
-                <BPPicker label="Terrain" options={terrainTypeOptions} value={terrain} onValueChange={setTerrain} accentColor={ACCENT} />
-                <BPPicker label="Schwierigkeit" options={difficultyOptions} value={difficulty} onValueChange={setDifficulty} accentColor={ACCENT} />
-                <BPPicker label="Bike" options={bikeTypeRideOptions} value={rideBikeType} onValueChange={setRideBikeType} accentColor={ACCENT} />
-                <BPPicker label="Bedingungen" options={conditionOptions} value={condition} onValueChange={setCondition} accentColor={ACCENT} />
-                <BPPicker label="Stimmung" options={moodOptions} value={mood} onValueChange={setMood} accentColor={ACCENT} />
+                <BPPicker label={t('ridelog.terrain')} options={terrainTypeOptions} value={terrain} onValueChange={setTerrain} accentColor={ACCENT} />
+                <BPPicker label={t('ridelog.difficulty')} options={difficultyOptions} value={difficulty} onValueChange={setDifficulty} accentColor={ACCENT} />
+                <BPPicker label={t('ridelog.bike')} options={bikeTypeRideOptions} value={rideBikeType} onValueChange={setRideBikeType} accentColor={ACCENT} />
+                <BPPicker label={t('ridelog.condition')} options={conditionOptions} value={condition} onValueChange={setCondition} accentColor={ACCENT} />
+                <BPPicker label={t('ridelog.mood')} options={moodOptions} value={mood} onValueChange={setMood} accentColor={ACCENT} />
 
                 <BPInput
-                    label="Notizen"
-                    placeholder="z.B. Neue Drops probiert, Line A war mega..."
+                    label={t('ridelog.notes')}
+                    placeholder={t('ridelog.notes_placeholder')}
                     value={notes}
                     onChangeText={setNotes}
                     multiline
@@ -394,7 +397,7 @@ export default function RideLogScreen() {
 
                 <View style={styles.modalActions}>
                     <BPButton
-                        title="Speichern"
+                        title={t('common.save')}
                         onPress={handleSave}
                         color={ACCENT}
                         fullWidth

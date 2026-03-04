@@ -13,6 +13,7 @@ import { theme } from '@/constants/Colors';
 import { syncLoadBikes, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
     ScrollView,
@@ -115,40 +116,41 @@ const tokenOptions = [
     { label: '3', value: '3' }, { label: '4', value: '4' }, { label: '5', value: '5' },
 ];
 
-const leverOptions = [
-    { label: '🟢 Offen', value: 'open' },
-    { label: '🟡 Mitte', value: 'mid' },
-    { label: '🔴 Geschlossen', value: 'closed' },
-];
-
 const tireWidthOptions = [
     { label: '2.3"', value: '2.3' }, { label: '2.35"', value: '2.35' },
     { label: '2.4"', value: '2.4' }, { label: '2.5"', value: '2.5' }, { label: '2.6"', value: '2.6' },
 ];
 
-// Helper: render rebound display text for card
-function reboundDisplay(sus: SuspensionValues): string {
-    const cfg = sus.config ?? defaultConfig;
-    if (cfg.reboundMode === 'hsls') return `LSR ${sus.reboundLSR}  HSR ${sus.reboundHSR}`;
-    return `Rebound ${sus.reboundClicks} Clicks`;
-}
-
-// Helper: render compression display text for card
-function compDisplay(sus: SuspensionValues): string {
-    const cfg = sus.config ?? defaultConfig;
-    if (cfg.compressionMode === 'hsls') return `LSC ${sus.compressionLSC}  HSC ${sus.compressionHSC}`;
-    if (cfg.compressionMode === 'lever') {
-        const lbl = leverOptions.find(l => l.value === sus.compressionLever)?.label ?? sus.compressionLever;
-        return `Comp: ${lbl}`;
-    }
-    return `Comp ${sus.compressionClicks} Clicks`;
-}
-
 export default function DialedInScreen() {
+    const { t } = useTranslation();
     const [setups, setSetups] = useState<Setup[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
+
+    const leverOptions = [
+        { label: t('dialed.open'), value: 'open' },
+        { label: t('dialed.mid'), value: 'mid' },
+        { label: t('dialed.closed'), value: 'closed' },
+    ];
+
+    // Helper: render rebound display text for card
+    function reboundDisplay(sus: SuspensionValues): string {
+        const cfg = sus.config ?? defaultConfig;
+        if (cfg.reboundMode === 'hsls') return `LSR ${sus.reboundLSR}  HSR ${sus.reboundHSR}`;
+        return `Rebound ${sus.reboundClicks} Clicks`;
+    }
+
+    // Helper: render compression display text for card
+    function compDisplay(sus: SuspensionValues): string {
+        const cfg = sus.config ?? defaultConfig;
+        if (cfg.compressionMode === 'hsls') return `LSC ${sus.compressionLSC}  HSC ${sus.compressionHSC}`;
+        if (cfg.compressionMode === 'lever') {
+            const lbl = leverOptions.find(l => l.value === sus.compressionLever)?.label ?? sus.compressionLever;
+            return `Comp: ${lbl}`;
+        }
+        return `Comp ${sus.compressionClicks} Clicks`;
+    }
 
     const [name, setName] = useState('');
     const [location, setLocation] = useState('');
@@ -177,7 +179,7 @@ export default function DialedInScreen() {
     };
 
     const bikeOptions = [
-        { label: '— Kein Bike zugeordnet —', value: '' },
+        { label: t('dialed.no_bike'), value: '' },
         ...trackerBikes.map(b => ({
             label: `${b.name} (${b.size ?? ''} ${b.model})`,
             value: b.id,
@@ -255,17 +257,17 @@ export default function DialedInScreen() {
 
     return (
         <View style={styles.container}>
-            <Stack.Screen options={{ title: '⚙️ Dialed-In', headerStyle: { backgroundColor: theme.colors.surface }, headerTintColor: theme.colors.text }} />
+            <Stack.Screen options={{ title: t('dialed.title'), headerStyle: { backgroundColor: theme.colors.surface }, headerTintColor: theme.colors.text }} />
             <StatusBar barStyle="light-content" />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <BPButton title="+ Neues Setup" onPress={openNewSetup} color={ACCENT} fullWidth size="lg" />
+                <BPButton title={t('dialed.add_setup')} onPress={openNewSetup} color={ACCENT} fullWidth size="lg" />
 
                 {setups.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>⚙️</Text>
-                        <Text style={styles.emptyTitle}>Noch keine Setups</Text>
-                        <Text style={styles.emptySubtitle}>Erstelle dein erstes Fahrwerks-Setup!</Text>
+                        <Text style={styles.emptyTitle}>{t('dialed.no_setups')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('dialed.create_first_setup')}</Text>
                     </View>
                 ) : (
                     setups.map(setup => (
@@ -287,7 +289,7 @@ export default function DialedInScreen() {
                                 <View style={styles.valuesGrid}>
                                     {/* Fork */}
                                     <View style={styles.valueCol}>
-                                        <Text style={styles.valueColTitle}>🔱 Gabel</Text>
+                                        <Text style={styles.valueColTitle}>{t('dialed.fork')}</Text>
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.fork.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
@@ -304,7 +306,7 @@ export default function DialedInScreen() {
 
                                     {/* Shock */}
                                     <View style={styles.valueCol}>
-                                        <Text style={styles.valueColTitle}>🔩 Dämpfer</Text>
+                                        <Text style={styles.valueColTitle}>{t('dialed.shock')}</Text>
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.shock.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
@@ -335,20 +337,20 @@ export default function DialedInScreen() {
             </ScrollView>
 
             {/* Modal */}
-            <BPModal visible={modalVisible} onClose={() => setModalVisible(false)} title={editingSetup ? 'Setup bearbeiten' : 'Neues Setup'}>
-                <BPInput label="Setup-Name" placeholder="z.B. Winterberg Enduro" value={name} onChangeText={setName} accentColor={ACCENT} />
-                <BPInput label="Location / Trail" placeholder="z.B. Winterberg DH1" value={location} onChangeText={setLocation} accentColor={ACCENT} />
+            <BPModal visible={modalVisible} onClose={() => setModalVisible(false)} title={editingSetup ? t('dialed.edit_setup') : t('dialed.new_setup')}>
+                <BPInput label={t('dialed.setup_name')} placeholder={t('dialed.setup_name_placeholder')} value={name} onChangeText={setName} accentColor={ACCENT} />
+                <BPInput label={t('dialed.location')} placeholder={t('dialed.location_placeholder')} value={location} onChangeText={setLocation} accentColor={ACCENT} />
 
                 {/* Bike Integration */}
-                <BPPicker label="🚵 Bike (Component Tracker)" options={bikeOptions} value={bikeId} onValueChange={setBikeId} accentColor={ACCENT} />
+                <BPPicker label={t('dialed.bike')} options={bikeOptions} value={bikeId} onValueChange={setBikeId} accentColor={ACCENT} />
 
                 {/* Component Tab */}
                 <BPPicker
-                    label="Komponente"
+                    label={t('dialed.component')}
                     options={[
-                        { label: '🔱 Gabel', value: 'fork' },
-                        { label: '🔩 Dämpfer', value: 'shock' },
-                        { label: '🛞 Reifen', value: 'tires' },
+                        { label: t('dialed.fork'), value: 'fork' },
+                        { label: t('dialed.shock'), value: 'shock' },
+                        { label: t('dialed.tires'), value: 'tires' },
                     ]}
                     value={activeTab}
                     onValueChange={v => setActiveTab(v as 'fork' | 'shock' | 'tires')}
@@ -360,7 +362,7 @@ export default function DialedInScreen() {
                     <>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label="Luftdruck" value={activeSuspension.psi} min={activeTab === 'fork' ? 40 : 80} max={activeTab === 'fork' ? 160 : 400} step={1} unit=" PSI" accentColor={ACCENT} onValueChange={v => updateSusValue('psi', v)} />
+                                <BPSlider label={t('dialed.pressure')} value={activeSuspension.psi} min={activeTab === 'fork' ? 40 : 80} max={activeTab === 'fork' ? 160 : 400} step={1} unit=" PSI" accentColor={ACCENT} onValueChange={v => updateSusValue('psi', v)} />
                             </View>
                         </View>
                         <View style={styles.inputRow}>
@@ -368,15 +370,15 @@ export default function DialedInScreen() {
                                 <BPSlider label="SAG" value={activeSuspension.sagPercent} min={10} max={45} step={1} unit="%" accentColor={ACCENT} onValueChange={v => updateSusValue('sagPercent', v)} />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label="Federweg" value={activeSuspension.travel} min={80} max={220} step={5} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('travel', v)} />
+                                <BPSlider label={t('dialed.travel')} value={activeSuspension.travel} min={80} max={220} step={5} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('travel', v)} />
                             </View>
                         </View>
 
                         {/* ─── REBOUND CONFIG ─── */}
                         <View style={styles.configSection}>
-                            <Text style={styles.subSectionTitle}>Zugstufe (Rebound)</Text>
+                            <Text style={styles.subSectionTitle}>{t('dialed.rebound')}</Text>
                             <View style={styles.configToggle}>
-                                <Text style={styles.configLabel}>HS/LS Einstellungen</Text>
+                                <Text style={styles.configLabel}>{t('dialed.rebound_hsls')}</Text>
                                 <Switch
                                     value={activeConfig.reboundMode === 'hsls'}
                                     onValueChange={v => updateConfig('reboundMode', v ? 'hsls' : 'clicks')}
@@ -401,13 +403,13 @@ export default function DialedInScreen() {
 
                         {/* ─── COMPRESSION CONFIG ─── */}
                         <View style={styles.configSection}>
-                            <Text style={styles.subSectionTitle}>Druckstufe (Compression)</Text>
+                            <Text style={styles.subSectionTitle}>{t('dialed.compression')}</Text>
                             <BPPicker
-                                label="Einstellungsart"
+                                label={t('dialed.compression_type')}
                                 options={[
-                                    { label: '🔢 Clicks', value: 'clicks' },
-                                    { label: '🔀 Lever (Auf/Zu)', value: 'lever' },
-                                    { label: '⚙️ HS / LS', value: 'hsls' },
+                                    { label: t('dialed.clicks'), value: 'clicks' },
+                                    { label: t('dialed.lever'), value: 'lever' },
+                                    { label: t('dialed.hsls'), value: 'hsls' },
                                 ]}
                                 value={activeConfig.compressionMode}
                                 onValueChange={v => updateConfig('compressionMode', v)}
@@ -419,7 +421,7 @@ export default function DialedInScreen() {
                             )}
 
                             {activeConfig.compressionMode === 'lever' && (
-                                <BPPicker label="Lever-Position" options={leverOptions} value={activeSuspension.compressionLever} onValueChange={v => updateSusValue('compressionLever', v)} accentColor={ACCENT} />
+                                <BPPicker label={t('dialed.lever_pos')} options={leverOptions} value={activeSuspension.compressionLever} onValueChange={v => updateSusValue('compressionLever', v)} accentColor={ACCENT} />
                             )}
 
                             {activeConfig.compressionMode === 'hsls' && (
@@ -434,41 +436,41 @@ export default function DialedInScreen() {
                             )}
                         </View>
 
-                        <BPPicker label="Volume Spacer / Tokens" options={tokenOptions} value={activeSuspension.tokens.toString()} onValueChange={v => updateSusValue('tokens', parseInt(v, 10))} accentColor={ACCENT} />
+                        <BPPicker label={t('dialed.tokens')} options={tokenOptions} value={activeSuspension.tokens.toString()} onValueChange={v => updateSusValue('tokens', parseInt(v, 10))} accentColor={ACCENT} />
                     </>
                 )}
 
                 {/* Tire Inputs */}
                 {activeTab === 'tires' && (
                     <>
-                        <Text style={styles.subSectionTitle}>Vorderrad</Text>
+                        <Text style={styles.subSectionTitle}>{t('dialed.front_tire')}</Text>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label="Druck VR" value={tires.frontBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, frontBar: v }))} />
+                                <BPSlider label={t('dialed.pressure_front')} value={tires.frontBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, frontBar: v }))} />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <BPPicker label="Breite" options={tireWidthOptions} value={tires.frontWidth} onValueChange={v => setTires(p => ({ ...p, frontWidth: v }))} accentColor={ACCENT} />
+                                <BPPicker label={t('dialed.width')} options={tireWidthOptions} value={tires.frontWidth} onValueChange={v => setTires(p => ({ ...p, frontWidth: v }))} accentColor={ACCENT} />
                             </View>
                         </View>
-                        <BPInput label="Reifen VR" placeholder="z.B. Maxxis Assegai MaxxGrip" value={tires.frontTire} onChangeText={v => setTires(p => ({ ...p, frontTire: v }))} accentColor={ACCENT} />
+                        <BPInput label={t('dialed.tire_front')} placeholder={t('dialed.tire_front_placeholder')} value={tires.frontTire} onChangeText={v => setTires(p => ({ ...p, frontTire: v }))} accentColor={ACCENT} />
 
-                        <Text style={styles.subSectionTitle}>Hinterrad</Text>
+                        <Text style={styles.subSectionTitle}>{t('dialed.rear_tire')}</Text>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label="Druck HR" value={tires.rearBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, rearBar: v }))} />
+                                <BPSlider label={t('dialed.pressure_rear')} value={tires.rearBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, rearBar: v }))} />
                             </View>
                             <View style={{ flex: 1 }}>
-                                <BPPicker label="Breite" options={tireWidthOptions} value={tires.rearWidth} onValueChange={v => setTires(p => ({ ...p, rearWidth: v }))} accentColor={ACCENT} />
+                                <BPPicker label={t('dialed.width')} options={tireWidthOptions} value={tires.rearWidth} onValueChange={v => setTires(p => ({ ...p, rearWidth: v }))} accentColor={ACCENT} />
                             </View>
                         </View>
-                        <BPInput label="Reifen HR" placeholder="z.B. Maxxis Minion DHR II" value={tires.rearTire} onChangeText={v => setTires(p => ({ ...p, rearTire: v }))} accentColor={ACCENT} />
+                        <BPInput label={t('dialed.tire_rear')} placeholder={t('dialed.tire_rear_placeholder')} value={tires.rearTire} onChangeText={v => setTires(p => ({ ...p, rearTire: v }))} accentColor={ACCENT} />
                     </>
                 )}
 
-                <BPInput label="Notizen" placeholder="z.B. Perfekt bei Nässe, Heck etwas weich" value={notes} onChangeText={setNotes} multiline numberOfLines={3} accentColor={ACCENT} />
+                <BPInput label={t('dialed.notes')} placeholder={t('dialed.notes_placeholder')} value={notes} onChangeText={setNotes} multiline numberOfLines={3} accentColor={ACCENT} />
 
                 <View style={styles.modalActions}>
-                    <BPButton title="Speichern" onPress={handleSave} color={ACCENT} fullWidth size="lg" disabled={!name.trim()} />
+                    <BPButton title={t('common.save')} onPress={handleSave} color={ACCENT} fullWidth size="lg" disabled={!name.trim()} />
                 </View>
             </BPModal>
         </View>

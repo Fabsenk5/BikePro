@@ -12,6 +12,7 @@ import { theme } from '@/constants/Colors';
 import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
     ScrollView,
@@ -107,6 +108,7 @@ function getTodayISO(): string {
 }
 
 export default function ShredCheckScreen() {
+    const { t } = useTranslation();
     const [components, setComponents] = useState<BikeComponent[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingComp, setEditingComp] = useState<BikeComponent | null>(null);
@@ -247,7 +249,7 @@ export default function ShredCheckScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: '🔧 Shred-Check',
+                    title: t('shred.title'),
                     headerStyle: { backgroundColor: theme.colors.surface },
                     headerTintColor: theme.colors.text,
                 }}
@@ -262,13 +264,13 @@ export default function ShredCheckScreen() {
                 {needsService > 0 && (
                     <BPCard style={styles.alertCard}>
                         <Text style={styles.alertText}>
-                            ⚠️ {needsService} Komponente{needsService > 1 ? 'n' : ''} braucht Service!
+                            {needsService === 1 ? t('shred.needs_service_one') : t('shred.needs_service_many', { count: needsService })}
                         </Text>
                     </BPCard>
                 )}
 
                 <BPButton
-                    title="+ Komponente hinzufügen"
+                    title={t('shred.add_component')}
                     onPress={openNew}
                     color={ACCENT}
                     fullWidth
@@ -278,9 +280,9 @@ export default function ShredCheckScreen() {
                 {sorted.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>🔧</Text>
-                        <Text style={styles.emptyTitle}>Keine Komponenten</Text>
+                        <Text style={styles.emptyTitle}>{t('shred.no_components')}</Text>
                         <Text style={styles.emptySubtitle}>
-                            Füge deine Verschleißteile hinzu!
+                            {t('shred.add_first')}
                         </Text>
                     </View>
                 ) : (
@@ -315,21 +317,21 @@ export default function ShredCheckScreen() {
 
                                     <View style={styles.compFooter}>
                                         <Text style={styles.compDate}>
-                                            Service: {formatDate(comp.lastServiceDate)}
+                                            {t('shred.service_label')} {formatDate(comp.lastServiceDate)}
                                         </Text>
                                         <View style={styles.compActions}>
                                             <TouchableOpacity
                                                 style={styles.actionBtn}
                                                 onPress={() => handleAddKm(comp)}
                                             >
-                                                <Text style={styles.actionBtnText}>+10km</Text>
+                                                <Text style={styles.actionBtnText}>{t('shred.add_10km')}</Text>
                                             </TouchableOpacity>
                                             <TouchableOpacity
                                                 style={[styles.actionBtn, styles.serviceBtn]}
                                                 onPress={() => handleService(comp)}
                                             >
                                                 <Text style={[styles.actionBtnText, styles.serviceBtnText]}>
-                                                    ✅ Service
+                                                    {t('shred.service_done')}
                                                 </Text>
                                             </TouchableOpacity>
                                         </View>
@@ -349,18 +351,18 @@ export default function ShredCheckScreen() {
             <BPModal
                 visible={modalVisible}
                 onClose={() => setModalVisible(false)}
-                title={editingComp ? 'Komponente bearbeiten' : 'Neue Komponente'}
+                title={editingComp ? t('shred.edit_component') : t('shred.new_component')}
             >
                 <BPPicker
-                    label="Typ"
+                    label={t('shred.type')}
                     options={componentTypes}
                     value={type}
                     onValueChange={handleTypeChange}
                     accentColor={ACCENT}
                 />
                 <BPInput
-                    label="Name (optional)"
-                    placeholder={`z.B. Maxxis Assegai ${getTypeName(type)}`}
+                    label={t('shred.name_optional')}
+                    placeholder={t('shred.name_placeholder')}
                     value={name}
                     onChangeText={setName}
                     accentColor={ACCENT}
@@ -368,7 +370,7 @@ export default function ShredCheckScreen() {
 
                 <View style={styles.inputRow}>
                     <BPInput
-                        label="Aktuelle km"
+                        label={t('shred.current_km')}
                         placeholder="0"
                         value={currentKm}
                         onChangeText={setCurrentKm}
@@ -378,7 +380,7 @@ export default function ShredCheckScreen() {
                         containerStyle={{ flex: 1 }}
                     />
                     <BPInput
-                        label="Service-Intervall"
+                        label={t('shred.interval_km')}
                         placeholder="500"
                         value={serviceIntervalKm}
                         onChangeText={setServiceIntervalKm}
@@ -390,14 +392,14 @@ export default function ShredCheckScreen() {
                 </View>
 
                 <BPInput
-                    label="Letzter Service"
+                    label={t('shred.last_service')}
                     placeholder="YYYY-MM-DD"
                     value={lastServiceDate}
                     onChangeText={setLastServiceDate}
                     accentColor={ACCENT}
                 />
                 <BPInput
-                    label="Notizen"
+                    label={t('shred.notes')}
                     placeholder="z.B. Schwalbe Magic Mary, Soft compound"
                     value={notes}
                     onChangeText={setNotes}
@@ -408,7 +410,7 @@ export default function ShredCheckScreen() {
 
                 <View style={styles.modalActions}>
                     <BPButton
-                        title="Speichern"
+                        title={t('common.save')}
                         onPress={handleSave}
                         color={ACCENT}
                         fullWidth

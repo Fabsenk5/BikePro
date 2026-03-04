@@ -10,6 +10,7 @@ import { theme } from '@/constants/Colors';
 import { syncLoadBikes, syncSaveBikes } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Alert,
     ScrollView,
@@ -167,6 +168,7 @@ function getTypeLabel(type: string): string {
 }
 
 export default function ComponentTrackerScreen() {
+    const { t } = useTranslation();
     const [bikes, setBikes] = useState<Bike[]>([]);
     const [selectedBikeId, setSelectedBikeId] = useState<string | null>(null);
     const [bikeModalVisible, setBikeModalVisible] = useState(false);
@@ -366,7 +368,7 @@ export default function ComponentTrackerScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: '🔩 Component Tracker',
+                    title: `🔩 ${t('features.component-tracker.title', { defaultValue: 'Component Tracker' })}`,
                     headerStyle: { backgroundColor: theme.colors.surface },
                     headerTintColor: theme.colors.text,
                 }}
@@ -440,16 +442,16 @@ export default function ComponentTrackerScreen() {
                 {selectedBike?.components.length === 0 && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>🔩</Text>
-                        <Text style={styles.emptyTitle}>Keine Komponenten</Text>
-                        <Text style={styles.emptySubtitle}>Füge die Parts deines Bikes hinzu!</Text>
+                        <Text style={styles.emptyTitle}>{t('tracker.components')}</Text>
+                        <Text style={styles.emptySubtitle}>—</Text>
                     </View>
                 )}
 
                 {!selectedBike && bikes.length === 0 && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>🚵</Text>
-                        <Text style={styles.emptyTitle}>Kein Bike angelegt</Text>
-                        <Text style={styles.emptySubtitle}>Erstelle zuerst dein Bike!</Text>
+                        <Text style={styles.emptyTitle}>{t('tracker.no_bikes')}</Text>
+                        <Text style={styles.emptySubtitle}>{t('tracker.add_first_bike')}</Text>
                     </View>
                 )}
 
@@ -501,17 +503,17 @@ export default function ComponentTrackerScreen() {
             <BPModal
                 visible={bikeModalVisible}
                 onClose={() => setBikeModalVisible(false)}
-                title={editingBike ? 'Bike bearbeiten' : 'Neues Bike'}
+                title={editingBike ? t('tracker.edit_bike') : t('tracker.add_bike')}
             >
-                <BPInput label="Bike-Name" placeholder="z.B. Canyon Torque" value={bikeName} onChangeText={setBikeName} accentColor={ACCENT} />
-                <BPPicker label="Typ" options={bikeTypeOptions} value={bikeType} onValueChange={setBikeType} accentColor={ACCENT} />
+                <BPInput label={t('tracker.name')} placeholder="z.B. Canyon Torque" value={bikeName} onChangeText={setBikeName} accentColor={ACCENT} />
+                <BPPicker label={t('tracker.type')} options={bikeTypeOptions} value={bikeType} onValueChange={setBikeType} accentColor={ACCENT} />
                 <View style={styles.inputRow}>
-                    <BPInput label="Modell" placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 2 }} />
-                    <BPPicker label="Größe" options={bikeSizeOptions} value={bikeSize} onValueChange={setBikeSize} accentColor={ACCENT} />
+                    <BPInput label={t('tracker.model')} placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 2 }} />
+                    <BPPicker label={t('tracker.size')} options={bikeSizeOptions} value={bikeSize} onValueChange={setBikeSize} accentColor={ACCENT} />
                 </View>
-                <BPInput label="Baujahr" placeholder="2024" value={bikeYear} onChangeText={setBikeYear} keyboardType="numeric" accentColor={ACCENT} />
+                <BPInput label={t('tracker.year')} placeholder="2024" value={bikeYear} onChangeText={setBikeYear} keyboardType="numeric" accentColor={ACCENT} />
                 <View style={{ marginTop: theme.spacing.lg }}>
-                    <BPButton title="Speichern" onPress={saveBike} color={ACCENT} fullWidth size="lg" disabled={!bikeName.trim()} />
+                    <BPButton title={t('common.save')} onPress={saveBike} color={ACCENT} fullWidth size="lg" disabled={!bikeName.trim()} />
                 </View>
             </BPModal>
 
@@ -519,19 +521,19 @@ export default function ComponentTrackerScreen() {
             <BPModal
                 visible={compModalVisible}
                 onClose={() => setCompModalVisible(false)}
-                title={editingComp ? 'Komponente bearbeiten' : 'Neue Komponente'}
+                title={editingComp ? t('tracker.edit_component') : t('tracker.add_component')}
             >
-                <BPPicker label="Typ" options={componentTypes} value={compType} onValueChange={handleCompTypeChange} accentColor={ACCENT} />
+                <BPPicker label={t('tracker.type')} options={componentTypes} value={compType} onValueChange={handleCompTypeChange} accentColor={ACCENT} />
                 <View style={styles.inputRow}>
-                    <BPInput label="Hersteller" placeholder="z.B. Shimano" value={compBrand} onChangeText={setCompBrand} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                    <BPInput label="Modell" placeholder="z.B. XT M8120" value={compModel} onChangeText={setCompModel} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('tracker.brand')} placeholder="z.B. Shimano" value={compBrand} onChangeText={setCompBrand} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('tracker.model')} placeholder="z.B. XT M8120" value={compModel} onChangeText={setCompModel} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
-                <BPInput label="Gewicht" placeholder="0" value={compWeight} onChangeText={setCompWeight} suffix="g" keyboardType="numeric" accentColor={ACCENT} />
+                <BPInput label={t('tracker.weight')} placeholder="0" value={compWeight} onChangeText={setCompWeight} suffix="g" keyboardType="numeric" accentColor={ACCENT} />
 
                 {/* Dynamic setup fields */}
                 {compSetup.length > 0 && (
                     <View style={styles.setupSection}>
-                        <Text style={styles.setupSectionTitle}>⚙️ Setup-Werte</Text>
+                        <Text style={styles.setupSectionTitle}>⚙️ {t('tracker.setup_values')}</Text>
                         {compSetup.map((sv, i) => (
                             <BPInput
                                 key={`${sv.key}-${i}`}
@@ -551,7 +553,7 @@ export default function ComponentTrackerScreen() {
                 {/* Move to different bike (only when editing and >1 bike exists) */}
                 {editingComp && bikes.length > 1 && (
                     <View style={styles.moveSection}>
-                        <Text style={styles.moveSectionTitle}>🔄 An anderes Bike verschieben</Text>
+                        <Text style={styles.moveSectionTitle}>🔄 {t('tracker.move_component')}</Text>
                         <BPPicker
                             label="Ziel-Bike"
                             options={[
@@ -569,7 +571,7 @@ export default function ComponentTrackerScreen() {
                 )}
 
                 <View style={{ marginTop: theme.spacing.lg }}>
-                    <BPButton title="Speichern" onPress={saveComp} color={ACCENT} fullWidth size="lg" />
+                    <BPButton title={t('common.save')} onPress={saveComp} color={ACCENT} fullWidth size="lg" />
                 </View>
             </BPModal>
         </View>

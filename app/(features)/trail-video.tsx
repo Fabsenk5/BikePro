@@ -10,6 +10,7 @@ import { BPCard, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { Stack } from 'expo-router';
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Dimensions,
     Image,
@@ -124,22 +125,23 @@ const curatedVideos: CuratedVideo[] = [
     },
 ];
 
-const categoryOptions = [
-    { label: '🏆 Alle', value: 'all' },
-    { label: '⛰️ Downhill', value: 'downhill' },
-    { label: '🦅 Freeride', value: 'freeride' },
-    { label: '🌲 Trail', value: 'trail' },
-    { label: '🏁 Enduro', value: 'enduro' },
-    { label: '🏙️ Street', value: 'street' },
-    { label: '📚 Technik', value: 'technik' },
-];
-
-function getThumbnail(youtubeId: string): string {
-    return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
-}
-
 export default function TrailVideoScreen() {
+    const { t } = useTranslation();
     const [category, setCategory] = useState('all');
+
+    const getThumbnail = (youtubeId: string): string => {
+        return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+    };
+
+    const categoryOptions = [
+        { label: t('trail_video.cat_all'), value: 'all' },
+        { label: t('trail_video.cat_downhill'), value: 'downhill' },
+        { label: t('trail_video.cat_freeride'), value: 'freeride' },
+        { label: t('trail_video.cat_trail'), value: 'trail' },
+        { label: t('trail_video.cat_enduro'), value: 'enduro' },
+        { label: t('trail_video.cat_street'), value: 'street' },
+        { label: t('trail_video.cat_technik'), value: 'technik' },
+    ];
 
     const filtered =
         category === 'all'
@@ -154,7 +156,7 @@ export default function TrailVideoScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: '🎬 Trail-Video',
+                    title: t('trail_video.title'),
                     headerStyle: { backgroundColor: theme.colors.surface },
                     headerTintColor: theme.colors.text,
                 }}
@@ -167,7 +169,7 @@ export default function TrailVideoScreen() {
             >
                 {/* Category filter */}
                 <BPPicker
-                    label="Kategorie"
+                    label={t('trail_video.category_label')}
                     options={categoryOptions}
                     value={category}
                     onValueChange={setCategory}
@@ -177,7 +179,7 @@ export default function TrailVideoScreen() {
                 {/* Featured section */}
                 {category === 'all' && (
                     <View style={styles.featuredSection}>
-                        <Text style={styles.sectionTitle}>🔥 Edits of the Week</Text>
+                        <Text style={styles.sectionTitle}>{t('trail_video.featured_title')}</Text>
                     </View>
                 )}
 
@@ -214,7 +216,7 @@ export default function TrailVideoScreen() {
                                 {/* Featured badge */}
                                 {video.featured && (
                                     <View style={[styles.featuredBadge, { backgroundColor: ACCENT }]}>
-                                        <Text style={styles.featuredBadgeText}>🔥 FEATURED</Text>
+                                        <Text style={styles.featuredBadgeText}>{t('trail_video.badge_featured')}</Text>
                                     </View>
                                 )}
                             </View>
@@ -238,7 +240,7 @@ export default function TrailVideoScreen() {
                 {filtered.length === 0 && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>🎬</Text>
-                        <Text style={styles.emptyTitle}>Keine Videos in dieser Kategorie</Text>
+                        <Text style={styles.emptyTitle}>{t('trail_video.no_videos')}</Text>
                     </View>
                 )}
             </ScrollView>

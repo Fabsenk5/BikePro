@@ -11,6 +11,7 @@ import { theme } from '@/constants/Colors';
 import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     Linking,
     RefreshControl,
@@ -518,71 +519,39 @@ const bikeparks: Bikepark[] = [
     },
 ];
 
-const regionFilter = [
-    { label: '🌍 Alle', value: 'all' },
-    { label: '🇩🇪 Deutschland', value: 'DE' },
-    { label: '🇦🇹 Österreich', value: 'AT' },
-    { label: '🇨🇭 Schweiz', value: 'CH' },
-    { label: '🇫🇷 Frankreich', value: 'FR' },
-    { label: '🇮🇹 Italien', value: 'IT' },
-    { label: '🇨🇿 Tschechien', value: 'CZ' },
-];
-
-const countryMap: Record<string, string> = {
-    '🇩🇪': 'DE',
-    '🇦🇹': 'AT',
-    '🇨🇭': 'CH',
-    '🇫🇷': 'FR',
-    '🇮🇹': 'IT',
-    '🇨🇿': 'CZ',
-};
-
-function getStatusInfo(status: Bikepark['liftStatus']) {
-    switch (status) {
-        case 'open':
-            return { color: '#4CAF50', label: 'OFFEN', emoji: '🟢' };
-        case 'partial':
-            return { color: '#FFC107', label: 'TEILWEISE', emoji: '🟡' };
-        case 'closed':
-            return { color: '#F44336', label: 'GESCHLOSSEN', emoji: '🔴' };
-        case 'season_end':
-            return { color: '#9E9E9E', label: 'SAISONENDE', emoji: '⚫' };
-    }
-}
-
-function getGoScore(park: Bikepark): number {
-    // Simple Go/No-Go scoring (0-100)
-    let score = 50;
-
-    // Weather bonus
-    if (park.weather.rain === 0) score += 20;
-    else if (park.weather.rain < 3) score += 5;
-    else score -= 20;
-
-    if (park.weather.temp >= 10 && park.weather.temp <= 25) score += 15;
-    else if (park.weather.temp >= 5) score += 5;
-    else score -= 10;
-
-    if (park.weather.wind < 15) score += 10;
-    else if (park.weather.wind > 25) score -= 15;
-
-    // Lift status
-    if (park.liftStatus === 'open') score += 20;
-    else if (park.liftStatus === 'partial') score += 5;
-    else score -= 30;
-
-    return Math.max(0, Math.min(100, score));
-}
-
-function getGoLabel(score: number): { label: string; color: string } {
-    if (score >= 80) return { label: '🟢 LET\'S GO!', color: '#4CAF50' };
-    if (score >= 60) return { label: '🟡 MACHBAR', color: '#FFC107' };
-    if (score >= 40) return { label: '🟠 RISKY', color: '#FF9800' };
-    return { label: '🔴 NO-GO', color: '#F44336' };
+function getGoLabel(score: number, t: any): { label: string; color: string } {
+    if (score >= 80) return { label: t('park_picker.go_lets_go'), color: '#4CAF50' };
+    if (score >= 60) return { label: t('park_picker.go_doable'), color: '#FFC107' };
+    if (score >= 40) return { label: t('park_picker.go_risky'), color: '#FF9800' };
+    return { label: t('park_picker.go_no_go'), color: '#F44336' };
 }
 
 export default function ParkPickerScreen() {
+    const { t } = useTranslation();
     const [region, setRegion] = useState('all');
+
+    const regionFilter = [
+        { label: t('park_picker.region_all'), value: 'all' },
+        { label: t('park_picker.region_de'), value: 'DE' },
+        { label: t('park_picker.region_at'), value: 'AT' },
+        { label: t('park_picker.region_ch'), value: 'CH' },
+        { label: t('park_picker.region_fr'), value: 'FR' },
+        { label: t('park_picker.region_it'), value: 'IT' },
+        { label: t('park_picker.region_cz'), value: 'CZ' },
+    ];
+
+    function getStatusInfo(status: Bikepark['liftStatus']) {
+        switch (status) {
+            case 'open':
+                return { color: '#4CAF50', label: t('park_picker.status_open'), emoji: '🟢' };
+            case 'partial':
+                return { color: '#FFC107', label: t('park_picker.status_partial'), emoji: '🟡' };
+            case 'closed':
+                return { color: '#F44336', label: t('park_picker.status_closed'), emoji: '🔴' };
+            case 'season_end':
+                return { color: '#9E9E9E', label: t('park_picker.status_season_end'), emoji: '⚫' };
+        }
+    }
     const [refreshing, setRefreshing] = useState(false);
     const [favorites, setFavorites] = useState<string[]>([]);
 
@@ -606,7 +575,21 @@ export default function ParkPickerScreen() {
             ? bikeparks
             : bikeparks.filter((p) => countryMap[p.country] === region);
 
-    // Sort: favorites first, then by Go-Score desc
+    const countryMap: Record<string, string> = {
+        '🇦🇹': 'at', '🇩🇪': 'de', '🇨🇭': 'ch', '🇮🇹': 'it', '🇫🇷': 'fr', '🇨🇦': 'ca', '🇬🇧': 'gb'
+    };
+
+    const getGoScore = (park: Bikepark) => {
+        let score = 0;
+        if (park.liftStatus === 'open') score += 5;
+        if (park.liftStatus === 'partial') score += 2;
+        if (park.weather.condition === '☀️') score += 3;
+        if (park.weather.condition === '⛅') score += 2;
+        if (park.weather.condition === '🌧️') score -= 2;
+        if (park.weather.temp > 15 && park.weather.temp < 25) score += 2; // Optimal temp
+        return score;
+    };
+
     const sorted = [...filtered].sort((a, b) => {
         const aFav = favorites.includes(a.id) ? 1 : 0;
         const bFav = favorites.includes(b.id) ? 1 : 0;
@@ -623,7 +606,7 @@ export default function ParkPickerScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: '🏔️ Park-Picker Pro',
+                    title: t('park_picker.title'),
                     headerStyle: { backgroundColor: theme.colors.surface },
                     headerTintColor: theme.colors.text,
                 }}
@@ -639,9 +622,9 @@ export default function ParkPickerScreen() {
             >
                 {/* Region filter */}
                 <BPPicker
-                    label="Region"
+                    label={t('park_picker.region_label')}
                     options={[
-                        { label: '⭐ Favoriten (' + favorites.length + ')', value: 'favorites' },
+                        { label: t('park_picker.favorites_label', { count: favorites.length }), value: 'favorites' },
                         ...regionFilter,
                     ]}
                     value={region}
@@ -650,14 +633,14 @@ export default function ParkPickerScreen() {
                 />
 
                 <Text style={styles.hint}>
-                    📡 Wetterdaten werden demnächst live geladen (OpenWeatherMap API)
+                    {t('park_picker.weather_hint')}
                 </Text>
 
                 {/* Park cards */}
                 {sorted.map((park) => {
                     const status = getStatusInfo(park.liftStatus);
                     const goScore = getGoScore(park);
-                    const go = getGoLabel(goScore);
+                    const go = getGoLabel(goScore, t);
 
                     return (
                         <TouchableOpacity
@@ -711,15 +694,15 @@ export default function ParkPickerScreen() {
                                             {status.emoji} {status.label}
                                         </Text>
                                         <Text style={styles.liftCount}>
-                                            {park.openLifts}/{park.lifts} Lifte
+                                            {t('park_picker.lifts_count', { open: park.openLifts, total: park.lifts })}
                                         </Text>
                                     </View>
                                 </View>
 
                                 {/* Trails info */}
                                 <View style={styles.trailsRow}>
-                                    <Text style={styles.trailsText}>🚵 {park.trails} Strecken</Text>
-                                    <Text style={styles.websiteLink}>Website →</Text>
+                                    <Text style={styles.trailsText}>{t('park_picker.trails_count', { count: park.trails })}</Text>
+                                    <Text style={styles.websiteLink}>{t('park_picker.website_link')}</Text>
                                 </View>
                             </BPCard>
                         </TouchableOpacity>

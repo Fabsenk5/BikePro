@@ -4,6 +4,7 @@ import { Feature, features as defaultFeatures } from '@/constants/Features';
 import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ScrollView,
   StatusBar,
@@ -17,6 +18,7 @@ const TILE_ORDER_KEY = '@bikepro_tile_order';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [editMode, setEditMode] = useState(false);
   const [orderedFeatures, setOrderedFeatures] = useState<Feature[]>(defaultFeatures);
   const [selectedTile, setSelectedTile] = useState<number | null>(null);
@@ -96,7 +98,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <Text style={styles.logoEmoji}>🚵</Text>
           <Text style={styles.logoText}>BikePro</Text>
-          <Text style={styles.tagline}>Dein All-in-One MTB Hub</Text>
+          <Text style={styles.tagline}>{t('home.tagline')}</Text>
         </View>
 
         {/* Edit mode toggle */}
@@ -105,7 +107,7 @@ export default function HomeScreen() {
           style={[styles.editBtn, editMode && styles.editBtnActive]}
         >
           <Text style={[styles.editBtnText, editMode && styles.editBtnTextActive]}>
-            {editMode ? '✓ Fertig' : '✏️ Sortieren'}
+            {editMode ? t('home.edit_done') : t('home.edit_sort')}
           </Text>
         </TouchableOpacity>
 
@@ -113,7 +115,7 @@ export default function HomeScreen() {
         {editMode && (
           <View style={styles.editHint}>
             <Text style={styles.editHintText}>
-              Tippe auf zwei Tiles um sie zu tauschen, oder nutze ▲ ▼ zum Verschieben
+              {t('home.edit_hint')}
             </Text>
           </View>
         )}
@@ -155,7 +157,7 @@ export default function HomeScreen() {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Shred hard. Ride smart. 🤙
+            {t('home.footer')}
           </Text>
         </View>
       </ScrollView>
