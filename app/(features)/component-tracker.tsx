@@ -234,7 +234,18 @@ export default function ComponentTrackerScreen() {
         setCompModel(comp.model);
         setCompWeight(comp.weight);
         setCompNotes(comp.notes);
-        setCompSetup(comp.setupValues.map(s => ({ ...s })));
+        // Merge saved values with defaults so new fields show up
+        const defaults = defaultSetupKeys[comp.type] ?? [];
+        const saved = comp.setupValues ?? [];
+        const merged = defaults.map(d => {
+            const existing = saved.find(s => s.key === d.key);
+            return existing ? { ...existing } : { ...d };
+        });
+        // Keep any saved keys that aren't in defaults (custom entries)
+        saved.forEach(s => {
+            if (!merged.find(m => m.key === s.key)) merged.push({ ...s });
+        });
+        setCompSetup(merged);
         setCompMoveToBikeId('');
         setCompModalVisible(true);
     };
