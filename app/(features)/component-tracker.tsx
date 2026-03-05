@@ -8,6 +8,7 @@
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, WearItem } from '@/lib/sync';
+import Slider from '@react-native-community/slider';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -171,11 +172,42 @@ export default function ComponentTrackerScreen() {
                 break;
             default:
                 list.push({ id: 'general', label: 'Verschleißteil', currentKm: 0, serviceIntervalKm: 500, lastServiceDate: installedDate, installedDate });
-                break;
         }
         return list;
     }
 
+    // specific setup field options
+    const wheelSizeOptions = [
+        { label: '26"', value: '26' },
+        { label: '27.5"', value: '27.5' },
+        { label: '29"', value: '29' },
+    ];
+    const tireWidthOptions = [
+        { label: '2.0"', value: '2.0' }, { label: '2.2"', value: '2.2' },
+        { label: '2.3"', value: '2.3' }, { label: '2.35"', value: '2.35' },
+        { label: '2.4"', value: '2.4' }, { label: '2.5"', value: '2.5' },
+        { label: '2.6"', value: '2.6' }, { label: '2.8" (Plus)', value: '2.8' },
+    ];
+    const tireTypeOptions = [
+        { label: t('tracker.type_xc', { defaultValue: 'XC / Marathon' }), value: 'xc' },
+        { label: t('tracker.type_trail', { defaultValue: 'Trail' }), value: 'trail' },
+        { label: t('tracker.type_enduro', { defaultValue: 'Enduro' }), value: 'enduro' },
+        { label: t('tracker.type_dh', { defaultValue: 'Downhill' }), value: 'dh' },
+        { label: t('tracker.type_mud', { defaultValue: 'Matschreifen' }), value: 'mud' },
+    ];
+    const casingOptions = [
+        { label: t('tracker.casing_light', { defaultValue: 'Light / Super Race' }), value: 'light' },
+        { label: t('tracker.casing_standard', { defaultValue: 'Standard / EXO' }), value: 'standard' },
+        { label: t('tracker.casing_reinforced', { defaultValue: 'Reinforced / EXO+' }), value: 'reinforced' },
+        { label: t('tracker.casing_doubledown', { defaultValue: 'DoubleDown (DD)' }), value: 'doubledown' },
+        { label: t('tracker.casing_dh', { defaultValue: 'DH / Super Gravity' }), value: 'dh' },
+    ];
+    const setupMountOptions = [
+        { label: t('tracker.setup_tubeless', { defaultValue: 'Tubeless' }), value: 'tubeless' },
+        { label: t('tracker.setup_tube_butyl', { defaultValue: 'Schlauch (Butyl)' }), value: 'tube_butyl' },
+        { label: t('tracker.setup_tube_latex', { defaultValue: 'Schlauch (Latex/TPU)' }), value: 'tube_latex' },
+        { label: t('tracker.setup_insert', { defaultValue: 'Tire Insert (z.B. CushCore)' }), value: 'insert' },
+    ];
     const loadData = async () => {
         const data = await syncLoadBikes();
         setBikes(data);
@@ -579,17 +611,55 @@ export default function ComponentTrackerScreen() {
                 {compSetup.length > 0 && (
                     <View style={styles.setupSection}>
                         <Text style={styles.setupSectionTitle}>⚙️ {t('tracker.setup_values')}</Text>
-                        {compSetup.map((sv, i) => (
-                            <BPInput
-                                key={`${sv.key}-${i}`}
-                                label={sv.key}
-                                placeholder="—"
-                                value={sv.value}
-                                onChangeText={(v) => updateSetupValue(i, v)}
-                                suffix={sv.unit}
-                                accentColor={ACCENT}
-                            />
-                        ))}
+                        {compSetup.map((sv, i) => {
+                            if (sv.key === 'Größe') {
+                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...wheelSizeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            }
+                            if (sv.key === 'Breite') {
+                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...tireWidthOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            }
+                            if (sv.key === 'Reifentyp') {
+                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...tireTypeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            }
+                            if (sv.key === 'Karkasse') {
+                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...casingOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            }
+                            if (sv.key === 'Montage') {
+                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...setupMountOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            }
+                            if (sv.key === 'Druck') {
+                                return (
+                                    <View key={i} style={{ marginBottom: theme.spacing.lg }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{sv.key}</Text>
+                                            <Text style={{ color: ACCENT, fontWeight: '600' }}>{parseFloat(sv.value || '0').toFixed(1)} {sv.unit}</Text>
+                                        </View>
+                                        <Slider
+                                            style={{ height: 40 }}
+                                            minimumValue={1.0}
+                                            maximumValue={3.5}
+                                            step={0.1}
+                                            value={parseFloat(sv.value || '1.8')}
+                                            onValueChange={(val) => updateSetupValue(i, val.toFixed(1))}
+                                            minimumTrackTintColor={ACCENT}
+                                            maximumTrackTintColor={theme.colors.border}
+                                            thumbTintColor={ACCENT}
+                                        />
+                                    </View>
+                                )
+                            }
+                            return (
+                                <BPInput
+                                    key={`${sv.key}-${i}`}
+                                    label={sv.key}
+                                    placeholder="—"
+                                    value={sv.value}
+                                    onChangeText={(v) => updateSetupValue(i, v)}
+                                    suffix={sv.unit}
+                                    accentColor={ACCENT}
+                                />
+                            );
+                        })}
                     </View>
                 )}
 
