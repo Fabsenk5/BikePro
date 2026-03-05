@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS components (
     purchase_date TEXT DEFAULT '',
     setup_values JSONB DEFAULT '[]'::jsonb,
     notes TEXT DEFAULT '',
+    is_wear_tracked BOOLEAN DEFAULT false,
+    current_km INTEGER DEFAULT 0,
+    service_interval_km INTEGER DEFAULT 500,
+    last_service_date TEXT DEFAULT '',
+    installed_date TEXT DEFAULT '',
+    wear_items JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
