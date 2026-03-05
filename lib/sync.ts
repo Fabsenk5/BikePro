@@ -90,6 +90,12 @@ export interface SyncComponent {
     purchaseDate: string;
     setupValues: any[];
     notes: string;
+    // --- Shred Check / Wear Tracking Fields ---
+    isWearTracked?: boolean;
+    currentKm?: number;
+    serviceIntervalKm?: number;
+    lastServiceDate?: string;
+    installedDate?: string;
 }
 
 const BIKES_KEY = '@bikepro_bikes';
@@ -116,6 +122,11 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         id: c.id, type: c.type, brand: c.brand, model: c.model,
                         weight: c.weight, purchaseDate: c.purchase_date,
                         setupValues: c.setup_values ?? [], notes: c.notes,
+                        isWearTracked: c.is_wear_tracked ?? false,
+                        currentKm: c.current_km ?? 0,
+                        serviceIntervalKm: c.service_interval_km ?? 500,
+                        lastServiceDate: c.last_service_date ?? new Date().toISOString().split('T')[0],
+                        installedDate: c.installed_date ?? new Date().toISOString().split('T')[0],
                     })),
             }));
 
@@ -168,6 +179,11 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
                     brand: c.brand, model: c.model, weight: c.weight,
                     purchase_date: c.purchaseDate, setup_values: c.setupValues,
                     notes: c.notes,
+                    is_wear_tracked: c.isWearTracked ?? false,
+                    current_km: c.currentKm ?? 0,
+                    service_interval_km: c.serviceIntervalKm ?? 500,
+                    last_service_date: c.lastServiceDate,
+                    installed_date: c.installedDate,
                 });
             });
         });

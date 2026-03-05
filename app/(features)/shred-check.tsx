@@ -7,9 +7,9 @@
  * Integration: Liest Ride-Log km für automatische Aggregation (später)
  * UI Supervisor: Wear & Tear Fortschrittsbalken
  */
-import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPProgressBar } from '@/components/ui';
+import { BPCard, BPProgressBar } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncLoadBikes, syncLoadPreference, syncSavePreference } from '@/lib/sync';
+import { syncLoadBikes, syncSaveBikes } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -103,9 +103,7 @@ function getTodayISO(): string {
 
 export default function ShredCheckScreen() {
     const { t, i18n } = useTranslation();
-    const [components, setComponents] = useState<BikeComponent[]>([]);
-    const [modalVisible, setModalVisible] = useState(false);
-    const [editingComp, setEditingComp] = useState<BikeComponent | null>(null);
+    const [bikes, setBikes] = useState<any[]>([]);
 
     const formatDate = (iso: string): string => {
         if (!iso) return '—';
@@ -113,174 +111,81 @@ export default function ShredCheckScreen() {
         return d.toLocaleDateString(i18n.language, { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    // Form state
-    const [name, setName] = useState('');
-    const [type, setType] = useState('chain');
-    const [currentKm, setCurrentKm] = useState('0');
-    const [serviceIntervalKm, setServiceIntervalKm] = useState('500');
-    const [lastServiceDate, setLastServiceDate] = useState(getTodayISO());
-    const [notes, setNotes] = useState('');
-
-    // --- Import from Component Tracker ---
-    const [importModalVisible, setImportModalVisible] = useState(false);
-    const [importBikes, setImportBikes] = useState<any[]>([]);
-    const [importSelectedBikeId, setImportSelectedBikeId] = useState<string>('');
-
-    const openImport = async () => {
-        const bikes = await syncLoadBikes();
-        setImportBikes(bikes);
-        setImportSelectedBikeId(bikes.length > 0 ? bikes[0].id : '');
-        setImportModalVisible(true);
-    };
-
-    const importSelectedBike = importBikes.find(b => b.id === importSelectedBikeId);
-
-    // Map tracker type -> shred type (best-effort match)
-    const trackerToShredType: Record<string, string> = {
-        fork: 'fork_small', shock: 'shock_small', chain: 'chain',
-        wheel_front: 'tire_front', wheel_rear: 'tire_rear',
-        brake_front: 'brake_front', brake_rear: 'brake_rear',
-        cassette: 'cassette', derailleur: 'derailleur', other: 'other',
-    };
-
-    const handleImportComp = (comp: any) => {
-        const shredType = trackerToShredType[comp.type] ?? 'other';
-        const compData: BikeComponent = {
-            id: Date.now().toString(),
-            name: `${comp.brand ?? ''} ${comp.model ?? ''}`.trim() || getTypeName(shredType),
-            type: shredType,
-            currentKm: 0,
-            serviceIntervalKm: defaultIntervals[shredType] ?? 500,
-            lastServiceDate: getTodayISO(),
-            installedDate: getTodayISO(),
-            notes: comp.notes ?? '',
-        };
-        persist([compData, ...components]);
-        setImportModalVisible(false);
+    // We don't edit components here anymore, ComponentTracker is master.
+    // We only update km/service status.
+    const loadBikes = async () => {
+        const data = await syncLoadBikes();
+        setBikes(data ?? []);
     };
 
     useEffect(() => {
-        syncLoadPreference<BikeComponent[]>('shred_check', STORAGE_KEY).then(data => setComponents(data ?? []));
+        loadBikes();
     }, []);
 
-    const persist = async (updated: BikeComponent[]) => {
-        await syncSavePreference('shred_check', STORAGE_KEY, updated);
-        setComponents(updated);
+    const updateComponentInBikes = async (compId: string, updateFn: (comp: any) => any) => {
+        const updatedBikes = bikes.map(b => ({
+            ...b,
+            components: b.components.map((c: any) => c.id === compId ? updateFn(c) : c)
+        }));
+        await syncSaveBikes(updatedBikes);
+        setBikes(updatedBikes);
     };
 
-    const openNew = () => {
-        setEditingComp(null);
-        setName('');
-        setType('chain');
-        setCurrentKm('0');
-        setServiceIntervalKm(defaultIntervals['chain'].toString());
-        setLastServiceDate(getTodayISO());
-        setNotes('');
-        setModalVisible(true);
-    };
-
-    const openEdit = (comp: BikeComponent) => {
-        setEditingComp(comp);
-        setName(comp.name);
-        setType(comp.type);
-        setCurrentKm(comp.currentKm.toString());
-        setServiceIntervalKm(comp.serviceIntervalKm.toString());
-        setLastServiceDate(comp.lastServiceDate);
-        setNotes(comp.notes);
-        setModalVisible(true);
-    };
-
-    const handleTypeChange = (newType: string) => {
-        setType(newType);
-        if (!editingComp) {
-            setServiceIntervalKm((defaultIntervals[newType] ?? 500).toString());
-        }
-    };
-
-    const handleSave = () => {
-        const compData: BikeComponent = {
-            id: editingComp?.id ?? Date.now().toString(),
-            name: name.trim() || getTypeName(type),
-            type,
-            currentKm: parseFloat(currentKm) || 0,
-            serviceIntervalKm: parseInt(serviceIntervalKm, 10) || 500,
-            lastServiceDate,
-            installedDate: editingComp?.installedDate ?? getTodayISO(),
-            notes: notes.trim(),
-        };
-
-        let updated: BikeComponent[];
-        if (editingComp) {
-            updated = components.map((c) => (c.id === editingComp.id ? compData : c));
-        } else {
-            updated = [compData, ...components];
-        }
-        persist(updated);
-        setModalVisible(false);
-    };
-
-    const handleService = (comp: BikeComponent) => {
+    const handleService = (comp: any) => {
         Alert.alert(
             'Service durchgeführt?',
-            `${getTypeEmoji(comp.type)} ${comp.name} — km-Zähler zurücksetzen?`,
+            `${getTypeEmoji(comp.type)} ${comp.brand || ''} ${comp.model || comp.type} — km-Zähler zurücksetzen?`,
             [
                 { text: 'Abbrechen', style: 'cancel' },
                 {
                     text: '✅ Service erledigt',
                     onPress: () => {
-                        const updated = components.map((c) =>
-                            c.id === comp.id
-                                ? { ...c, currentKm: 0, lastServiceDate: getTodayISO() }
-                                : c
-                        );
-                        persist(updated);
+                        updateComponentInBikes(comp.id, c => ({
+                            ...c,
+                            currentKm: 0,
+                            lastServiceDate: getTodayISO()
+                        }));
                     },
                 },
             ]
         );
     };
 
-    const handleDelete = (id: string) => {
-        Alert.alert('Komponente löschen?', '', [
-            { text: 'Abbrechen', style: 'cancel' },
-            {
-                text: 'Löschen',
-                style: 'destructive',
-                onPress: () => persist(components.filter((c) => c.id !== id)),
-            },
-        ]);
-    };
-
-    const handleAddKm = (comp: BikeComponent) => {
+    const handleAddKm = (comp: any) => {
         Alert.prompt
-            ? Alert.prompt('km hinzufügen', `Wie viele km für ${comp.name}?`, (val) => {
+            ? Alert.prompt('km hinzufügen', `Wie viele km für ${comp.brand || ''} ${comp.model || comp.type}?`, (val) => {
                 const km = parseFloat(val);
                 if (!isNaN(km) && km > 0) {
-                    const updated = components.map((c) =>
-                        c.id === comp.id ? { ...c, currentKm: c.currentKm + km } : c
-                    );
-                    persist(updated);
+                    updateComponentInBikes(comp.id, c => ({
+                        ...c,
+                        currentKm: (c.currentKm ?? 0) + km
+                    }));
                 }
             })
             : (() => {
                 // Fallback for platforms without Alert.prompt
                 const km = 10; // add 10km as default
-                const updated = components.map((c) =>
-                    c.id === comp.id ? { ...c, currentKm: c.currentKm + km } : c
-                );
-                persist(updated);
+                updateComponentInBikes(comp.id, c => ({
+                    ...c,
+                    currentKm: (c.currentKm ?? 0) + km
+                }));
             })();
     };
 
-    // Sort: most worn first
-    const sorted = [...components].sort((a, b) => {
-        const pctA = a.currentKm / a.serviceIntervalKm;
-        const pctB = b.currentKm / b.serviceIntervalKm;
+    // Extract all components that have wear tracking enabled
+    const allTrackedComps = bikes.flatMap(b => b.components.filter((c: any) => c.isWearTracked === true));
+
+
+
+    // Check if parts need service
+    const sorted = [...allTrackedComps].sort((a, b) => {
+        const pctA = (a.currentKm ?? 0) / (a.serviceIntervalKm ?? 500);
+        const pctB = (b.currentKm ?? 0) / (b.serviceIntervalKm ?? 500);
         return pctB - pctA;
     });
 
     const needsService = sorted.filter(
-        (c) => c.currentKm / c.serviceIntervalKm >= 0.8
+        (c) => (c.currentKm ?? 0) / (c.serviceIntervalKm ?? 500) >= 0.8
     ).length;
 
     return (
@@ -307,22 +212,10 @@ export default function ShredCheckScreen() {
                     </BPCard>
                 )}
 
-                <View style={{ flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.sm }}>
-                    <BPButton
-                        title={t('shred.add_component')}
-                        onPress={openNew}
-                        color={ACCENT}
-                        size="lg"
-                        style={{ flex: 1 }}
-                    />
-                    <BPButton
-                        title={t('shred.import_from_tracker')}
-                        onPress={openImport}
-                        variant="secondary"
-                        color={ACCENT}
-                        size="lg"
-                        style={{ flex: 1 }}
-                    />
+                <View style={{ marginBottom: theme.spacing.md }}>
+                    <Text style={{ color: theme.colors.textMuted, fontSize: 13, textAlign: 'center' }}>
+                        {t('shred.manage_hint', { defaultValue: 'Komponenten und deren Verschleiß-Status werden im Component Tracker verwaltet.' })}
+                    </Text>
                 </View>
 
                 {sorted.length === 0 ? (
@@ -335,29 +228,22 @@ export default function ShredCheckScreen() {
                     </View>
                 ) : (
                     sorted.map((comp) => {
-                        const pct = (comp.currentKm / comp.serviceIntervalKm) * 100;
+                        const pct = ((comp.currentKm ?? 0) / (comp.serviceIntervalKm ?? 500)) * 100;
                         return (
-                            <TouchableOpacity
-                                key={comp.id}
-                                onPress={() => openEdit(comp)}
-                                activeOpacity={0.8}
-                            >
+                            <View key={comp.id} style={{ marginBottom: 12 }}>
                                 <BPCard style={styles.compCard}>
                                     <View style={styles.compHeader}>
                                         <Text style={styles.compEmoji}>{getTypeEmoji(comp.type)}</Text>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={styles.compTitle}>{comp.name}</Text>
+                                            <Text style={styles.compTitle}>{comp.brand || ''} {comp.model || ''}</Text>
                                             <Text style={styles.compType}>{getTypeName(comp.type)}</Text>
                                         </View>
-                                        <TouchableOpacity onPress={() => handleDelete(comp.id)}>
-                                            <Text style={styles.deleteIcon}>🗑</Text>
-                                        </TouchableOpacity>
                                     </View>
 
                                     <BPProgressBar
-                                        label={`${comp.currentKm} / ${comp.serviceIntervalKm} km`}
-                                        value={comp.currentKm}
-                                        max={comp.serviceIntervalKm}
+                                        label={`${comp.currentKm ?? 0} / ${comp.serviceIntervalKm ?? 500} km`}
+                                        value={comp.currentKm ?? 0}
+                                        max={comp.serviceIntervalKm ?? 500}
                                         unit="%"
                                         colorThresholds
                                         containerStyle={{ marginTop: theme.spacing.sm }}
@@ -389,136 +275,12 @@ export default function ShredCheckScreen() {
                                         <Text style={styles.compNotes}>{comp.notes}</Text>
                                     ) : null}
                                 </BPCard>
-                            </TouchableOpacity>
+                            </View>
                         );
                     })
                 )}
             </ScrollView>
 
-            {/* Create/Edit Modal */}
-            <BPModal
-                visible={modalVisible}
-                onClose={() => setModalVisible(false)}
-                title={editingComp ? t('shred.edit_component') : t('shred.new_component')}
-            >
-                <BPPicker
-                    label={t('shred.type')}
-                    options={componentTypes}
-                    value={type}
-                    onValueChange={handleTypeChange}
-                    accentColor={ACCENT}
-                />
-                <BPInput
-                    label={t('shred.name_optional')}
-                    placeholder={t('shred.name_placeholder')}
-                    value={name}
-                    onChangeText={setName}
-                    accentColor={ACCENT}
-                />
-
-                <View style={styles.inputRow}>
-                    <BPInput
-                        label={t('shred.current_km')}
-                        placeholder="0"
-                        value={currentKm}
-                        onChangeText={setCurrentKm}
-                        keyboardType="numeric"
-                        suffix="km"
-                        accentColor={ACCENT}
-                        containerStyle={{ flex: 1 }}
-                    />
-                    <BPInput
-                        label={t('shred.interval_km')}
-                        placeholder="500"
-                        value={serviceIntervalKm}
-                        onChangeText={setServiceIntervalKm}
-                        keyboardType="numeric"
-                        suffix="km"
-                        accentColor={ACCENT}
-                        containerStyle={{ flex: 1 }}
-                    />
-                </View>
-
-                <BPInput
-                    label={t('shred.last_service')}
-                    placeholder="YYYY-MM-DD"
-                    value={lastServiceDate}
-                    onChangeText={setLastServiceDate}
-                    accentColor={ACCENT}
-                />
-                <BPInput
-                    label={t('shred.notes')}
-                    placeholder="z.B. Schwalbe Magic Mary, Soft compound"
-                    value={notes}
-                    onChangeText={setNotes}
-                    multiline
-                    numberOfLines={2}
-                    accentColor={ACCENT}
-                />
-
-                <View style={styles.modalActions}>
-                    <BPButton
-                        title={t('common.save')}
-                        onPress={handleSave}
-                        color={ACCENT}
-                        fullWidth
-                        size="lg"
-                    />
-                </View>
-            </BPModal>
-
-            {/* Import Modal */}
-            <BPModal
-                visible={importModalVisible}
-                onClose={() => setImportModalVisible(false)}
-                title={t('shred.import_title')}
-            >
-                {importBikes.length === 0 ? (
-                    <Text style={{ color: theme.colors.textMuted, textAlign: 'center', paddingVertical: theme.spacing.lg }}>
-                        {t('shred.import_no_bikes')}
-                    </Text>
-                ) : (
-                    <>
-                        <BPPicker
-                            label={t('shred.import_select_bike')}
-                            options={importBikes.map(b => ({ label: `${b.name}`, value: b.id }))}
-                            value={importSelectedBikeId}
-                            onValueChange={setImportSelectedBikeId}
-                            accentColor={ACCENT}
-                        />
-                        <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-                            {t('shred.import_select_component')}
-                        </Text>
-                        <ScrollView style={{ maxHeight: 320 }}>
-                            {importSelectedBike?.components?.map((comp: any) => (
-                                <TouchableOpacity
-                                    key={comp.id}
-                                    style={{
-                                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                                        padding: 12, backgroundColor: theme.colors.elevated,
-                                        borderRadius: theme.radius.md, marginBottom: 6,
-                                        borderWidth: 1, borderColor: theme.colors.border,
-                                    }}
-                                    onPress={() => handleImportComp(comp)}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700' }}>
-                                            {comp.brand} {comp.model}
-                                        </Text>
-                                        <Text style={{ color: theme.colors.textMuted, fontSize: 11 }}>
-                                            {comp.type}
-                                        </Text>
-                                    </View>
-                                    <Text style={{ color: ACCENT, fontSize: 13, fontWeight: '700' }}>
-                                        {t('shred.import_btn')}
-                                    </Text>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
-                    </>
-                )}
-            </BPModal>
         </View>
     );
 }
@@ -584,9 +346,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 1,
     },
-    deleteIcon: {
-        fontSize: 16,
-        padding: 4,
+    compNotes: {
+        color: theme.colors.textMuted,
+        fontSize: 11,
+        fontStyle: 'italic',
+        marginTop: theme.spacing.sm,
     },
     compFooter: {
         flexDirection: 'row',
@@ -621,18 +385,5 @@ const styles = StyleSheet.create({
     },
     serviceBtnText: {
         color: theme.colors.accentLime,
-    },
-    compNotes: {
-        color: theme.colors.textMuted,
-        fontSize: 11,
-        fontStyle: 'italic',
-        marginTop: theme.spacing.sm,
-    },
-    inputRow: {
-        flexDirection: 'row',
-        gap: theme.spacing.sm,
-    },
-    modalActions: {
-        marginTop: theme.spacing.lg,
     },
 });

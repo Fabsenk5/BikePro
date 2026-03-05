@@ -28,13 +28,17 @@ export default function BPSlider({
     const progress = Math.max(0, Math.min(1, (value - min) / (max - min)));
 
     const handleIncrement = useCallback(() => {
-        const next = Math.min(max, value + step);
-        onValueChange(Math.round(next * 100) / 100);
+        const v = Number(value) || 0;
+        const s = Number(step) || 1;
+        const next = Math.min(Number(max), v + s);
+        onValueChange(Math.round((next + Number.EPSILON) * 1000) / 1000);
     }, [value, max, step, onValueChange]);
 
     const handleDecrement = useCallback(() => {
-        const next = Math.max(min, value - step);
-        onValueChange(Math.round(next * 100) / 100);
+        const v = Number(value) || 0;
+        const s = Number(step) || 1;
+        const next = Math.max(Number(min), v - s);
+        onValueChange(Math.round((next + Number.EPSILON) * 1000) / 1000);
     }, [value, min, step, onValueChange]);
 
     return (
@@ -54,6 +58,7 @@ export default function BPSlider({
                     style={[styles.stepButton, { borderColor: accentColor }]}
                     onPress={handleDecrement}
                     activeOpacity={0.6}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                     <Text style={styles.stepButtonText}>−</Text>
                 </TouchableOpacity>
@@ -85,6 +90,7 @@ export default function BPSlider({
                     style={[styles.stepButton, { borderColor: accentColor }]}
                     onPress={handleIncrement}
                     activeOpacity={0.6}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                     <Text style={styles.stepButtonText}>+</Text>
                 </TouchableOpacity>

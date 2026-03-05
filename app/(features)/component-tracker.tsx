@@ -7,7 +7,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncLoadBikes, syncSaveBikes } from '@/lib/sync';
+import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncSaveBikes } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,7 @@ import {
     ScrollView,
     StatusBar,
     StyleSheet,
+    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -23,32 +24,13 @@ import {
 
 const ACCENT = '#26A69A';
 
-// --- Types ---
-interface SetupValue {
+type Bike = SyncBike;
+type Component = SyncComponent;
+
+export interface SetupValue {
     key: string;
     value: string;
     unit: string;
-}
-
-interface Component {
-    id: string;
-    type: string;
-    brand: string;
-    model: string;
-    weight: string;
-    purchaseDate: string;
-    setupValues: SetupValue[];
-    notes: string;
-}
-
-interface Bike {
-    id: string;
-    name: string;
-    type: string;
-    model: string;
-    year: string;
-    size: string;
-    components: Component[];
 }
 
 const bikeTypeOptions = [
@@ -74,11 +56,12 @@ export default function ComponentTrackerScreen() {
     const isGerman = i18n.language.startsWith('de');
     const tirePressureUnit = isGerman ? 'bar' : 'psi';
     const [bikes, setBikes] = useState<Bike[]>([]);
+    const [setups, setSetups] = useState<any[]>([]);
     const [selectedBikeId, setSelectedBikeId] = useState<string | null>(null);
     const [bikeModalVisible, setBikeModalVisible] = useState(false);
     const [compModalVisible, setCompModalVisible] = useState(false);
     const [editingBike, setEditingBike] = useState<Bike | null>(null);
-    const [editingComp, setEditingComp] = useState<Component | null>(null);
+    const [editingComp, setEditingComp] = useState<SyncComponent | null>(null);
 
     // Bike form
     const [bikeName, setBikeName] = useState('');
@@ -95,6 +78,13 @@ export default function ComponentTrackerScreen() {
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
+    // Wear tracking state
+    const [compIsWearTracked, setCompIsWearTracked] = useState(false);
+    const [compCurrentKm, setCompCurrentKm] = useState('0');
+    const [compServiceIntervalKm, setCompServiceIntervalKm] = useState('500');
+    const getTodayISO = () => new Date().toISOString().split('T')[0];
+    const [compLastServiceDate, setCompLastServiceDate] = useState(getTodayISO());
+    const [compInstalledDate, setCompInstalledDate] = useState(getTodayISO());
 
     const componentTypes = [
         { label: t('tracker.type_handlebar'), value: 'handlebar' },
@@ -126,7 +116,7 @@ export default function ComponentTrackerScreen() {
         grips: [{ key: 'Drehmoment', value: '', unit: 'Nm' }],
         pedals: [{ key: 'Drehmoment', value: '', unit: 'Nm' }, { key: 'Plattformgröße', value: '', unit: 'mm' }],
         stem: [{ key: 'Länge', value: '', unit: 'mm' }, { key: 'Winkel', value: '', unit: '°' }, { key: 'Drehmoment Lenker', value: '', unit: 'Nm' }, { key: 'Drehmoment Steuerrohr', value: '', unit: 'Nm' }],
-        fork: [{ key: 'Federweg', value: '', unit: 'mm' }, { key: 'Offset', value: '', unit: 'mm' }],
+        fork: [{ key: 'Federweg', value: '', unit: 'mm' }, { key: 'Offset', value: '', unit: 'mm' }, { key: 'Hub', value: '', unit: 'mm' }],
         shock: [{ key: 'Federweg', value: '', unit: 'mm' }, { key: 'Einbaulänge', value: '', unit: 'mm' }, { key: 'Hub', value: '', unit: 'mm' }],
         wheel_front: [{ key: 'Größe', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'Druck', value: '', unit: tirePressureUnit }],
         wheel_rear: [{ key: 'Größe', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'Druck', value: '', unit: tirePressureUnit }],
@@ -146,6 +136,9 @@ export default function ComponentTrackerScreen() {
         syncLoadBikes().then((data) => {
             setBikes(data);
             if (data.length > 0) setSelectedBikeId(data[0].id);
+        });
+        syncLoadTable('suspension_setups', '@bikepro_setups').then((data) => {
+            setSetups(data ?? []);
         });
     }, []);
 
@@ -224,16 +217,29 @@ export default function ComponentTrackerScreen() {
         setCompNotes('');
         setCompSetup(defaultSetupKeys['handlebar']?.map(s => ({ ...s })) ?? []);
         setCompMoveToBikeId('');
+
+        setCompIsWearTracked(false);
+        setCompCurrentKm('0');
+        setCompServiceIntervalKm('500');
+        setCompLastServiceDate(getTodayISO());
+        setCompInstalledDate(getTodayISO());
+
         setCompModalVisible(true);
     };
 
-    const openEditComp = (comp: Component) => {
+    const openEditComp = (comp: SyncComponent) => {
         setEditingComp(comp);
         setCompType(comp.type);
         setCompBrand(comp.brand);
         setCompModel(comp.model);
         setCompWeight(comp.weight);
         setCompNotes(comp.notes);
+
+        setCompIsWearTracked(comp.isWearTracked ?? false);
+        setCompCurrentKm((comp.currentKm ?? 0).toString());
+        setCompServiceIntervalKm((comp.serviceIntervalKm ?? 500).toString());
+        setCompLastServiceDate(comp.lastServiceDate ?? getTodayISO());
+        setCompInstalledDate(comp.installedDate ?? getTodayISO());
         // Merge saved values with defaults so new fields show up
         const defaults = defaultSetupKeys[comp.type] ?? [];
         const saved = comp.setupValues ?? [];
@@ -263,15 +269,20 @@ export default function ComponentTrackerScreen() {
 
     const saveComp = () => {
         if (!selectedBike) return;
-        const compData: Component = {
+        const compData: SyncComponent = {
             id: editingComp?.id ?? Date.now().toString(),
             type: compType,
             brand: compBrand.trim(),
             model: compModel.trim(),
             weight: compWeight,
-            purchaseDate: editingComp?.purchaseDate ?? new Date().toISOString().split('T')[0],
+            purchaseDate: editingComp?.purchaseDate ?? getTodayISO(),
             setupValues: compSetup.filter(s => s.value.trim() !== ''),
             notes: compNotes.trim(),
+            isWearTracked: compIsWearTracked,
+            currentKm: parseInt(compCurrentKm || '0', 10),
+            serviceIntervalKm: parseInt(compServiceIntervalKm || '500', 10),
+            lastServiceDate: compLastServiceDate,
+            installedDate: compInstalledDate,
         };
 
         let updatedBikes = [...bikes];
@@ -442,6 +453,13 @@ export default function ComponentTrackerScreen() {
                                     {comp.setupValues.length > 3 && (
                                         <Text style={styles.compRowChipMore}>+{comp.setupValues.length - 3}</Text>
                                     )}
+                                    {['fork', 'shock', 'wheel_front', 'wheel_rear'].includes(comp.type) && setups.filter(s => s.bikeId === selectedBike?.id).length > 0 && (
+                                        <View style={{ backgroundColor: ACCENT + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 }}>
+                                            <Text style={{ color: ACCENT, fontSize: 10, fontWeight: '700' }}>
+                                                🎯 {setups.filter(s => s.bikeId === selectedBike?.id).length} Setups
+                                            </Text>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                             {comp.notes ? (
@@ -505,6 +523,32 @@ export default function ComponentTrackerScreen() {
                 )}
 
                 <BPInput label="Notizen" placeholder="..." value={compNotes} onChangeText={setCompNotes} multiline numberOfLines={2} accentColor={ACCENT} />
+
+                {/* --- Wear Tracking Section --- */}
+                <View style={styles.wearSection}>
+                    <View style={styles.wearToggleRow}>
+                        <Text style={styles.wearSectionTitle}>♻️ {t('tracker.wear_tracking', { defaultValue: 'Verschleiß erfassen?' })}</Text>
+                        <Switch
+                            value={compIsWearTracked}
+                            onValueChange={setCompIsWearTracked}
+                            trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
+                            thumbColor={compIsWearTracked ? ACCENT : theme.colors.textMuted}
+                        />
+                    </View>
+
+                    {compIsWearTracked && (
+                        <View style={{ marginTop: 12 }}>
+                            <View style={styles.inputRow}>
+                                <BPInput label="Aktuelle km" value={compCurrentKm} onChangeText={setCompCurrentKm} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label="Service-Intervall" value={compServiceIntervalKm} onChangeText={setCompServiceIntervalKm} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                            </View>
+                            <View style={styles.inputRow}>
+                                <BPInput label="Einbaudatum" value={compInstalledDate} onChangeText={setCompInstalledDate} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label="Letzter Service" value={compLastServiceDate} onChangeText={setCompLastServiceDate} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                            </View>
+                        </View>
+                    )}
+                </View>
 
                 {/* Move to different bike (only when editing and >1 bike exists) */}
                 {editingComp && bikes.length > 1 && (
@@ -583,6 +627,22 @@ const styles = StyleSheet.create({
     compRowChipVal: { fontSize: 11, fontWeight: '800' },
     compRowChipMore: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600', alignSelf: 'center' },
     compRowNotes: { color: theme.colors.textMuted, fontSize: 10, fontStyle: 'italic', flex: 1 },
+    wearSection: {
+        marginTop: theme.spacing.md,
+        paddingTop: theme.spacing.md,
+        borderTopWidth: 1,
+        borderColor: theme.colors.border,
+    },
+    wearToggleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    wearSectionTitle: {
+        color: theme.colors.text,
+        fontSize: 16,
+        fontWeight: '700',
+    },
     compRowDelete: { padding: 4 },
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     setupSection: { marginTop: theme.spacing.sm, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md },

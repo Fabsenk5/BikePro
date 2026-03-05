@@ -92,7 +92,7 @@ interface TrackerBike {
 const defaultConfig: SuspensionConfig = { reboundMode: 'clicks', compressionMode: 'clicks' };
 
 const defaultFork: SuspensionValues = {
-    psi: 80, sagPercent: 20, travel: 170,
+    psi: 80, sagPercent: 20, travel: 170, stroke: 170,
     reboundClicks: 10, reboundLSR: 10, reboundHSR: 5,
     compressionClicks: 10, compressionLever: 'open',
     compressionLSC: 10, compressionHSC: 3,
@@ -294,10 +294,10 @@ export default function DialedInScreen() {
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.fork.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
-                                            {setup.fork.travel && setup.fork.sagPercent ? (
+                                            {setup.fork.stroke && setup.fork.sagPercent ? (
                                                 <Text>
                                                     <Text style={[styles.valueNum, { color: theme.colors.text }]}>
-                                                        {Math.round(setup.fork.travel * (setup.fork.sagPercent / 100))}
+                                                        {Math.round(setup.fork.stroke * (setup.fork.sagPercent / 100))}
                                                     </Text>
                                                     <Text style={styles.valueLabel}> mm </Text>
                                                     <Text style={[styles.valueLabel, { fontStyle: 'italic', fontSize: 10 }]}>
@@ -402,8 +402,8 @@ export default function DialedInScreen() {
                                 <BPSlider label={t('dialed.travel')} value={activeSuspension.travel} min={80} max={220} step={5} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('travel', v)} />
                             </View>
                         </View>
-                        {activeTab === 'shock' && (
-                            <BPSlider label={t('dialed.stroke')} value={activeSuspension.stroke ?? 57} min={30} max={90} step={1} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('stroke', v)} />
+                        {['fork', 'shock'].includes(activeTab) && (
+                            <BPSlider label={t('dialed.stroke')} value={activeSuspension.stroke ?? (activeTab === 'fork' ? 170 : 57)} min={30} max={220} step={1} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('stroke', v)} />
                         )}
 
                         {/* ─── REBOUND CONFIG ─── */}
