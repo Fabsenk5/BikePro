@@ -7,9 +7,9 @@
  * Integration: Liest Ride-Log km für automatische Aggregation (später)
  * UI Supervisor: Wear & Tear Fortschrittsbalken
  */
-import { BPCard, BPProgressBar } from '@/components/ui';
+import { BPButton, BPCard, BPProgressBar } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncLoadBikes, syncSaveBikes } from '@/lib/sync';
+import { SyncBike, SyncComponent, syncLoadBikes, syncSaveBikes, WearItem } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -103,7 +103,7 @@ function getTodayISO(): string {
 
 export default function ShredCheckScreen() {
     const { t, i18n } = useTranslation();
-    const [bikes, setBikes] = useState<any[]>([]);
+    const [bikes, setBikes] = useState<SyncBike[]>([]);
 
     const formatDate = (iso: string): string => {
         if (!iso) return '—';
@@ -122,28 +122,31 @@ export default function ShredCheckScreen() {
         loadBikes();
     }, []);
 
-    const updateComponentInBikes = async (compId: string, updateFn: (comp: any) => any) => {
+    const updateComponentInBikes = async (compId: string, updateFn: (comp: SyncComponent) => SyncComponent) => {
         const updatedBikes = bikes.map(b => ({
             ...b,
-            components: b.components.map((c: any) => c.id === compId ? updateFn(c) : c)
+            components: b.components.map(c => c.id === compId ? updateFn(c) : c)
         }));
         await syncSaveBikes(updatedBikes);
         setBikes(updatedBikes);
     };
 
-    const handleService = (comp: any) => {
+    const handleService = (comp: SyncComponent, item: WearItem) => {
         Alert.alert(
             'Service durchgeführt?',
-            `${getTypeEmoji(comp.type)} ${comp.brand || ''} ${comp.model || comp.type} — km-Zähler zurücksetzen?`,
+            `${item.label} (${comp.brand || ''} ${comp.model || comp.type}) — km-Zähler zurücksetzen?`,
             [
                 { text: 'Abbrechen', style: 'cancel' },
                 {
-                    text: '✅ Service erledigt',
+                    text: '✅ Erledigt',
                     onPress: () => {
                         updateComponentInBikes(comp.id, c => ({
                             ...c,
-                            currentKm: 0,
-                            lastServiceDate: getTodayISO()
+                            wearItems: (c.wearItems || []).map(w =>
+                                w.id === item.id
+                                    ? { ...w, currentKm: 0, lastServiceDate: getTodayISO() }
+                                    : w
+                            )
                         }));
                     },
                 },
@@ -151,42 +154,73 @@ export default function ShredCheckScreen() {
         );
     };
 
-    const handleAddKm = (comp: any) => {
+    const handleAddKmItem = (comp: SyncComponent, item: WearItem) => {
         Alert.prompt
-            ? Alert.prompt('km hinzufügen', `Wie viele km für ${comp.brand || ''} ${comp.model || comp.type}?`, (val) => {
+            ? Alert.prompt('km hinzufügen', `Für ${item.label} (${comp.brand || ''} ${comp.model || comp.type})`, (val) => {
                 const km = parseFloat(val);
                 if (!isNaN(km) && km > 0) {
                     updateComponentInBikes(comp.id, c => ({
                         ...c,
-                        currentKm: (c.currentKm ?? 0) + km
+                        wearItems: (c.wearItems || []).map(w =>
+                            w.id === item.id
+                                ? { ...w, currentKm: w.currentKm + km }
+                                : w
+                        )
                     }));
                 }
             })
             : (() => {
-                // Fallback for platforms without Alert.prompt
-                const km = 10; // add 10km as default
+                const km = 10;
                 updateComponentInBikes(comp.id, c => ({
                     ...c,
-                    currentKm: (c.currentKm ?? 0) + km
+                    wearItems: (c.wearItems || []).map(w =>
+                        w.id === item.id
+                            ? { ...w, currentKm: w.currentKm + km }
+                            : w
+                    )
                 }));
             })();
     };
 
+    const handleAddGlobalKm = () => {
+        Alert.prompt
+            ? Alert.prompt('Tour erfassen', 'Wie viele Kilometer bist du gefahren?', (val) => {
+                const km = parseFloat(val);
+                if (!isNaN(km) && km > 0) {
+                    const updatedBikes = bikes.map(b => ({
+                        ...b,
+                        components: b.components.map(c => {
+                            if (!c.isWearTracked || !c.wearItems) return c;
+                            return {
+                                ...c,
+                                wearItems: c.wearItems.map(w => ({
+                                    ...w,
+                                    currentKm: w.currentKm + km
+                                }))
+                            };
+                        })
+                    }));
+                    syncSaveBikes(updatedBikes);
+                    setBikes(updatedBikes);
+                }
+            })
+            : Alert.alert('Fehler', 'Nicht unterstützt auf dieser Plattform.');
+    };
+
     // Extract all components that have wear tracking enabled
-    const allTrackedComps = bikes.flatMap(b => b.components.filter((c: any) => c.isWearTracked === true));
+    const allTrackedComps = bikes.flatMap(b => b.components.filter(c => c.isWearTracked === true));
 
-
-
-    // Check if parts need service
+    // Sort by worst wear item percentage
     const sorted = [...allTrackedComps].sort((a, b) => {
-        const pctA = (a.currentKm ?? 0) / (a.serviceIntervalKm ?? 500);
-        const pctB = (b.currentKm ?? 0) / (b.serviceIntervalKm ?? 500);
-        return pctB - pctA;
+        const maxPctA = Math.max(...(a.wearItems?.map(w => w.currentKm / w.serviceIntervalKm) || [0]), 0);
+        const maxPctB = Math.max(...(b.wearItems?.map(w => w.currentKm / w.serviceIntervalKm) || [0]), 0);
+        return maxPctB - maxPctA;
     });
 
-    const needsService = sorted.filter(
-        (c) => (c.currentKm ?? 0) / (c.serviceIntervalKm ?? 500) >= 0.8
-    ).length;
+    // Count how many individual items need service across all components
+    const needsService = sorted.reduce((count, comp) => {
+        return count + (comp.wearItems || []).filter(w => (w.currentKm / w.serviceIntervalKm) >= 0.8).length;
+    }, 0);
 
     return (
         <View style={styles.container}>
@@ -212,7 +246,14 @@ export default function ShredCheckScreen() {
                     </BPCard>
                 )}
 
-                <View style={{ marginBottom: theme.spacing.md }}>
+                <View style={{ marginBottom: theme.spacing.md, gap: theme.spacing.sm }}>
+                    <BPButton
+                        title="+ Alle (Tour erfassen)"
+                        onPress={handleAddGlobalKm}
+                        color={ACCENT}
+                        size="md"
+                        fullWidth
+                    />
                     <Text style={{ color: theme.colors.textMuted, fontSize: 13, textAlign: 'center' }}>
                         {t('shred.manage_hint', { defaultValue: 'Komponenten und deren Verschleiß-Status werden im Component Tracker verwaltet.' })}
                     </Text>
@@ -228,7 +269,7 @@ export default function ShredCheckScreen() {
                     </View>
                 ) : (
                     sorted.map((comp) => {
-                        const pct = ((comp.currentKm ?? 0) / (comp.serviceIntervalKm ?? 500)) * 100;
+                        const items = comp.wearItems || [];
                         return (
                             <View key={comp.id} style={{ marginBottom: 12 }}>
                                 <BPCard style={styles.compCard}>
@@ -240,36 +281,40 @@ export default function ShredCheckScreen() {
                                         </View>
                                     </View>
 
-                                    <BPProgressBar
-                                        label={`${comp.currentKm ?? 0} / ${comp.serviceIntervalKm ?? 500} km`}
-                                        value={comp.currentKm ?? 0}
-                                        max={comp.serviceIntervalKm ?? 500}
-                                        unit="%"
-                                        colorThresholds
-                                        containerStyle={{ marginTop: theme.spacing.sm }}
-                                    />
-
-                                    <View style={styles.compFooter}>
-                                        <Text style={styles.compDate}>
-                                            {t('shred.service_label')} {formatDate(comp.lastServiceDate)}
-                                        </Text>
-                                        <View style={styles.compActions}>
-                                            <TouchableOpacity
-                                                style={styles.actionBtn}
-                                                onPress={() => handleAddKm(comp)}
-                                            >
-                                                <Text style={styles.actionBtnText}>{t('shred.add_10km')}</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                style={[styles.actionBtn, styles.serviceBtn]}
-                                                onPress={() => handleService(comp)}
-                                            >
-                                                <Text style={[styles.actionBtnText, styles.serviceBtnText]}>
-                                                    {t('shred.service_done')}
+                                    {items.map((item) => (
+                                        <View key={item.id} style={styles.wearItemContainer}>
+                                            <View style={styles.wearItemHeader}>
+                                                <Text style={styles.wearItemLabel}>{item.label}</Text>
+                                                <Text style={styles.compDate}>
+                                                    Service: {formatDate(item.lastServiceDate)}
                                                 </Text>
-                                            </TouchableOpacity>
+                                            </View>
+                                            <BPProgressBar
+                                                label={`${item.currentKm} / ${item.serviceIntervalKm} km`}
+                                                value={item.currentKm}
+                                                max={item.serviceIntervalKm}
+                                                unit="%"
+                                                colorThresholds
+                                                containerStyle={{ marginTop: 4 }}
+                                            />
+                                            <View style={styles.compActions}>
+                                                <TouchableOpacity
+                                                    style={styles.actionBtn}
+                                                    onPress={() => handleAddKmItem(comp, item)}
+                                                >
+                                                    <Text style={styles.actionBtnText}>{t('shred.add_10km', { defaultValue: '+10 km' })}</Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={[styles.actionBtn, styles.serviceBtn]}
+                                                    onPress={() => handleService(comp, item)}
+                                                >
+                                                    <Text style={[styles.actionBtnText, styles.serviceBtnText]}>
+                                                        {t('shred.service_done')}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
                                         </View>
-                                    </View>
+                                    ))}
 
                                     {comp.notes ? (
                                         <Text style={styles.compNotes}>{comp.notes}</Text>
@@ -352,19 +397,32 @@ const styles = StyleSheet.create({
         fontStyle: 'italic',
         marginTop: theme.spacing.sm,
     },
-    compFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: 4,
-    },
     compDate: {
         color: theme.colors.textMuted,
         fontSize: 11,
     },
+    wearItemContainer: {
+        marginTop: theme.spacing.md,
+        paddingTop: theme.spacing.sm,
+        borderTopWidth: 1,
+        borderColor: theme.colors.border + '60',
+    },
+    wearItemHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 6,
+    },
+    wearItemLabel: {
+        color: theme.colors.textSecondary,
+        fontSize: 13,
+        fontWeight: '600',
+    },
     compActions: {
         flexDirection: 'row',
+        justifyContent: 'flex-end',
         gap: 8,
+        marginTop: 10,
     },
     actionBtn: {
         backgroundColor: theme.colors.elevated,

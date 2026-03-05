@@ -81,6 +81,15 @@ export interface SyncBike {
     components: SyncComponent[];
 }
 
+export interface WearItem {
+    id: string;
+    label: string;
+    currentKm: number;
+    serviceIntervalKm: number;
+    lastServiceDate: string;
+    installedDate: string;
+}
+
 export interface SyncComponent {
     id: string;
     type: string;
@@ -96,6 +105,7 @@ export interface SyncComponent {
     serviceIntervalKm?: number;
     lastServiceDate?: string;
     installedDate?: string;
+    wearItems?: WearItem[];
 }
 
 const BIKES_KEY = '@bikepro_bikes';
@@ -127,6 +137,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         serviceIntervalKm: c.service_interval_km ?? 500,
                         lastServiceDate: c.last_service_date ?? new Date().toISOString().split('T')[0],
                         installedDate: c.installed_date ?? new Date().toISOString().split('T')[0],
+                        wearItems: c.wear_items ?? [],
                     })),
             }));
 
@@ -184,6 +195,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
                     service_interval_km: c.serviceIntervalKm ?? 500,
                     last_service_date: c.lastServiceDate,
                     installed_date: c.installedDate,
+                    wear_items: c.wearItems ?? [],
                 });
             });
         });

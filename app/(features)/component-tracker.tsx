@@ -7,7 +7,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncSaveBikes } from '@/lib/sync';
+import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, WearItem } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -80,11 +80,8 @@ export default function ComponentTrackerScreen() {
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
     // Wear tracking state
     const [compIsWearTracked, setCompIsWearTracked] = useState(false);
-    const [compCurrentKm, setCompCurrentKm] = useState('0');
-    const [compServiceIntervalKm, setCompServiceIntervalKm] = useState('500');
     const getTodayISO = () => new Date().toISOString().split('T')[0];
-    const [compLastServiceDate, setCompLastServiceDate] = useState(getTodayISO());
-    const [compInstalledDate, setCompInstalledDate] = useState(getTodayISO());
+    const [compWearItems, setCompWearItems] = useState<WearItem[]>([]);
 
     const componentTypes = [
         { label: t('tracker.type_handlebar'), value: 'handlebar' },
@@ -130,6 +127,53 @@ export default function ComponentTrackerScreen() {
 
     function getTypeLabel(type: string): string {
         return componentTypes.find(t => t.value === type)?.label ?? t('tracker.type_other');
+    }
+
+    function getDefaultWearItems(type: string, installedDate: string): WearItem[] {
+        const list: WearItem[] = [];
+        switch (type) {
+            case 'brake_front':
+            case 'brake_rear':
+                list.push({ id: 'pads', label: 'Bremsbeläge', currentKm: 0, serviceIntervalKm: 500, lastServiceDate: installedDate, installedDate });
+                list.push({ id: 'rotor', label: 'Bremsscheibe', currentKm: 0, serviceIntervalKm: 3000, lastServiceDate: installedDate, installedDate });
+                list.push({ id: 'fluid', label: 'Bremsflüssigkeit', currentKm: 0, serviceIntervalKm: 1500, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'fork':
+                list.push({ id: 'lower_leg', label: 'Kleiner Service (Lower Legs)', currentKm: 0, serviceIntervalKm: 750, lastServiceDate: installedDate, installedDate });
+                list.push({ id: 'full_service', label: 'Großer Service', currentKm: 0, serviceIntervalKm: 1500, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'shock':
+                list.push({ id: 'air_can', label: 'Luftkammer Service', currentKm: 0, serviceIntervalKm: 750, lastServiceDate: installedDate, installedDate });
+                list.push({ id: 'full_service', label: 'Großer Service', currentKm: 0, serviceIntervalKm: 1500, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'chain':
+                list.push({ id: 'chain', label: 'Kette', currentKm: 0, serviceIntervalKm: 500, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'cassette':
+                list.push({ id: 'cassette', label: 'Kassette', currentKm: 0, serviceIntervalKm: 1500, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'wheel_front':
+                list.push({ id: 'tire', label: 'Reifen VR', currentKm: 0, serviceIntervalKm: 1200, lastServiceDate: installedDate, installedDate });
+                list.push({ id: 'sealant', label: 'Dichtmilch', currentKm: 0, serviceIntervalKm: 300, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'wheel_rear':
+                list.push({ id: 'tire', label: 'Reifen HR', currentKm: 0, serviceIntervalKm: 800, lastServiceDate: installedDate, installedDate });
+                list.push({ id: 'sealant', label: 'Dichtmilch', currentKm: 0, serviceIntervalKm: 300, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'derailleur':
+                list.push({ id: 'jockey_wheels', label: 'Schaltröllchen', currentKm: 0, serviceIntervalKm: 2000, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'battery':
+                list.push({ id: 'battery', label: 'Akku', currentKm: 0, serviceIntervalKm: 5000, lastServiceDate: installedDate, installedDate });
+                break;
+            case 'motor':
+                list.push({ id: 'motor', label: 'Motor', currentKm: 0, serviceIntervalKm: 5000, lastServiceDate: installedDate, installedDate });
+                break;
+            default:
+                list.push({ id: 'general', label: 'Verschleißteil', currentKm: 0, serviceIntervalKm: 500, lastServiceDate: installedDate, installedDate });
+                break;
+        }
+        return list;
     }
 
     useEffect(() => {
@@ -219,10 +263,7 @@ export default function ComponentTrackerScreen() {
         setCompMoveToBikeId('');
 
         setCompIsWearTracked(false);
-        setCompCurrentKm('0');
-        setCompServiceIntervalKm('500');
-        setCompLastServiceDate(getTodayISO());
-        setCompInstalledDate(getTodayISO());
+        setCompWearItems(getDefaultWearItems('handlebar', getTodayISO()));
 
         setCompModalVisible(true);
     };
@@ -236,10 +277,20 @@ export default function ComponentTrackerScreen() {
         setCompNotes(comp.notes);
 
         setCompIsWearTracked(comp.isWearTracked ?? false);
-        setCompCurrentKm((comp.currentKm ?? 0).toString());
-        setCompServiceIntervalKm((comp.serviceIntervalKm ?? 500).toString());
-        setCompLastServiceDate(comp.lastServiceDate ?? getTodayISO());
-        setCompInstalledDate(comp.installedDate ?? getTodayISO());
+
+        let initialWear = comp.wearItems || [];
+        if (comp.isWearTracked && initialWear.length === 0) {
+            initialWear = getDefaultWearItems(comp.type, comp.installedDate ?? getTodayISO()).map(w => ({
+                ...w,
+                currentKm: comp.currentKm ?? 0,
+                serviceIntervalKm: comp.serviceIntervalKm ?? w.serviceIntervalKm,
+                lastServiceDate: comp.lastServiceDate ?? getTodayISO(),
+            }));
+        } else if (!comp.isWearTracked && initialWear.length === 0) {
+            initialWear = getDefaultWearItems(comp.type, getTodayISO());
+        }
+        setCompWearItems(initialWear);
+
         // Merge saved values with defaults so new fields show up
         const defaults = defaultSetupKeys[comp.type] ?? [];
         const saved = comp.setupValues ?? [];
@@ -260,11 +311,22 @@ export default function ComponentTrackerScreen() {
         setCompType(newType);
         if (!editingComp) {
             setCompSetup(defaultSetupKeys[newType]?.map(s => ({ ...s })) ?? []);
+            setCompWearItems(getDefaultWearItems(newType, getTodayISO()));
         }
     };
 
     const updateSetupValue = (index: number, value: string) => {
         setCompSetup(prev => prev.map((s, i) => i === index ? { ...s, value } : s));
+    };
+
+    const updateWearItem = (index: number, field: keyof WearItem, value: string) => {
+        setCompWearItems(prev => prev.map((w, i) => {
+            if (i !== index) return w;
+            if (field === 'currentKm' || field === 'serviceIntervalKm') {
+                return { ...w, [field]: parseInt(value || '0', 10) };
+            }
+            return { ...w, [field]: value };
+        }));
     };
 
     const saveComp = () => {
@@ -279,10 +341,13 @@ export default function ComponentTrackerScreen() {
             setupValues: compSetup.filter(s => s.value.trim() !== ''),
             notes: compNotes.trim(),
             isWearTracked: compIsWearTracked,
-            currentKm: parseInt(compCurrentKm || '0', 10),
-            serviceIntervalKm: parseInt(compServiceIntervalKm || '500', 10),
-            lastServiceDate: compLastServiceDate,
-            installedDate: compInstalledDate,
+            wearItems: compIsWearTracked ? compWearItems : [],
+            // Keep legacy fields populated from the first item for backwards compat logic outside this screen if needed,
+            // or just 0 if not tracked.
+            currentKm: compIsWearTracked && compWearItems.length > 0 ? compWearItems[0].currentKm : 0,
+            serviceIntervalKm: compIsWearTracked && compWearItems.length > 0 ? compWearItems[0].serviceIntervalKm : 500,
+            lastServiceDate: compIsWearTracked && compWearItems.length > 0 ? compWearItems[0].lastServiceDate : getTodayISO(),
+            installedDate: compIsWearTracked && compWearItems.length > 0 ? compWearItems[0].installedDate : getTodayISO(),
         };
 
         let updatedBikes = [...bikes];
@@ -536,18 +601,19 @@ export default function ComponentTrackerScreen() {
                         />
                     </View>
 
-                    {compIsWearTracked && (
-                        <View style={{ marginTop: 12 }}>
+                    {compIsWearTracked && compWearItems.map((item, index) => (
+                        <View key={item.id} style={{ marginTop: 12, padding: 12, backgroundColor: theme.colors.background, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border }}>
+                            <Text style={{ fontWeight: 'bold', color: theme.colors.text, marginBottom: 8 }}>{item.label}</Text>
                             <View style={styles.inputRow}>
-                                <BPInput label="Aktuelle km" value={compCurrentKm} onChangeText={setCompCurrentKm} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                                <BPInput label="Service-Intervall" value={compServiceIntervalKm} onChangeText={setCompServiceIntervalKm} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label="Aktuelle km" value={item.currentKm.toString()} onChangeText={(val) => updateWearItem(index, 'currentKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label="Intervall" value={item.serviceIntervalKm.toString()} onChangeText={(val) => updateWearItem(index, 'serviceIntervalKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                             </View>
                             <View style={styles.inputRow}>
-                                <BPInput label="Einbaudatum" value={compInstalledDate} onChangeText={setCompInstalledDate} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                                <BPInput label="Letzter Service" value={compLastServiceDate} onChangeText={setCompLastServiceDate} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label="Einbaudatum" value={item.installedDate} onChangeText={(val) => updateWearItem(index, 'installedDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label="Letzter Service" value={item.lastServiceDate} onChangeText={(val) => updateWearItem(index, 'lastServiceDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                             </View>
                         </View>
-                    )}
+                    ))}
                 </View>
 
                 {/* Move to different bike (only when editing and >1 bike exists) */}
