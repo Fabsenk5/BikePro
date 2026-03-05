@@ -6,10 +6,11 @@
  *         Tubeless/Schlauch, Reifentyp, Casing, Fahrstil, Untergrund, Wetterlage
  * Logik: Erweiterte Matrix basierend auf Hersteller-Empfehlungen + Praxis-Werte
  */
-import { BPCard, BPPicker, BPSlider } from '@/components/ui';
+import { BPButton, BPCard, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { Stack } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import { SyncBike, syncLoadBikes } from '@/lib/sync';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ScrollView,
@@ -36,6 +37,36 @@ export default function PressureBotScreen() {
     const [tireType, setTireType] = useState('enduro');
     const [casing, setCasing] = useState('standard');
     const [ridingStyle, setRidingStyle] = useState('normal');
+
+    const router = useRouter();
+    const [trackerBikes, setTrackerBikes] = useState<SyncBike[]>([]);
+    const [selectedBikeId, setSelectedBikeId] = useState<string>('');
+
+    useEffect(() => {
+        syncLoadBikes().then(data => setTrackerBikes(data ?? []));
+    }, []);
+
+    const handleBikeChange = (bikeId: string) => {
+        setSelectedBikeId(bikeId);
+        if (!bikeId) return;
+
+        const bike = trackerBikes.find(b => b.id === bikeId);
+        if (!bike) return;
+
+        // Try to find front wheel to auto-fill tire size/width
+        const frontWheel = bike.components.find((c: any) => c.type === 'wheel_front');
+        if (frontWheel && frontWheel.setupValues) {
+            const sizeVal = frontWheel.setupValues.find((s: any) => s.key === 'Größe')?.value;
+            const sizeStr = sizeVal?.replace('"', ''); // "29"
+            if (sizeStr === '29' || sizeStr === '27.5' || sizeStr === '26') {
+                setWheelSize(sizeStr);
+            }
+
+            // Reifen Setup "Tubeless" etc. is not explicitly saved by default in component tracker SetupValue keys,
+            // but if user has "Tubeless" setup we default to tubeless anyway.
+            // If they noted width, we can check. For now, rely on manual tire width if it's not a standard key.
+        }
+    };
 
     const terrainOptions = [
         { label: t('pressure_bot.terrain_hardpack'), value: 'hardpack' },
@@ -256,11 +287,39 @@ export default function PressureBotScreen() {
                             ))}
                         </View>
                     )}
+
+                    <View style={{ marginTop: theme.spacing.lg }}>
+                        <BPButton
+                            title="✅ In Dialed In speichern"
+                            onPress={() => {
+                                const fb = result.front.toFixed(2);
+                                const rb = result.rear.toFixed(2);
+                                const ts = Date.now().toString();
+                                router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&frontBar=${fb}&rearBar=${rb}&ts=${ts}`);
+                            }}
+                            color={ACCENT}
+                            style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '60', borderWidth: 1 }}
+                            textStyle={{ color: ACCENT }}
+                            fullWidth
+                        />
+                    </View>
                 </BPCard>
 
-                {/* Gewicht */}
+                {/* Gewicht & Bike */}
                 <BPCard style={styles.sectionCard}>
                     <Text style={styles.sectionTitle}>{t('pressure_bot.weight_section')}</Text>
+                    {trackerBikes.length > 0 && (
+                        <BPPicker
+                            label="🚲 Bike auswählen (Auto-Fill)"
+                            options={[
+                                { label: 'Kein Bike', value: '' },
+                                ...trackerBikes.map(b => ({ label: `${b.name} (${b.model})`, value: b.id }))
+                            ]}
+                            value={selectedBikeId}
+                            onValueChange={handleBikeChange}
+                            accentColor={ACCENT}
+                        />
+                    )}
                     <BPSlider label={t('pressure_bot.rider_weight_label')} value={riderWeight} min={40} max={140} step={1} unit=" kg" accentColor={ACCENT} onValueChange={setRiderWeight} />
                     <BPSlider label={t('pressure_bot.bike_weight_label')} value={bikeWeight} min={8} max={30} step={0.5} unit=" kg" accentColor={ACCENT} onValueChange={setBikeWeight} />
                 </BPCard>

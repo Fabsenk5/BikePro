@@ -11,7 +11,7 @@
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { syncLoadBikes, syncLoadTable, syncSaveTable } from '@/lib/sync';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -162,7 +162,62 @@ export default function DialedInScreen() {
     const [tires, setTires] = useState<TireSetup>({ ...defaultTires });
     const [activeTab, setActiveTab] = useState<'fork' | 'shock' | 'tires'>('fork');
 
+    const params = useLocalSearchParams();
+    const [lastHandledTs, setLastHandledTs] = useState('');
+
     useEffect(() => { loadSetups(); loadBikes(); }, []);
+
+    useEffect(() => {
+        if (params.ts && typeof params.ts === 'string' && params.ts !== lastHandledTs && trackerBikes.length > 0) {
+            setLastHandledTs(params.ts);
+
+            setEditingSetup(null);
+            setName(''); setLocation(''); setNotes('');
+            setActiveTab('tires');
+
+            let resetFork = { ...defaultFork, config: { ...defaultConfig } };
+            let resetShock = { ...defaultShock, config: { ...defaultConfig } };
+
+            let applyBikeId = '';
+
+            if (params.bikeId && typeof params.bikeId === 'string' && trackerBikes.some(b => b.id === params.bikeId)) {
+                applyBikeId = params.bikeId;
+            } else if (trackerBikes.length > 0) {
+                applyBikeId = trackerBikes[0].id;
+            }
+
+            setBikeId(applyBikeId);
+            const bike = trackerBikes.find(b => b.id === applyBikeId);
+            if (bike) {
+                const forkComp = bike.components.find((c: any) => c.type === 'fork');
+                if (forkComp && forkComp.setupValues) {
+                    const travel = forkComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
+                    const stroke = forkComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                    if (travel) resetFork.travel = parseInt(travel, 10) || resetFork.travel;
+                    if (stroke) resetFork.stroke = parseInt(stroke, 10) || resetFork.stroke;
+                }
+
+                const shockComp = bike.components.find((c: any) => c.type === 'shock');
+                if (shockComp && shockComp.setupValues) {
+                    const travel = shockComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
+                    const stroke = shockComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                    if (travel) resetShock.travel = parseInt(travel, 10) || resetShock.travel;
+                    if (stroke) resetShock.stroke = parseInt(stroke, 10) || resetShock.stroke;
+                }
+            }
+
+            setFork(resetFork);
+            setShock(resetShock);
+
+            setTires(prev => ({
+                ...defaultTires,
+                frontBar: params.frontBar ? parseFloat(params.frontBar as string) : defaultTires.frontBar,
+                rearBar: params.rearBar ? parseFloat(params.rearBar as string) : defaultTires.rearBar
+            }));
+
+            setModalVisible(true);
+        }
+    }, [params.ts, trackerBikes.length]);
 
     const loadSetups = async () => {
         const data = await syncLoadTable<Setup>('suspension_setups', SETUPS_KEY);
