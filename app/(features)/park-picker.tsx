@@ -526,6 +526,10 @@ function getGoLabel(score: number, t: any): { label: string; color: string } {
     return { label: t('park_picker.go_no_go'), color: '#F44336' };
 }
 
+const countryMap: Record<string, string> = {
+    '🇦🇹': 'AT', '🇩🇪': 'DE', '🇨🇭': 'CH', '🇮🇹': 'IT', '🇫🇷': 'FR', '🇨🇦': 'CA', '🇬🇧': 'GB', '🇨🇿': 'CZ'
+};
+
 export default function ParkPickerScreen() {
     const { t } = useTranslation();
     const [region, setRegion] = useState('all');
@@ -574,10 +578,6 @@ export default function ParkPickerScreen() {
         : region === 'all'
             ? bikeparks
             : bikeparks.filter((p) => countryMap[p.country] === region);
-
-    const countryMap: Record<string, string> = {
-        '🇦🇹': 'at', '🇩🇪': 'de', '🇨🇭': 'ch', '🇮🇹': 'it', '🇫🇷': 'fr', '🇨🇦': 'ca', '🇬🇧': 'gb'
-    };
 
     const getGoScore = (park: Bikepark) => {
         let score = 0;
