@@ -62,9 +62,34 @@ export default function PressureBotScreen() {
                 setWheelSize(sizeStr);
             }
 
-            // Reifen Setup "Tubeless" etc. is not explicitly saved by default in component tracker SetupValue keys,
-            // but if user has "Tubeless" setup we default to tubeless anyway.
-            // If they noted width, we can check. For now, rely on manual tire width if it's not a standard key.
+            const widthVal = frontWheel.setupValues.find((s: any) => s.key === 'Breite')?.value;
+            if (widthVal) {
+                const widthStr = widthVal.replace('"', '').trim();
+                // Valid widths like "2.4" or "2.5"
+                if (parseFloat(widthStr) >= 2.0 && parseFloat(widthStr) <= 3.0) {
+                    setTireWidth(widthStr);
+                }
+            }
+
+            const typeStr = frontWheel.setupValues.find((s: any) => s.key === 'Reifentyp')?.value?.toLowerCase() || '';
+            if (typeStr.includes('xc') || typeStr.includes('cross')) setTireType('xc');
+            else if (typeStr.includes('trail')) setTireType('trail');
+            else if (typeStr.includes('enduro')) setTireType('enduro');
+            else if (typeStr.includes('dh') || typeStr.includes('downhill')) setTireType('dh');
+            else if (typeStr.includes('mud') || typeStr.includes('matsch')) setTireType('mud');
+
+            const casingStr = frontWheel.setupValues.find((s: any) => s.key === 'Karkasse')?.value?.toLowerCase() || '';
+            if (casingStr.includes('light') || casingStr.includes('super race') || casingStr.includes('super ground') || casingStr.includes('leicht')) setCasing('light');
+            else if (casingStr.includes('standard') || casingStr.includes('exo') || casingStr.includes('super trail')) setCasing('standard');
+            else if (casingStr.includes('reinforced') || casingStr.includes('exo+') || casingStr.includes('super gravity')) setCasing('reinforced');
+            else if (casingStr.includes('doubledown') || casingStr.includes('dd')) setCasing('doubledown');
+            else if (casingStr.includes('dh') || casingStr.includes('downhill') || casingStr.includes('super downhill')) setCasing('dh');
+
+            const setupStr = frontWheel.setupValues.find((s: any) => s.key === 'Montage')?.value?.toLowerCase() || '';
+            if (setupStr.includes('tubeless') || setupStr.includes('tlr')) setSetup('tubeless');
+            else if (setupStr.includes('butyl') || setupStr.includes('schlauch') || setupStr === 'tube') setSetup('tube_butyl');
+            else if (setupStr.includes('latex')) setSetup('tube_latex');
+            else if (setupStr.includes('insert') || setupStr.includes('cushcore') || setupStr.includes('noodle')) setSetup('insert');
         }
     };
 
