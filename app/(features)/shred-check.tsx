@@ -10,8 +10,8 @@
 import { BPButton, BPCard, BPProgressBar } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { SyncBike, SyncComponent, syncLoadBikes, syncSaveBikes, WearItem } from '@/lib/sync';
-import { Stack } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Alert,
@@ -118,9 +118,11 @@ export default function ShredCheckScreen() {
         setBikes(data ?? []);
     };
 
-    useEffect(() => {
-        loadBikes();
-    }, []);
+    useFocusEffect(
+        useCallback(() => {
+            loadBikes();
+        }, [])
+    );
 
     const updateComponentInBikes = async (compId: string, updateFn: (comp: SyncComponent) => SyncComponent) => {
         const updatedBikes = bikes.map(b => ({

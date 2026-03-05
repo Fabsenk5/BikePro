@@ -8,8 +8,8 @@
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, WearItem } from '@/lib/sync';
-import { Stack } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Alert,
@@ -176,15 +176,21 @@ export default function ComponentTrackerScreen() {
         return list;
     }
 
-    useEffect(() => {
-        syncLoadBikes().then((data) => {
-            setBikes(data);
-            if (data.length > 0) setSelectedBikeId(data[0].id);
-        });
-        syncLoadTable('suspension_setups', '@bikepro_setups').then((data) => {
-            setSetups(data ?? []);
-        });
-    }, []);
+    const loadData = async () => {
+        const data = await syncLoadBikes();
+        setBikes(data);
+        if (data.length > 0 && !selectedBikeId) {
+            setSelectedBikeId(data[0].id);
+        }
+        const setupsData = await syncLoadTable('suspension_setups', '@bikepro_setups');
+        setSetups(setupsData ?? []);
+    };
+
+    useFocusEffect(
+        useCallback(() => {
+            loadData();
+        }, [selectedBikeId])
+    );
 
     const persist = async (updated: Bike[]) => {
         await syncSaveBikes(updated);
