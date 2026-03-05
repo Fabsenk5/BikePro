@@ -192,12 +192,72 @@ export default function DialedInScreen() {
         return trackerBikes.find(b => b.id === bikeId)?.name ?? '';
     };
 
+    const handleBikeChange = (newBikeId: string) => {
+        setBikeId(newBikeId);
+        if (!newBikeId) return;
+
+        const bike = trackerBikes.find(b => b.id === newBikeId);
+        if (!bike) return;
+
+        setFork(prev => {
+            let next = { ...prev };
+            const forkComp = bike.components.find((c: any) => c.type === 'fork');
+            if (forkComp && forkComp.setupValues) {
+                const travel = forkComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
+                const stroke = forkComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                if (travel) next.travel = parseInt(travel, 10) || next.travel;
+                if (stroke) next.stroke = parseInt(stroke, 10) || next.stroke;
+            }
+            return next;
+        });
+
+        setShock(prev => {
+            let next = { ...prev };
+            const shockComp = bike.components.find((c: any) => c.type === 'shock');
+            if (shockComp && shockComp.setupValues) {
+                const travel = shockComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
+                const stroke = shockComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                if (travel) next.travel = parseInt(travel, 10) || next.travel;
+                if (stroke) next.stroke = parseInt(stroke, 10) || next.stroke;
+            }
+            return next;
+        });
+    };
+
     const openNewSetup = () => {
         setEditingSetup(null);
-        setName(''); setLocation(''); setNotes(''); setBikeId('');
-        setFork({ ...defaultFork, config: { ...defaultConfig } });
-        setShock({ ...defaultShock, config: { ...defaultConfig } });
-        setTires({ ...defaultTires }); setActiveTab('fork');
+        setName(''); setLocation(''); setNotes(''); setActiveTab('fork');
+        setTires({ ...defaultTires });
+
+        let resetFork = { ...defaultFork, config: { ...defaultConfig } };
+        let resetShock = { ...defaultShock, config: { ...defaultConfig } };
+
+        if (trackerBikes.length > 0) {
+            const defaultId = trackerBikes[0].id;
+            setBikeId(defaultId);
+            const bike = trackerBikes[0];
+
+            const forkComp = bike.components.find((c: any) => c.type === 'fork');
+            if (forkComp && forkComp.setupValues) {
+                const travel = forkComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
+                const stroke = forkComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                if (travel) resetFork.travel = parseInt(travel, 10) || resetFork.travel;
+                if (stroke) resetFork.stroke = parseInt(stroke, 10) || resetFork.stroke;
+            }
+
+            const shockComp = bike.components.find((c: any) => c.type === 'shock');
+            if (shockComp && shockComp.setupValues) {
+                const travel = shockComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
+                const stroke = shockComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                if (travel) resetShock.travel = parseInt(travel, 10) || resetShock.travel;
+                if (stroke) resetShock.stroke = parseInt(stroke, 10) || resetShock.stroke;
+            }
+        } else {
+            setBikeId('');
+        }
+
+        setFork(resetFork);
+        setShock(resetShock);
         setModalVisible(true);
     };
 
@@ -371,7 +431,7 @@ export default function DialedInScreen() {
                 <BPInput label={t('dialed.location')} placeholder={t('dialed.location_placeholder')} value={location} onChangeText={setLocation} accentColor={ACCENT} />
 
                 {/* Bike Integration */}
-                <BPPicker label={t('dialed.bike')} options={bikeOptions} value={bikeId} onValueChange={setBikeId} accentColor={ACCENT} />
+                <BPPicker label={t('dialed.bike')} options={bikeOptions} value={bikeId} onValueChange={handleBikeChange} accentColor={ACCENT} />
 
                 {/* Component Tab */}
                 <BPPicker
