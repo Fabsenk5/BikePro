@@ -2,7 +2,7 @@
  * Profile Screen — Shows user info, admin badge, stats, and logout.
  * If not logged in, shows login prompt.
  */
-import { BPButton, BPCard } from '@/components/ui';
+import { BPButton, BPCard, BPInput } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { syncLoadPreference, syncLoadProfile, syncLoadTable, syncSaveProfile } from '@/lib/sync';
