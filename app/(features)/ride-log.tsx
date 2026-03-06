@@ -8,7 +8,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncLoadTable, syncSaveTable } from '@/lib/sync';
+import { SyncBike, syncLoadBikes, syncLoadTable, syncSaveBikes, syncSaveTable } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +17,7 @@ import {
     ScrollView,
     StatusBar,
     StyleSheet,
+    Switch,
     Text,
     TouchableOpacity,
     View,
@@ -39,6 +40,9 @@ interface Ride {
     terrain: string;
     difficulty: string;
     bikeType: string;
+    bikeId?: string;
+    setupId?: string;
+    setupFeel?: string;
     condition: string;
     mood: string;
     notes: string;
@@ -52,6 +56,8 @@ function getTodayISO(): string {
 export default function RideLogScreen() {
     const { t, i18n } = useTranslation();
     const [rides, setRides] = useState<Ride[]>([]);
+    const [bikes, setBikes] = useState<SyncBike[]>([]);
+    const [setups, setSetups] = useState<any[]>([]);
 
     const conditionOptions = [
         { label: t('ridelog.cond_dry'), value: 'dry' },
@@ -117,12 +123,20 @@ export default function RideLogScreen() {
     const [terrain, setTerrain] = useState('bikepark');
     const [difficulty, setDifficulty] = useState('medium');
     const [rideBikeType, setRideBikeType] = useState('enduro');
+    // Integrations
+    const [rideBikeId, setRideBikeId] = useState('');
+    const [rideSetupId, setRideSetupId] = useState('');
+    const [rideSetupFeel, setRideSetupFeel] = useState('');
+    const [trackWear, setTrackWear] = useState(true);
+
     const [condition, setCondition] = useState('dry');
     const [mood, setMood] = useState('fire');
     const [notes, setNotes] = useState('');
 
     useEffect(() => {
         syncLoadTable<Ride>('rides', STORAGE_KEY).then(setRides);
+        syncLoadBikes().then(setBikes);
+        syncLoadTable('suspension_setups', '@bikepro_setups').then(setSetups);
     }, []);
 
     const persist = async (updated: Ride[]) => {
@@ -138,6 +152,7 @@ export default function RideLogScreen() {
         setDescentM(''); setMaxSpeedKmh('');
         setTerrain('bikepark'); setDifficulty('medium');
         setRideBikeType('enduro');
+        setRideBikeId(''); setRideSetupId(''); setRideSetupFeel(''); setTrackWear(true);
         setCondition('dry'); setMood('fire'); setNotes('');
         setEditingRide(null);
     };
@@ -160,25 +175,32 @@ export default function RideLogScreen() {
         setTerrain(ride.terrain ?? 'bikepark');
         setDifficulty(ride.difficulty ?? 'medium');
         setRideBikeType(ride.bikeType ?? 'enduro');
+        setRideBikeId(ride.bikeId ?? '');
+        setRideSetupId(ride.setupId ?? '');
+        setRideSetupFeel(ride.setupFeel ?? '');
+        setTrackWear(false); // Edit mode: auto-wear tracking off to prevent double-counting
         setCondition(ride.condition); setMood(ride.mood);
         setNotes(ride.notes);
         setModalVisible(true);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!location.trim()) return;
+
+        const parsedDistance = parseFloat(distanceKm) || 0;
 
         const rideData: Ride = {
             id: editingRide?.id ?? Date.now().toString(),
             date,
             location: location.trim(),
             trail: trail.trim(),
-            distanceKm: parseFloat(distanceKm) || 0,
+            distanceKm: parsedDistance,
             durationMin: parseInt(durationMin, 10) || 0,
             elevationM: parseInt(elevationM, 10) || 0,
             descentM: parseInt(descentM, 10) || 0,
             maxSpeedKmh: parseFloat(maxSpeedKmh) || 0,
             terrain, difficulty, bikeType: rideBikeType,
+            bikeId: rideBikeId, setupId: rideSetupId, setupFeel: rideSetupFeel.trim(),
             condition, mood,
             notes: notes.trim(),
             createdAt: editingRide?.createdAt ?? new Date().toISOString(),
@@ -189,9 +211,27 @@ export default function RideLogScreen() {
             updated = rides.map((r) => (r.id === editingRide.id ? rideData : r));
         } else {
             updated = [rideData, ...rides];
+
+            // Apply Wear Tracking (Shred Check Integration)
+            if (trackWear && rideBikeId && parsedDistance > 0) {
+                const updatedBikes = bikes.map(b => {
+                    if (b.id !== rideBikeId) return b;
+                    const updatedComps = b.components.map(c => {
+                        if (!c.isWearTracked || !c.wearItems || c.wearItems.length === 0) return c;
+                        const updatedWearItems = c.wearItems.map(w => ({
+                            ...w,
+                            currentKm: w.currentKm + parsedDistance
+                        }));
+                        return { ...c, wearItems: updatedWearItems, currentKm: updatedWearItems[0]?.currentKm ?? c.currentKm };
+                    });
+                    return { ...b, components: updatedComps };
+                });
+                await syncSaveBikes(updatedBikes);
+                setBikes(updatedBikes);
+            }
         }
 
-        persist(updated);
+        await persist(updated);
         setModalVisible(false);
         resetForm();
     };
@@ -382,6 +422,46 @@ export default function RideLogScreen() {
                 <BPPicker label={t('ridelog.terrain')} options={terrainTypeOptions} value={terrain} onValueChange={setTerrain} accentColor={ACCENT} />
                 <BPPicker label={t('ridelog.difficulty')} options={difficultyOptions} value={difficulty} onValueChange={setDifficulty} accentColor={ACCENT} />
                 <BPPicker label={t('ridelog.bike')} options={bikeTypeRideOptions} value={rideBikeType} onValueChange={setRideBikeType} accentColor={ACCENT} />
+
+                {/* Bike & Setup Integration */}
+                <BPPicker
+                    label="Gewähltes Bike (für Verschleiß)"
+                    options={[{ label: 'Keins / Andere', value: '' }, ...bikes.map(b => ({ label: b.name, value: b.id }))]}
+                    value={rideBikeId}
+                    onValueChange={setRideBikeId}
+                    accentColor={ACCENT}
+                />
+
+                {!editingRide && rideBikeId ? (
+                    <View style={styles.wearToggleRow}>
+                        <Text style={styles.wearToggleText}>♻️ Verschleiß auf Bike anrechnen?</Text>
+                        <Switch
+                            value={trackWear}
+                            onValueChange={setTrackWear}
+                            trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
+                            thumbColor={trackWear ? ACCENT : theme.colors.textMuted}
+                        />
+                    </View>
+                ) : null}
+
+                <BPPicker
+                    label="Gefahrenes Fahrwerks-Setup"
+                    options={[{ label: 'Keins', value: '' }, ...setups.filter(s => rideBikeId ? s.bikeId === rideBikeId : true).map(s => ({ label: s.name, value: s.id }))]}
+                    value={rideSetupId}
+                    onValueChange={setRideSetupId}
+                    accentColor={ACCENT}
+                />
+
+                {rideSetupId ? (
+                    <BPInput
+                        label="Note zum Setup (Trail Feeling)"
+                        placeholder="z.B. Gabel taucht noch etwas ab"
+                        value={rideSetupFeel}
+                        onChangeText={setRideSetupFeel}
+                        accentColor={ACCENT}
+                    />
+                ) : null}
+
                 <BPPicker label={t('ridelog.condition')} options={conditionOptions} value={condition} onValueChange={setCondition} accentColor={ACCENT} />
                 <BPPicker label={t('ridelog.mood')} options={moodOptions} value={mood} onValueChange={setMood} accentColor={ACCENT} />
 
@@ -530,6 +610,22 @@ const styles = StyleSheet.create({
     inputRow: {
         flexDirection: 'row',
         gap: theme.spacing.sm,
+    },
+    wearToggleRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginVertical: theme.spacing.sm,
+        padding: theme.spacing.sm,
+        backgroundColor: theme.colors.elevated,
+        borderRadius: theme.radius.md,
+        borderWidth: 1,
+        borderColor: ACCENT + '40',
+    },
+    wearToggleText: {
+        color: theme.colors.text,
+        fontSize: 14,
+        fontWeight: '600',
     },
     modalActions: {
         marginTop: theme.spacing.lg,

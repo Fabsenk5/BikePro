@@ -8,8 +8,9 @@
  */
 import { BPCard } from '@/components/ui';
 import { theme } from '@/constants/Colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ScrollView,
@@ -47,6 +48,27 @@ export default function SetupGuideScreen() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedArticle, setExpandedArticle] = useState<string | null>(null);
+
+    const [favorites, setFavorites] = useState<string[]>([]);
+    const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        AsyncStorage.getItem('@bikepro_favorites').then(res => setFavorites(res ? JSON.parse(res) : []));
+        AsyncStorage.getItem('@bikepro_checklists').then(res => setChecklistState(res ? JSON.parse(res) : {}));
+    }, []);
+
+    const toggleFavorite = (id: string) => {
+        const next = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
+        setFavorites(next);
+        AsyncStorage.setItem('@bikepro_favorites', JSON.stringify(next));
+    };
+
+    const toggleCheck = (articleId: string, lineIndex: number) => {
+        const key = `${articleId}-${lineIndex}`;
+        const next = { ...checklistState, [key]: !checklistState[key] };
+        setChecklistState(next);
+        AsyncStorage.setItem('@bikepro_checklists', JSON.stringify(next));
+    };
 
     const categories: WikiCategory[] = [
         { id: 'cockpit', emoji: '🔩', title: t('setup_guide.cat_cockpit'), description: t('setup_guide.cat_cockpit_desc') },
@@ -372,7 +394,9 @@ export default function SetupGuideScreen() {
 
     const filteredArticles = useMemo(() => {
         let result = articles;
-        if (selectedCategory) {
+        if (selectedCategory === 'favorites') {
+            result = result.filter((a) => favorites.includes(a.id));
+        } else if (selectedCategory) {
             result = result.filter((a) => a.category === selectedCategory);
         }
         if (searchQuery.trim()) {
@@ -390,6 +414,11 @@ export default function SetupGuideScreen() {
     const toggleArticle = (id: string) => {
         setExpandedArticle(expandedArticle === id ? null : id);
     };
+
+    const augmentedCategories = [
+        ...(favorites.length > 0 ? [{ id: 'favorites', emoji: '⭐', title: 'Favoriten', description: `${favorites.length} gespeicherte Artikel` }] : []),
+        ...categories
+    ];
 
     return (
         <View style={styles.container}>
@@ -430,8 +459,8 @@ export default function SetupGuideScreen() {
                 {/* Category grid */}
                 {!selectedCategory && !searchQuery && (
                     <View style={styles.categoryGrid}>
-                        {categories.map((cat) => {
-                            const count = articles.filter(a => a.category === cat.id).length;
+                        {augmentedCategories.map((cat) => {
+                            const count = cat.id === 'favorites' ? favorites.length : articles.filter(a => a.category === cat.id).length;
                             return (
                                 <TouchableOpacity
                                     key={cat.id}
@@ -456,8 +485,8 @@ export default function SetupGuideScreen() {
                             <Text style={[styles.backBtn, { color: ACCENT }]}>{t('setup_guide.categories_back')}</Text>
                         </TouchableOpacity>
                         <Text style={styles.catHeaderTitle}>
-                            {categories.find(c => c.id === selectedCategory)?.emoji}{' '}
-                            {categories.find(c => c.id === selectedCategory)?.title}
+                            {augmentedCategories.find(c => c.id === selectedCategory)?.emoji}{' '}
+                            {augmentedCategories.find(c => c.id === selectedCategory)?.title}
                         </Text>
                     </View>
                 )}
@@ -477,12 +506,37 @@ export default function SetupGuideScreen() {
                                         <Text style={styles.articleTitle}>{article.title}</Text>
                                         <Text style={styles.articleSummary}>{article.summary}</Text>
                                     </View>
-                                    <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                        <TouchableOpacity onPress={() => toggleFavorite(article.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                            <Text style={{ fontSize: 18 }}>{favorites.includes(article.id) ? '⭐' : '☆'}</Text>
+                                        </TouchableOpacity>
+                                        <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>
+                                    </View>
                                 </View>
 
                                 {expanded && (
                                     <View style={styles.articleBody}>
-                                        <Text style={styles.bodyText}>{article.content}</Text>
+                                        {article.content.split('\n').map((line, idx) => {
+                                            const trimmed = line.trim();
+                                            const isUnchecked = trimmed.startsWith('- [ ]') || trimmed.startsWith('[ ]');
+                                            const isChecked = trimmed.startsWith('- [x]') || trimmed.startsWith('- [X]') || trimmed.startsWith('[x]') || trimmed.startsWith('[X]');
+                                            if (isUnchecked || isChecked) {
+                                                const text = trimmed.replace(/^-\s*\[[ xX]\]\s*/, '').replace(/^\[[ xX]\]\s*/, '');
+                                                const key = `${article.id}-${idx}`;
+                                                const isItemChecked = checklistState[key] ?? isChecked;
+                                                return (
+                                                    <TouchableOpacity key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 4 }} onPress={() => toggleCheck(article.id, idx)}>
+                                                        <Text style={{ fontSize: 18, color: isItemChecked ? ACCENT : theme.colors.textMuted, marginRight: 8 }}>
+                                                            {isItemChecked ? '☑️' : '⬜'}
+                                                        </Text>
+                                                        <Text style={{ flex: 1, fontSize: 14, color: isItemChecked ? theme.colors.textMuted : theme.colors.textSecondary, textDecorationLine: isItemChecked ? 'line-through' : 'none' }}>
+                                                            {text}
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            }
+                                            return <Text key={idx} style={styles.bodyText}>{line}</Text>;
+                                        })}
 
                                         {article.values && (
                                             <View style={[styles.infoBox, { borderColor: ACCENT + '40' }]}>

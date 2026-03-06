@@ -5,7 +5,7 @@
 import { BPButton, BPCard } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
-import { syncLoadPreference, syncLoadTable } from '@/lib/sync';
+import { syncLoadPreference, syncLoadProfile, syncLoadTable, syncSaveProfile } from '@/lib/sync';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +27,12 @@ export default function ProfileScreen() {
     const [setupCount, setSetupCount] = useState(0);
     const [componentCount, setComponentCount] = useState(0);
 
+    // Profile inputs
+    const [weight, setWeight] = useState('');
+    const [height, setHeight] = useState('');
+    const [inseam, setInseam] = useState('');
+    const [savingProfile, setSavingProfile] = useState(false);
+
     const toggleLanguage = () => {
         const nextLang = i18n.language.startsWith('de') ? 'en' : 'de';
         i18n.changeLanguage(nextLang);
@@ -36,7 +42,19 @@ export default function ProfileScreen() {
         syncLoadTable('rides', '@bikepro_rides').then((d) => setRideCount(d.length));
         syncLoadTable('suspension_setups', '@bikepro_setups').then((d) => setSetupCount(d.length));
         syncLoadPreference<any[]>('shred_check', '@bikepro_components').then((d) => setComponentCount(d?.length ?? 0));
+
+        syncLoadProfile().then((p) => {
+            setWeight(p.weight ?? '');
+            setHeight(p.height ?? '');
+            setInseam(p.inseam ?? '');
+        });
     }, [user]);
+
+    const handleSaveProfile = async () => {
+        setSavingProfile(true);
+        await syncSaveProfile({ weight, height, inseam });
+        setTimeout(() => setSavingProfile(false), 500); // small delay for UX
+    };
 
     const handleLogout = async () => {
         await signOut();
@@ -138,6 +156,20 @@ export default function ProfileScreen() {
                         </Text>
                     </View>
                 </BPCard>
+                {/* Rider Profile (Body metrics) */}
+                <BPCard style={[styles.infoCard, { marginBottom: theme.spacing.md }]}>
+                    <Text style={styles.sectionTitle}>⚖️ {t('profile.body_metrics', { defaultValue: 'Körperdaten (Für Berechnungen)' })}</Text>
+                    <View style={styles.inputRow}>
+                        <BPInput label="Gewicht (fahrfertig)" placeholder="z.B. 82" value={weight} onChangeText={setWeight} suffix="kg" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} />
+                    </View>
+                    <View style={styles.inputRow}>
+                        <BPInput label="Körpergröße" placeholder="z.B. 182" value={height} onChangeText={setHeight} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} />
+                        <BPInput label="Schrittinnenlänge" placeholder="z.B. 86" value={inseam} onChangeText={setInseam} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} />
+                    </View>
+                    <View style={{ marginTop: theme.spacing.md }}>
+                        <BPButton title={savingProfile ? "Speichere..." : "Daten speichern"} onPress={handleSaveProfile} color={theme.colors.accentCyan} size="md" variant={savingProfile ? 'secondary' : 'primary'} />
+                    </View>
+                </BPCard>
 
                 {/* Settings & Language */}
                 <BPCard style={styles.infoCard}>
@@ -205,6 +237,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingVertical: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     },
+    inputRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.sm },
     infoLabel: { color: theme.colors.textMuted, fontSize: 13, fontWeight: '600' },
     infoValue: { color: theme.colors.text, fontSize: 13, fontWeight: '700' },
 });

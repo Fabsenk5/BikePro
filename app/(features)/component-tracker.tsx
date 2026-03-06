@@ -20,7 +20,7 @@ import {
     Switch,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 
 const ACCENT = '#26A69A';
@@ -76,6 +76,7 @@ export default function ComponentTrackerScreen() {
     const [compBrand, setCompBrand] = useState('');
     const [compModel, setCompModel] = useState('');
     const [compWeight, setCompWeight] = useState('');
+    const [compPrice, setCompPrice] = useState('');
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
@@ -83,6 +84,10 @@ export default function ComponentTrackerScreen() {
     const [compIsWearTracked, setCompIsWearTracked] = useState(false);
     const getTodayISO = () => new Date().toISOString().split('T')[0];
     const [compWearItems, setCompWearItems] = useState<WearItem[]>([]);
+
+    // Service Log Inline UI
+    const [addingServiceForIndex, setAddingServiceForIndex] = useState(-1);
+    const [newServiceNote, setNewServiceNote] = useState('');
 
     const componentTypes = [
         { label: t('tracker.type_handlebar'), value: 'handlebar' },
@@ -296,6 +301,7 @@ export default function ComponentTrackerScreen() {
         setCompBrand('');
         setCompModel('');
         setCompWeight('');
+        setCompPrice('');
         setCompNotes('');
         setCompSetup(defaultSetupKeys['handlebar']?.map(s => ({ ...s })) ?? []);
         setCompMoveToBikeId('');
@@ -312,6 +318,7 @@ export default function ComponentTrackerScreen() {
         setCompBrand(comp.brand);
         setCompModel(comp.model);
         setCompWeight(comp.weight);
+        setCompPrice(comp.price ?? '');
         setCompNotes(comp.notes);
 
         setCompIsWearTracked(comp.isWearTracked ?? false);
@@ -375,6 +382,7 @@ export default function ComponentTrackerScreen() {
             brand: compBrand.trim(),
             model: compModel.trim(),
             weight: compWeight,
+            price: compPrice.trim(),
             purchaseDate: editingComp?.purchaseDate ?? getTodayISO(),
             setupValues: compSetup.filter(s => s.value.trim() !== ''),
             notes: compNotes.trim(),
@@ -438,6 +446,27 @@ export default function ComponentTrackerScreen() {
             },
         ]);
     };
+    const handleShareBike = async () => {
+        if (!selectedBike) return;
+        const comps = selectedBike.components;
+        let totalWeight = 0;
+        let totalPrice = 0;
+
+        const lines = comps.map(c => {
+            const w = parseInt(c.weight) || 0;
+            const p = parseFloat(c.price ?? '0') || 0;
+            totalWeight += w;
+            totalPrice += p;
+            return `- ${getTypeLabel(c.type)}: ${c.brand} ${c.model} (${w > 0 ? w + 'g' : '-'} | ${p > 0 ? p.toFixed(2) + '€' : '-'})`;
+        });
+
+        const msg = `🚴 ${selectedBike.name} Build\n\n${lines.join('\n')}\n\n⚖️ Gesamtgewicht Teile: ${totalWeight}g\n💶 Gesamtwert Teile: ${totalPrice.toFixed(2)}€`;
+        try {
+            await Share.share({ message: msg });
+        } catch (error) {
+            console.warn(error);
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -499,6 +528,9 @@ export default function ComponentTrackerScreen() {
                                 </Text>
                             </View>
                             <View style={styles.bikeActions}>
+                                <TouchableOpacity onPress={handleShareBike}>
+                                    <Text style={styles.actionIcon}>📋</Text>
+                                </TouchableOpacity>
                                 <TouchableOpacity onPress={() => openEditBike(selectedBike)}>
                                     <Text style={styles.actionIcon}>✏️</Text>
                                 </TouchableOpacity>
@@ -507,9 +539,16 @@ export default function ComponentTrackerScreen() {
                                 </TouchableOpacity>
                             </View>
                         </View>
-                        <Text style={styles.compCount}>
-                            {selectedBike.components.length} Komponenten
-                        </Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={styles.compCount}>
+                                {selectedBike.components.length} Komponenten
+                            </Text>
+                            <Text style={styles.compCount}>
+                                💶 Gesamtwert: {
+                                    selectedBike.components.reduce((sum, c) => sum + (parseFloat(c.price ?? '0') || 0), 0).toFixed(2)
+                                } €
+                            </Text>
+                        </View>
                     </BPCard>
                 )}
 
@@ -605,7 +644,10 @@ export default function ComponentTrackerScreen() {
                     <BPInput label={t('tracker.brand')} placeholder="z.B. Shimano" value={compBrand} onChangeText={setCompBrand} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                     <BPInput label={t('tracker.model')} placeholder="z.B. XT M8120" value={compModel} onChangeText={setCompModel} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
-                <BPInput label={t('tracker.weight')} placeholder="0" value={compWeight} onChangeText={setCompWeight} suffix="g" keyboardType="numeric" accentColor={ACCENT} />
+                <View style={styles.inputRow}>
+                    <BPInput label={t('tracker.weight')} placeholder="0" value={compWeight} onChangeText={setCompWeight} suffix="g" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label="Preis" placeholder="0.00" value={compPrice} onChangeText={setCompPrice} suffix="€" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                </View>
 
                 {/* Dynamic setup fields */}
                 {compSetup.length > 0 && (
@@ -684,10 +726,43 @@ export default function ComponentTrackerScreen() {
                                 <BPInput label="Aktuelle km" value={item.currentKm.toString()} onChangeText={(val) => updateWearItem(index, 'currentKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                                 <BPInput label="Intervall" value={item.serviceIntervalKm.toString()} onChangeText={(val) => updateWearItem(index, 'serviceIntervalKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                             </View>
-                            <View style={styles.inputRow}>
+                            <View style={[styles.inputRow, { alignItems: 'center', marginTop: 8 }]}>
                                 <BPInput label="Einbaudatum" value={item.installedDate} onChangeText={(val) => updateWearItem(index, 'installedDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                                 <BPInput label="Letzter Service" value={item.lastServiceDate} onChangeText={(val) => updateWearItem(index, 'lastServiceDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                             </View>
+                            {/* Service Log Injection */}
+                            <View style={{ marginTop: 4, alignItems: 'flex-start' }}>
+                                <BPButton title="Service loggen..." onPress={() => setAddingServiceForIndex(addingServiceForIndex === index ? -1 : index)} size="sm" variant="secondary" color={ACCENT} />
+                            </View>
+
+                            {addingServiceForIndex === index && (
+                                <View style={{ marginTop: 8, padding: 8, backgroundColor: theme.colors.surface, borderRadius: theme.radius.sm }}>
+                                    <Text style={{ fontSize: 13, fontWeight: '700', marginBottom: 4, color: theme.colors.text }}>➕ Neuen Service eintragen</Text>
+                                    <BPInput label="Notiz (was wurde gemacht?)" placeholder="z.B. Ölwechsel, Dichtungen neu" value={newServiceNote} onChangeText={setNewServiceNote} accentColor={ACCENT} />
+                                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                                        <BPButton title="Speichern & km Reset" onPress={() => {
+                                            const today = getTodayISO();
+                                            const updatedHistory = [...(item.serviceHistory ?? []), { date: today, note: newServiceNote, type: 'maintenance' }];
+                                            setCompWearItems(prev => prev.map((w, i) => i === index ? { ...w, currentKm: 0, lastServiceDate: today, serviceHistory: updatedHistory } : w));
+                                            setAddingServiceForIndex(-1);
+                                            setNewServiceNote('');
+                                        }} size="sm" color={theme.colors.accentCyan} style={{ flex: 1 }} />
+                                        <BPButton title="Abbrechen" onPress={() => { setAddingServiceForIndex(-1); setNewServiceNote(''); }} size="sm" variant="secondary" color={theme.colors.textMuted} />
+                                    </View>
+                                </View>
+                            )}
+
+                            {item.serviceHistory && item.serviceHistory.length > 0 && (
+                                <View style={{ marginTop: 12 }}>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textMuted, textTransform: 'uppercase', marginBottom: 4 }}>Service-Historie</Text>
+                                    {item.serviceHistory.map((sh, idx) => (
+                                        <View key={idx} style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                                            <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600', width: 80 }}>{sh.date}</Text>
+                                            <Text style={{ color: theme.colors.text, fontSize: 12, flex: 1 }}>{sh.note}</Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
                         </View>
                     ))}
                 </View>

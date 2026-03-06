@@ -8,7 +8,7 @@
  */
 import { BPButton, BPCard, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, syncLoadBikes } from '@/lib/sync';
+import { SyncBike, syncLoadBikes, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -41,9 +41,17 @@ export default function PressureBotScreen() {
     const router = useRouter();
     const [trackerBikes, setTrackerBikes] = useState<SyncBike[]>([]);
     const [selectedBikeId, setSelectedBikeId] = useState<string>('');
+    const [savingToBike, setSavingToBike] = useState(false);
+    const [activeTab, setActiveTab] = useState<'tires' | 'suspension'>('tires');
 
     useEffect(() => {
         syncLoadBikes().then(data => setTrackerBikes(data ?? []));
+        syncLoadProfile().then(p => {
+            if (p.weight) {
+                const w = parseFloat(p.weight);
+                if (!isNaN(w) && w > 30) setRiderWeight(w);
+            }
+        });
     }, []);
 
     const handleBikeChange = (bikeId: string) => {
@@ -91,6 +99,41 @@ export default function PressureBotScreen() {
             else if (setupStr.includes('latex')) setSetup('tube_latex');
             else if (setupStr.includes('insert') || setupStr.includes('cushcore') || setupStr.includes('noodle')) setSetup('insert');
         }
+    };
+
+    const handleSaveToBike = async () => {
+        if (!selectedBikeId) return;
+        setSavingToBike(true);
+
+        const fbStr = `${result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
+        const rbStr = `${result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
+
+        const updatedBikes = trackerBikes.map(b => {
+            if (b.id !== selectedBikeId) return b;
+            const updatedComps = b.components.map(c => {
+                if (c.type === 'wheel_front') {
+                    const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
+                    const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
+                    if (dIdx >= 0) newSetup[dIdx].value = fbStr;
+                    else newSetup.push({ key: 'Druck', value: fbStr });
+                    return { ...c, setupValues: newSetup };
+                }
+                if (c.type === 'wheel_rear') {
+                    const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
+                    const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
+                    if (dIdx >= 0) newSetup[dIdx].value = rbStr;
+                    else newSetup.push({ key: 'Druck', value: rbStr });
+                    return { ...c, setupValues: newSetup };
+                }
+                return c;
+            });
+            return { ...b, components: updatedComps };
+        });
+
+        await syncSaveBikes(updatedBikes);
+        setTrackerBikes(updatedBikes);
+
+        setTimeout(() => setSavingToBike(false), 800);
     };
 
     const terrainOptions = [
@@ -265,6 +308,13 @@ export default function PressureBotScreen() {
         [riderWeight, bikeWeight, wheelSize, tireWidth, setup, terrain, weather, tireType, casing, ridingStyle]
     );
 
+    const suspResult = useMemo(() => {
+        let fPsi = Math.round(riderWeight * 1.05 + (terrain === 'bikepark' ? 5 : 0) + (tireType === 'dh' ? 5 : 0));
+        let sPsi = Math.round(riderWeight * 2.3 + (terrain === 'bikepark' ? 10 : 0) + (tireType === 'dh' ? 10 : 0));
+        if (bikeWeight > 18) { fPsi += 3; sPsi += 8; } // E-Bike compensation
+        return { forkPsi: fPsi, shockPsi: sPsi };
+    }, [riderWeight, bikeWeight, terrain, tireType]);
+
     const frontPSI = Math.round(result.front * 14.5038);
     const rearPSI = Math.round(result.rear * 14.5038);
 
@@ -283,54 +333,100 @@ export default function PressureBotScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Result card */}
-                <BPCard accentColor={ACCENT} style={styles.resultCard}>
-                    <Text style={styles.resultTitle}>{t('pressure_bot.recommended_title')}</Text>
-                    <View style={styles.resultRow}>
-                        <View style={styles.resultItem}>
-                            <Text style={styles.resultLabel}>{t('pressure_bot.front')}</Text>
-                            <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                {result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Text>
-                            <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
-                            <Text style={styles.resultPSI}>{frontPSI} PSI</Text>
+                {/* Mode Switch */}
+                <View style={{ flexDirection: 'row', backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: 4, marginBottom: theme.spacing.md }}>
+                    <TouchableOpacity style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: activeTab === 'tires' ? ACCENT : 'transparent', borderRadius: theme.radius.sm }} onPress={() => setActiveTab('tires')}>
+                        <Text style={{ fontWeight: '700', color: activeTab === 'tires' ? '#000' : theme.colors.text }}>🛞 {t('dialed.tires') || 'Reifen'}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: activeTab === 'suspension' ? ACCENT : 'transparent', borderRadius: theme.radius.sm }} onPress={() => setActiveTab('suspension')}>
+                        <Text style={{ fontWeight: '700', color: activeTab === 'suspension' ? '#000' : theme.colors.text }}>🔱 {t('dialed.suspension') || 'Fahrwerk'}</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Result card Tires */}
+                {activeTab === 'tires' && (
+                    <BPCard accentColor={ACCENT} style={styles.resultCard}>
+                        <Text style={styles.resultTitle}>{t('pressure_bot.recommended_title')}</Text>
+                        <View style={styles.resultRow}>
+                            <View style={styles.resultItem}>
+                                <Text style={styles.resultLabel}>{t('pressure_bot.front')}</Text>
+                                <Text style={[styles.resultValue, { color: ACCENT }]}>
+                                    {result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                                <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
+                                <Text style={styles.resultPSI}>{frontPSI} PSI</Text>
+                            </View>
+                            <View style={styles.resultDivider} />
+                            <View style={styles.resultItem}>
+                                <Text style={styles.resultLabel}>{t('pressure_bot.rear')}</Text>
+                                <Text style={[styles.resultValue, { color: ACCENT }]}>
+                                    {result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                                <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
+                                <Text style={styles.resultPSI}>{rearPSI} PSI</Text>
+                            </View>
                         </View>
-                        <View style={styles.resultDivider} />
-                        <View style={styles.resultItem}>
-                            <Text style={styles.resultLabel}>{t('pressure_bot.rear')}</Text>
-                            <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                {result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Text>
-                            <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
-                            <Text style={styles.resultPSI}>{rearPSI} PSI</Text>
+                        {result.notes.length > 0 && (
+                            <View style={styles.notesBox}>
+                                {result.notes.map((note, i) => (
+                                    <Text key={i} style={styles.noteText}>💡 {note}</Text>
+                                ))}
+                            </View>
+                        )}
+
+                        <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+                            <BPButton
+                                title="✅ In Dialed In speichern"
+                                onPress={() => {
+                                    const fb = result.front.toFixed(2);
+                                    const rb = result.rear.toFixed(2);
+                                    const ts = Date.now().toString();
+                                    router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&frontBar=${fb}&rearBar=${rb}&ts=${ts}`);
+                                }}
+                                color={ACCENT}
+                                style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '60', borderWidth: 1 }}
+                                textStyle={{ color: ACCENT }}
+                                fullWidth
+                            />
+                            {selectedBikeId ? (
+                                <BPButton
+                                    title={savingToBike ? "⏳ Wird gespeichert..." : "💾 Im Component Tracker (Räder) speichern"}
+                                    onPress={handleSaveToBike}
+                                    color={theme.colors.accentCyan}
+                                    style={{ backgroundColor: theme.colors.accentCyan + '20', borderColor: theme.colors.accentCyan + '60', borderWidth: 1 }}
+                                    textStyle={{ color: theme.colors.accentCyan }}
+                                    fullWidth
+                                    disabled={savingToBike}
+                                />
+                            ) : null}
                         </View>
-                    </View>
-                    {result.notes.length > 0 && (
+                    </BPCard>
+                )}
+
+                {/* Result card Suspension */}
+                {activeTab === 'suspension' && (
+                    <BPCard accentColor={ACCENT} style={styles.resultCard}>
+                        <Text style={styles.resultTitle}>Start-Setup Fahrwerk</Text>
+                        <View style={styles.resultRow}>
+                            <View style={styles.resultItem}>
+                                <Text style={styles.resultLabel}>Gabel (Fork)</Text>
+                                <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.forkPsi}</Text>
+                                <Text style={styles.resultUnit}>PSI</Text>
+                            </View>
+                            <View style={styles.resultDivider} />
+                            <View style={styles.resultItem}>
+                                <Text style={styles.resultLabel}>Dämpfer (Shock)</Text>
+                                <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.shockPsi}</Text>
+                                <Text style={styles.resultUnit}>PSI</Text>
+                            </View>
+                        </View>
                         <View style={styles.notesBox}>
-                            {result.notes.map((note, i) => (
-                                <Text key={i} style={styles.noteText}>💡 {note}</Text>
-                            ))}
+                            <Text style={styles.noteText}>💡 Dies ist ein Näherungswert als Startpunkt (Basis: Fox/RockShox Enduro/Trail). Der exakte Wert hängt von der verbauten Kartusche ab. Bitte SAG prüfen (ca. 20% Gabel, 30% Dämpfer)!</Text>
                         </View>
-                    )}
+                    </BPCard>
+                )}
 
-                    <View style={{ marginTop: theme.spacing.lg }}>
-                        <BPButton
-                            title="✅ In Dialed In speichern"
-                            onPress={() => {
-                                const fb = result.front.toFixed(2);
-                                const rb = result.rear.toFixed(2);
-                                const ts = Date.now().toString();
-                                router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&frontBar=${fb}&rearBar=${rb}&ts=${ts}`);
-                            }}
-                            color={ACCENT}
-                            style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '60', borderWidth: 1 }}
-                            textStyle={{ color: ACCENT }}
-                            fullWidth
-                        />
-                    </View>
-                </BPCard>
-
-                {/* Gewicht & Bike */}
+                {/* Gewicht & Bike (Shared) */}
                 <BPCard style={styles.sectionCard}>
                     <Text style={styles.sectionTitle}>{t('pressure_bot.weight_section')}</Text>
                     {trackerBikes.length > 0 && (
@@ -350,14 +446,16 @@ export default function PressureBotScreen() {
                 </BPCard>
 
                 {/* Reifen */}
-                <BPCard style={styles.sectionCard}>
-                    <Text style={styles.sectionTitle}>{t('pressure_bot.tire_section')}</Text>
-                    <BPPicker label={t('pressure_bot.wheel_size_label')} options={wheelOptions} value={wheelSize} onValueChange={setWheelSize} accentColor={ACCENT} />
-                    <BPPicker label={t('pressure_bot.tire_width_label')} options={tireWidthOptions} value={tireWidth} onValueChange={setTireWidth} accentColor={ACCENT} />
-                    <BPPicker label={t('pressure_bot.tire_type_label')} options={tireTypeOptions} value={tireType} onValueChange={setTireType} accentColor={ACCENT} />
-                    <BPPicker label={t('pressure_bot.casing_label')} options={casingOptions} value={casing} onValueChange={setCasing} accentColor={ACCENT} />
-                    <BPPicker label={t('pressure_bot.setup_label')} options={setupOptions} value={setup} onValueChange={setSetup} accentColor={ACCENT} />
-                </BPCard>
+                {activeTab === 'tires' && (
+                    <BPCard style={styles.sectionCard}>
+                        <Text style={styles.sectionTitle}>{t('pressure_bot.tire_section')}</Text>
+                        <BPPicker label={t('pressure_bot.wheel_size_label')} options={wheelOptions} value={wheelSize} onValueChange={setWheelSize} accentColor={ACCENT} />
+                        <BPPicker label={t('pressure_bot.tire_width_label')} options={tireWidthOptions} value={tireWidth} onValueChange={setTireWidth} accentColor={ACCENT} />
+                        <BPPicker label={t('pressure_bot.tire_type_label')} options={tireTypeOptions} value={tireType} onValueChange={setTireType} accentColor={ACCENT} />
+                        <BPPicker label={t('pressure_bot.casing_label')} options={casingOptions} value={casing} onValueChange={setCasing} accentColor={ACCENT} />
+                        <BPPicker label={t('pressure_bot.setup_label')} options={setupOptions} value={setup} onValueChange={setSetup} accentColor={ACCENT} />
+                    </BPCard>
+                )}
 
                 {/* Bedingungen */}
                 <BPCard style={styles.sectionCard}>

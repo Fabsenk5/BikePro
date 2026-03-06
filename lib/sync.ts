@@ -88,6 +88,7 @@ export interface WearItem {
     serviceIntervalKm: number;
     lastServiceDate: string;
     installedDate: string;
+    serviceHistory?: { date: string; note: string; type: string }[];
 }
 
 export interface SyncComponent {
@@ -99,6 +100,7 @@ export interface SyncComponent {
     purchaseDate: string;
     setupValues: any[];
     notes: string;
+    price?: string;
     // --- Shred Check / Wear Tracking Fields ---
     isWearTracked?: boolean;
     currentKm?: number;
@@ -138,6 +140,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         lastServiceDate: c.last_service_date ?? new Date().toISOString().split('T')[0],
                         installedDate: c.installed_date ?? new Date().toISOString().split('T')[0],
                         wearItems: c.wear_items ?? [],
+                        price: c.price,
                     })),
             }));
 
@@ -196,6 +199,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
                     last_service_date: c.lastServiceDate,
                     installed_date: c.installedDate,
                     wear_items: c.wearItems ?? [],
+                    price: c.price,
                 });
             });
         });
@@ -328,6 +332,25 @@ export async function syncSavePreference<T>(key: string, storageKey: string, val
     } catch (e) {
         console.warn(`[sync] Cloud save pref ${key} failed:`, e);
     }
+}
+
+// ─── RIDER PROFILE ───
+
+export interface SyncProfile {
+    weight?: string;
+    height?: string;
+    inseam?: string;
+}
+
+const PROFILE_KEY = '@bikepro_rider_profile';
+
+export async function syncLoadProfile(): Promise<SyncProfile> {
+    const data = await syncLoadPreference<SyncProfile>('rider_profile', PROFILE_KEY);
+    return data ?? {};
+}
+
+export async function syncSaveProfile(profile: SyncProfile): Promise<void> {
+    await syncSavePreference<SyncProfile>('rider_profile', PROFILE_KEY, profile);
 }
 
 // ─── ROW MAPPING ───

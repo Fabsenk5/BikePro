@@ -74,6 +74,7 @@ interface Setup {
     fork: SuspensionValues;
     shock: SuspensionValues;
     tires: TireSetup;
+    tags?: string[];
     notes: string;
     createdAt: string;
 }
@@ -129,6 +130,27 @@ export default function DialedInScreen() {
     const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
 
+    const [wizardVisible, setWizardVisible] = useState(false);
+    const [wizardSolution, setWizardSolution] = useState('');
+
+    const TAG_OPTIONS = [
+        { label: '🌧 Nass', value: 'wet' },
+        { label: '☀️ Trocken', value: 'dry' },
+        { label: '🎢 Bikepark', value: 'park' },
+        { label: '🌲 Hometrail', value: 'trail' },
+        { label: '🤘 Tech', value: 'tech' },
+        { label: '🌊 Flow', value: 'flow' },
+        { label: '🏁 Race', value: 'race' }
+    ];
+
+    const tuningIssues = [
+        { label: 'Gabel taucht stark beim Bremsen/Kurven', solution: 'Erhöhe die Low-Speed Compression (LSC) um 2-3 Klicks. Wenn sie auch oft durchschlägt, füge 1 Token hinzu oder erhöhe den Druck um 5-10 PSI.' },
+        { label: 'Gabel fühlt sich harsch an kleinen Schlägen an', solution: 'Reduziere die LSC um 1-2 Klicks. Mach den Rebound (LSR) 1-2 Klicks schneller, damit sie nicht im Federweg stecken bleibt.' },
+        { label: 'Dämpfer schlägt oft durch', solution: 'Baue einen Volume Spacer (Token) ein, um die Endprogression zu erhöhen. Alternativ +10 PSI Druck oder mehr HSC.' },
+        { label: 'Bike kickt beim Absprung vom Kicker nach vorn', solution: 'Rebound am Dämpfer ist zu schnell! LSR um 1-2 Klicks schließen (langsamer machen).' },
+        { label: 'Fahrwerk fühlt sich leblos an / Bike saugt sich am Boden fest', solution: 'Rebound ist generell zu langsam gedämpft. Öffne LSR (und HSR) vorne und hinten um 2-4 Klicks (schneller). Evtl. etwas mehr Druck.' },
+    ];
+
     const leverOptions = [
         { label: t('dialed.open'), value: 'open' },
         { label: t('dialed.mid'), value: 'mid' },
@@ -157,6 +179,7 @@ export default function DialedInScreen() {
     const [location, setLocation] = useState('');
     const [bikeId, setBikeId] = useState('');
     const [notes, setNotes] = useState('');
+    const [tags, setTags] = useState<string[]>([]);
     const [fork, setFork] = useState<SuspensionValues>({ ...defaultFork });
     const [shock, setShock] = useState<SuspensionValues>({ ...defaultShock });
     const [tires, setTires] = useState<TireSetup>({ ...defaultTires });
@@ -172,7 +195,7 @@ export default function DialedInScreen() {
             setLastHandledTs(params.ts);
 
             setEditingSetup(null);
-            setName(''); setLocation(''); setNotes('');
+            setName(''); setLocation(''); setNotes(''); setTags([]);
             setActiveTab('tires');
 
             let resetFork = { ...defaultFork, config: { ...defaultConfig } };
@@ -281,7 +304,7 @@ export default function DialedInScreen() {
 
     const openNewSetup = () => {
         setEditingSetup(null);
-        setName(''); setLocation(''); setNotes(''); setActiveTab('fork');
+        setName(''); setLocation(''); setNotes(''); setTags([]); setActiveTab('fork');
         setTires({ ...defaultTires });
 
         let resetFork = { ...defaultFork, config: { ...defaultConfig } };
@@ -320,6 +343,7 @@ export default function DialedInScreen() {
         setEditingSetup(setup);
         setName(setup.name); setLocation(setup.location);
         setNotes(setup.notes); setBikeId(setup.bikeId || '');
+        setTags(setup.tags || []);
         setFork({ ...defaultFork, ...setup.fork, config: { ...defaultConfig, ...setup.fork?.config } });
         setShock({ ...defaultShock, ...setup.shock, config: { ...defaultConfig, ...setup.shock?.config } });
         setTires({ ...defaultTires, ...setup.tires });
@@ -333,7 +357,7 @@ export default function DialedInScreen() {
             id: editingSetup?.id ?? Date.now().toString(),
             name: name.trim(), location: location.trim(),
             bikeId, bikeName: getSelectedBikeName(),
-            fork, shock, tires, notes: notes.trim(),
+            fork, shock, tires, tags, notes: notes.trim(),
             createdAt: editingSetup?.createdAt ?? new Date().toISOString(),
         };
         let updated: Setup[];
@@ -377,7 +401,10 @@ export default function DialedInScreen() {
             <StatusBar barStyle="light-content" />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                <BPButton title={t('dialed.add_setup')} onPress={openNewSetup} color={ACCENT} fullWidth size="lg" />
+                <View style={styles.btnRow}>
+                    <BPButton title={t('dialed.add_setup')} onPress={openNewSetup} color={ACCENT} size="md" style={{ flex: 2 }} />
+                    <BPButton title="🧙 Wizard" onPress={() => { setWizardSolution(''); setWizardVisible(true); }} color={theme.colors.accentCyan} size="md" style={{ flex: 1 }} />
+                </View>
 
                 {setups.length === 0 ? (
                     <View style={styles.emptyState}>
@@ -470,6 +497,19 @@ export default function DialedInScreen() {
                                     <View style={styles.tiresRow}>
                                         <Text style={styles.tireText}>🛞 VR: {setup.tires.frontBar?.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? '?'} bar</Text>
                                         <Text style={styles.tireText}>🛞 HR: {setup.tires.rearBar?.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? '?'} bar</Text>
+                                    </View>
+                                )}
+
+                                {setup.tags && setup.tags.length > 0 && (
+                                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
+                                        {setup.tags.map(tVal => {
+                                            const lbl = TAG_OPTIONS.find(o => o.value === tVal)?.label || tVal;
+                                            return (
+                                                <View key={tVal} style={{ backgroundColor: ACCENT + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                                                    <Text style={{ color: ACCENT, fontSize: 10, fontWeight: '700' }}>{lbl}</Text>
+                                                </View>
+                                            );
+                                        })}
                                     </View>
                                 )}
 
@@ -614,11 +654,67 @@ export default function DialedInScreen() {
                     </>
                 )}
 
+                <Text style={styles.subSectionTitle}>Tags & Notizen</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: theme.spacing.md }}>
+                    {TAG_OPTIONS.map(tagOpt => {
+                        const isActive = tags.includes(tagOpt.value);
+                        return (
+                            <TouchableOpacity
+                                key={tagOpt.value}
+                                onPress={() => setTags(prev => isActive ? prev.filter(t => t !== tagOpt.value) : [...prev, tagOpt.value])}
+                                style={{
+                                    backgroundColor: isActive ? ACCENT : theme.colors.elevated,
+                                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
+                                    borderWidth: 1, borderColor: isActive ? ACCENT : theme.colors.border
+                                }}
+                            >
+                                <Text style={{ color: isActive ? '#fff' : theme.colors.text, fontSize: 13, fontWeight: '600' }}>
+                                    {tagOpt.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
                 <BPInput label={t('dialed.notes')} placeholder={t('dialed.notes_placeholder')} value={notes} onChangeText={setNotes} multiline numberOfLines={3} accentColor={ACCENT} />
 
                 <View style={styles.modalActions}>
                     <BPButton title={t('common.save')} onPress={handleSave} color={ACCENT} fullWidth size="lg" disabled={!name.trim()} />
                 </View>
+            </BPModal>
+
+            {/* Tuning Wizard Modal */}
+            <BPModal visible={wizardVisible} onClose={() => setWizardVisible(false)} title="🧙 Tuning Wizard">
+                {!wizardSolution ? (
+                    <>
+                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>Was ist das Problem mit deinem Fahrwerk?</Text>
+                        {tuningIssues.map((issue, idx) => (
+                            <TouchableOpacity
+                                key={idx}
+                                onPress={() => setWizardSolution(issue.solution)}
+                                style={{
+                                    backgroundColor: theme.colors.surface,
+                                    padding: 16, borderRadius: theme.radius.md,
+                                    borderWidth: 1, borderColor: theme.colors.border,
+                                    marginBottom: 8
+                                }}
+                            >
+                                <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>{issue.label}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </>
+                ) : (
+                    <>
+                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.sm, fontSize: 13, textTransform: 'uppercase', fontWeight: '700', letterSpacing: 1 }}>Empfehlung</Text>
+                        <View style={{ backgroundColor: theme.colors.accentCyan + '20', padding: 16, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.accentCyan + '60', marginBottom: theme.spacing.lg }}>
+                            <Text style={{ color: theme.colors.text, fontSize: 16, lineHeight: 24, fontWeight: '600' }}>💡 {wizardSolution}</Text>
+                        </View>
+                        <BPButton title="Neues Setup damit anlegen" onPress={() => {
+                            setWizardVisible(false);
+                            openNewSetup();
+                        }} color={ACCENT} fullWidth />
+                        <BPButton title="Zurück" onPress={() => setWizardSolution('')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
+                    </>
+                )}
             </BPModal>
         </View>
     );
@@ -627,6 +723,7 @@ export default function DialedInScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
     scrollContent: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
+    btnRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
     emptyState: { alignItems: 'center', paddingVertical: theme.spacing.xxl * 2 },
     emptyIcon: { fontSize: 48, marginBottom: theme.spacing.md },
     emptyTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '700' },
