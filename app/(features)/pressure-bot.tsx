@@ -407,22 +407,22 @@ export default function PressureBotScreen() {
                 {/* Result card Suspension */}
                 {activeTab === 'suspension' && (
                     <BPCard accentColor={ACCENT} style={styles.resultCard}>
-                        <Text style={styles.resultTitle}>Start-Setup Fahrwerk</Text>
+                        <Text style={styles.resultTitle}>{t('pressure_bot.suspension_title', { defaultValue: 'Start-Setup Fahrwerk' })}</Text>
                         <View style={styles.resultRow}>
                             <View style={styles.resultItem}>
-                                <Text style={styles.resultLabel}>Gabel (Fork)</Text>
+                                <Text style={styles.resultLabel}>{t('pressure_bot.fork_label', { defaultValue: 'Gabel (Fork)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.forkPsi}</Text>
                                 <Text style={styles.resultUnit}>PSI</Text>
                             </View>
                             <View style={styles.resultDivider} />
                             <View style={styles.resultItem}>
-                                <Text style={styles.resultLabel}>Dämpfer (Shock)</Text>
+                                <Text style={styles.resultLabel}>{t('pressure_bot.shock_label', { defaultValue: 'Dämpfer (Shock)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.shockPsi}</Text>
                                 <Text style={styles.resultUnit}>PSI</Text>
                             </View>
                         </View>
                         <View style={styles.notesBox}>
-                            <Text style={styles.noteText}>💡 Dies ist ein Näherungswert als Startpunkt (Basis: Fox/RockShox Enduro/Trail). Der exakte Wert hängt von der verbauten Kartusche ab. Bitte SAG prüfen (ca. 20% Gabel, 30% Dämpfer)!</Text>
+                            <Text style={styles.noteText}>{t('pressure_bot.suspension_note', { defaultValue: '💡 Dies ist ein Näherungswert als Startpunkt (Basis: Fox/RockShox Enduro/Trail). Der exakte Wert hängt von der verbauten Kartusche ab. Bitte SAG prüfen (ca. 20% Gabel, 30% Dämpfer)!' })}</Text>
                         </View>
                     </BPCard>
                 )}

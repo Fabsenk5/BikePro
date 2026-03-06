@@ -439,6 +439,12 @@
     "pressure_bot": {
         "title": "💨 Pressure-Bot",
         "recommended_title": "Empfohlener Reifendruck",
+        "tab_tires": "Reifen",
+        "tab_suspension": "Fahrwerk",
+        "suspension_title": "Start-Setup Fahrwerk",
+        "fork_label": "Gabel (Fork)",
+        "shock_label": "Dämpfer (Shock)",
+        "suspension_note": "💡 Dies ist ein Näherungswert als Startpunkt (Basis: Fox/RockShox Enduro/Trail). Der exakte Wert hängt von der verbauten Kartusche ab. Bitte SAG prüfen (ca. 20% Gabel, 30% Dämpfer)!",
         "front": "VORNE",
         "rear": "HINTEN",
         "weight_section": "⚖️ Gewicht",

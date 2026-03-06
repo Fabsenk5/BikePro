@@ -575,6 +575,12 @@
     "pressure_bot": {
         "title": "💨 Pressure Bot",
         "recommended_title": "Recommended Tire Pressure",
+        "tab_tires": "Tires",
+        "tab_suspension": "Suspension",
+        "suspension_title": "Baseline Suspension Setup",
+        "fork_label": "Fork",
+        "shock_label": "Shock",
+        "suspension_note": "💡 This is an approximate starting point (Based on Fox/RockShox Enduro/Trail). The exact value depends on your specific cartridge. Please check SAG (approx. 20% fork, 30% shock)!",
         "front": "FRONT",
         "rear": "REAR",
         "weight_section": "⚖️ Weight",
