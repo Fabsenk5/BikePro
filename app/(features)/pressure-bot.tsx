@@ -357,10 +357,10 @@ export default function PressureBotScreen() {
                 {/* Mode Switch */}
                 <View style={{ flexDirection: 'row', backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: 4, marginBottom: theme.spacing.md }}>
                     <TouchableOpacity style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: activeTab === 'tires' ? ACCENT : 'transparent', borderRadius: theme.radius.sm }} onPress={() => setActiveTab('tires')}>
-                        <Text style={{ fontWeight: '700', color: activeTab === 'tires' ? '#000' : theme.colors.text }}>🛞 {t('dialed.tires') || 'Reifen'}</Text>
+                        <Text style={{ fontWeight: '700', color: activeTab === 'tires' ? '#000' : theme.colors.text }}>🛞 {t('pressure_bot.tab_tires', { defaultValue: 'Reifen' })}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: activeTab === 'suspension' ? ACCENT : 'transparent', borderRadius: theme.radius.sm }} onPress={() => setActiveTab('suspension')}>
-                        <Text style={{ fontWeight: '700', color: activeTab === 'suspension' ? '#000' : theme.colors.text }}>🔱 {t('dialed.suspension') || 'Fahrwerk'}</Text>
+                        <Text style={{ fontWeight: '700', color: activeTab === 'suspension' ? '#000' : theme.colors.text }}>🔱 {t('pressure_bot.tab_suspension', { defaultValue: 'Fahrwerk' })}</Text>
                     </TouchableOpacity>
                 </View>
 

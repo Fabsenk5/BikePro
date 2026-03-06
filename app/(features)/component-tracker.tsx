@@ -629,13 +629,13 @@ export default function ComponentTrackerScreen() {
             >
                 <BPInput label={t('tracker.name')} placeholder="z.B. Canyon Torque" value={bikeName} onChangeText={setBikeName} accentColor={ACCENT} />
                 <BPPicker label={t('tracker.type')} options={bikeTypeOptions} value={bikeType} onValueChange={setBikeType} accentColor={ACCENT} />
-                <View style={styles.inputRow}>
-                    <BPInput label={t('tracker.model')} placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 2 }} />
-                    <BPPicker label={t('tracker.size')} options={bikeSizeOptions} value={bikeSize} onValueChange={setBikeSize} accentColor={ACCENT} />
+                <View style={[styles.inputRow, { gap: theme.spacing.md }]}>
+                    <BPInput label={t('tracker.model')} placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 3 }} />
+                    <BPPicker label={t('tracker.size')} options={bikeSizeOptions} value={bikeSize} onValueChange={setBikeSize} accentColor={ACCENT} containerStyle={{ flex: 2 }} />
                 </View>
-                <View style={styles.inputRow}>
+                <View style={[styles.inputRow, { gap: theme.spacing.md }]}>
                     <BPInput label={t('tracker.year')} placeholder="2024" value={bikeYear} onChangeText={setBikeYear} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                    <BPInput label="Gewicht (kg)" placeholder="z.B. 15.5" value={bikeWeight} onChangeText={setBikeWeight} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label="Gewicht (kg)" placeholder="15.5" value={bikeWeight} onChangeText={setBikeWeight} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
                 <View style={{ marginTop: theme.spacing.lg }}>
                     <BPButton title={t('common.save')} onPress={saveBike} color={ACCENT} fullWidth size="lg" disabled={!bikeName.trim()} />
@@ -665,6 +665,27 @@ export default function ComponentTrackerScreen() {
                         {compSetup.map((sv, i) => {
                             if (sv.key === 'Größe') {
                                 return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...wheelSizeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            }
+                            if (sv.key === 'Breite' && compType === 'handlebar') {
+                                return (
+                                    <View key={i} style={{ marginBottom: theme.spacing.lg }}>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{sv.key}</Text>
+                                            <Text style={{ color: ACCENT, fontWeight: '600' }}>{parseFloat(sv.value || '780').toFixed(0)} {sv.unit}</Text>
+                                        </View>
+                                        <Slider
+                                            style={{ height: 40 }}
+                                            minimumValue={700}
+                                            maximumValue={820}
+                                            step={5}
+                                            value={parseFloat(sv.value || '780')}
+                                            onValueChange={(val) => updateSetupValue(i, val.toFixed(0))}
+                                            minimumTrackTintColor={ACCENT}
+                                            maximumTrackTintColor={theme.colors.border}
+                                            thumbTintColor={ACCENT}
+                                        />
+                                    </View>
+                                )
                             }
                             if (sv.key === 'Breite') {
                                 return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...tireWidthOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
