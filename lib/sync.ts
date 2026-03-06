@@ -130,6 +130,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
             const result: SyncBike[] = (bikes ?? []).map(b => ({
                 id: b.id, name: b.name, type: b.type,
                 model: b.model, year: b.year, size: b.size ?? 'L',
+                weight: b.weight ?? undefined,
                 components: (comps ?? [])
                     .filter(c => c.bike_id === b.id)
                     .map(c => ({
