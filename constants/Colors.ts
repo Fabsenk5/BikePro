@@ -44,6 +44,7 @@ export const theme = {
     accentPurple,
     accentBlue,
     accentRed,
+    error: accentRed,
   },
   spacing: {
     xs: 4,

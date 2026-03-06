@@ -190,6 +190,26 @@ export default function PressureBotScreen() {
         { label: t('pressure_bot.type_mud'), value: 'mud' },
     ];
 
+    // Auto-fill bike weight if bike selected
+    useEffect(() => {
+        if (!selectedBikeId) return;
+        const bike = trackerBikes.find(b => b.id === selectedBikeId);
+        if (bike) {
+            if (bike.weight) {
+                setBikeWeight(bike.weight);
+            } else {
+                // Fallback: Calculate total weight of components
+                const totalWeightGram = bike.components.reduce((sum, c) => sum + (parseInt(c.weight) || 0), 0);
+                if (totalWeightGram > 0) {
+                    // Convert to kg for the slider
+                    setBikeWeight(parseFloat((totalWeightGram / 1000).toFixed(1)));
+                } else {
+                    setBikeWeight(15); // Fallback standard weight
+                }
+            }
+        }
+    }, [selectedBikeId, trackerBikes]);
+
     const casingOptions = [
         { label: t('pressure_bot.casing_light'), value: 'light' },
         { label: t('pressure_bot.casing_standard'), value: 'standard' },
@@ -443,7 +463,7 @@ export default function PressureBotScreen() {
                         />
                     )}
                     <BPSlider label={t('pressure_bot.rider_weight_label')} value={riderWeight} min={40} max={140} step={1} unit=" kg" accentColor={ACCENT} onValueChange={setRiderWeight} />
-                    <BPSlider label={t('pressure_bot.bike_weight_label')} value={bikeWeight} min={8} max={30} step={0.5} unit=" kg" accentColor={ACCENT} onValueChange={setBikeWeight} />
+                    <BPSlider label={t('pressure_bot.bike_weight_label') + (selectedBikeId ? ' (Auto)' : '')} value={bikeWeight} min={8} max={30} step={0.5} unit=" kg" accentColor={ACCENT} onValueChange={setBikeWeight} disabled={!!selectedBikeId && bikeWeight > 8} />
                 </BPCard>
 
                 {/* Reifen */}

@@ -57,6 +57,7 @@ interface BikeRow {
     model: string;
     year: string;
     size: string;
+    weight: number | null;
 }
 
 interface ComponentRow {
@@ -78,6 +79,7 @@ export interface SyncBike {
     model: string;
     year: string;
     size: string;
+    weight?: number;
     components: SyncComponent[];
 }
 
@@ -172,7 +174,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
         // Upsert all bikes
         const bikeRows = bikes.map(b => ({
             id: b.id, user_id: userId, name: b.name, type: b.type,
-            model: b.model, year: b.year, size: b.size,
+            model: b.model, year: b.year, size: b.size, weight: b.weight ?? null,
         }));
 
         if (bikeRows.length > 0) {

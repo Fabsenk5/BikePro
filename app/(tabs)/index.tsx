@@ -78,9 +78,9 @@ export default function HomeScreen() {
       });
 
       // Load Dialed In
-      syncLoadTable('dialed_in').then(setups => {
+      syncLoadTable<{ id: string; name: string; createdAt: string }>('dialed_in', '@bikepro_dialed_in').then(setups => {
         if (setups && setups.length > 0) {
-          const last = setups.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0];
+          const last = setups.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0];
           setDialedSub(`Aktuell: ${last.name}`);
         }
       });

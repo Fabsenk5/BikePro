@@ -12,6 +12,7 @@ interface BPSliderProps {
     accentColor?: string;
     onValueChange: (value: number) => void;
     containerStyle?: ViewStyle;
+    disabled?: boolean;
 }
 
 export default function BPSlider({
@@ -24,22 +25,25 @@ export default function BPSlider({
     accentColor = theme.colors.accent,
     onValueChange,
     containerStyle,
+    disabled,
 }: BPSliderProps) {
     const progress = Math.max(0, Math.min(1, (value - min) / (max - min)));
 
     const handleIncrement = useCallback(() => {
+        if (disabled) return;
         const v = Number(value) || 0;
         const s = Number(step) || 1;
         const next = Math.min(Number(max), v + s);
         onValueChange(Math.round((next + Number.EPSILON) * 1000) / 1000);
-    }, [value, max, step, onValueChange]);
+    }, [value, max, step, onValueChange, disabled]);
 
     const handleDecrement = useCallback(() => {
+        if (disabled) return;
         const v = Number(value) || 0;
         const s = Number(step) || 1;
         const next = Math.max(Number(min), v - s);
         onValueChange(Math.round((next + Number.EPSILON) * 1000) / 1000);
-    }, [value, min, step, onValueChange]);
+    }, [value, min, step, onValueChange, disabled]);
 
     return (
         <View style={[styles.container, containerStyle]}>
@@ -59,6 +63,7 @@ export default function BPSlider({
                     onPress={handleDecrement}
                     activeOpacity={0.6}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    disabled={disabled}
                 >
                     <Text style={styles.stepButtonText}>−</Text>
                 </TouchableOpacity>
@@ -91,6 +96,7 @@ export default function BPSlider({
                     onPress={handleIncrement}
                     activeOpacity={0.6}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    disabled={disabled}
                 >
                     <Text style={styles.stepButtonText}>+</Text>
                 </TouchableOpacity>

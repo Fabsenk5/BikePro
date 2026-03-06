@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import {
     Alert,
     ScrollView,
+    Share,
     StatusBar,
     StyleSheet,
     Switch,
@@ -70,6 +71,7 @@ export default function ComponentTrackerScreen() {
     const [bikeModel, setBikeModel] = useState('');
     const [bikeYear, setBikeYear] = useState('2024');
     const [bikeSize, setBikeSize] = useState('L');
+    const [bikeWeight, setBikeWeight] = useState('');
 
     // Component form
     const [compType, setCompType] = useState('handlebar');
@@ -242,6 +244,7 @@ export default function ComponentTrackerScreen() {
         setBikeName('');
         setBikeType('enduro');
         setBikeModel('');
+        setBikeWeight('');
         setBikeYear('2024');
         setBikeSize('L');
         setBikeModalVisible(true);
@@ -252,6 +255,7 @@ export default function ComponentTrackerScreen() {
         setBikeName(bike.name);
         setBikeType(bike.type);
         setBikeModel(bike.model);
+        setBikeWeight(bike.weight?.toString() ?? '');
         setBikeYear(bike.year);
         setBikeSize(bike.size ?? 'L');
         setBikeModalVisible(true);
@@ -259,11 +263,13 @@ export default function ComponentTrackerScreen() {
 
     const saveBike = () => {
         if (!bikeName.trim()) return;
+        const parsedWeight = parseFloat(bikeWeight);
         const bikeData: Bike = {
             id: editingBike?.id ?? Date.now().toString(),
             name: bikeName.trim(),
             type: bikeType,
             model: bikeModel.trim(),
+            weight: isNaN(parsedWeight) ? undefined : parsedWeight,
             year: bikeYear,
             size: bikeSize,
             components: editingBike?.components ?? [],
@@ -524,7 +530,7 @@ export default function ComponentTrackerScreen() {
                             <View style={{ flex: 1 }}>
                                 <Text style={styles.bikeName}>{selectedBike.name}</Text>
                                 <Text style={styles.bikeInfo}>
-                                    {selectedBike.model} • {selectedBike.year} • Gr. {selectedBike.size ?? '–'} • {bikeTypeOptions.find(t => t.value === selectedBike.type)?.label}
+                                    {selectedBike.model} • {selectedBike.year} • Gr. {selectedBike.size ?? '–'} • {selectedBike.weight ? selectedBike.weight + ' kg • ' : ''}{bikeTypeOptions.find(t => t.value === selectedBike.type)?.label}
                                 </Text>
                             </View>
                             <View style={styles.bikeActions}>
@@ -627,7 +633,10 @@ export default function ComponentTrackerScreen() {
                     <BPInput label={t('tracker.model')} placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 2 }} />
                     <BPPicker label={t('tracker.size')} options={bikeSizeOptions} value={bikeSize} onValueChange={setBikeSize} accentColor={ACCENT} />
                 </View>
-                <BPInput label={t('tracker.year')} placeholder="2024" value={bikeYear} onChangeText={setBikeYear} keyboardType="numeric" accentColor={ACCENT} />
+                <View style={styles.inputRow}>
+                    <BPInput label={t('tracker.year')} placeholder="2024" value={bikeYear} onChangeText={setBikeYear} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label="Gewicht (kg)" placeholder="z.B. 15.5" value={bikeWeight} onChangeText={setBikeWeight} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                </View>
                 <View style={{ marginTop: theme.spacing.lg }}>
                     <BPButton title={t('common.save')} onPress={saveBike} color={ACCENT} fullWidth size="lg" disabled={!bikeName.trim()} />
                 </View>
