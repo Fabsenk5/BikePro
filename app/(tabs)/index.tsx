@@ -1,9 +1,9 @@
 import FeatureTile from '@/components/FeatureTile';
 import { theme } from '@/constants/Colors';
 import { Feature, features as defaultFeatures } from '@/constants/Features';
-import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import { syncLoadBikes, syncLoadPreference, syncLoadRides, syncLoadTable, syncSavePreference } from '@/lib/sync';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ScrollView,
@@ -23,21 +23,69 @@ export default function HomeScreen() {
   const [orderedFeatures, setOrderedFeatures] = useState<Feature[]>(defaultFeatures);
   const [selectedTile, setSelectedTile] = useState<number | null>(null);
 
-  useEffect(() => {
-    syncLoadPreference<string[]>('tile_order', TILE_ORDER_KEY).then((order) => {
-      if (order) {
-        const reordered: Feature[] = [];
-        order.forEach((id) => {
-          const feature = defaultFeatures.find((f) => f.id === id);
-          if (feature) reordered.push(feature);
-        });
-        defaultFeatures.forEach((f) => {
-          if (!reordered.find((r) => r.id === f.id)) reordered.push(f);
-        });
-        setOrderedFeatures(reordered);
-      }
-    });
-  }, []);
+  // Widget Data State
+  const [shredBadge, setShredBadge] = useState<string | null>(null);
+  const [lastRideSub, setLastRideSub] = useState<string | null>(null);
+  const [pressureSub, setPressureSub] = useState<string | null>(null);
+  const [dialedSub, setDialedSub] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Load Order
+      syncLoadPreference<string[]>('tile_order', TILE_ORDER_KEY).then((order) => {
+        if (order) {
+          const reordered: Feature[] = [];
+          order.forEach((id) => {
+            const feature = defaultFeatures.find((f) => f.id === id);
+            if (feature) reordered.push(feature);
+          });
+          defaultFeatures.forEach((f) => {
+            if (!reordered.find((r) => r.id === f.id)) reordered.push(f);
+          });
+          setOrderedFeatures(reordered);
+        }
+      });
+
+      // Load Ride Log
+      syncLoadRides().then(rides => {
+        if (rides && rides.length > 0) {
+          const last = rides.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+          const dateStr = new Date(last.date).toLocaleDateString();
+          setLastRideSub(`Zuletzt: ${dateStr} (${last.distance}km)`);
+        }
+      });
+
+      // Load Shred Check & Pressure Bot
+      syncLoadBikes().then(bikes => {
+        if (bikes && bikes.length > 0) {
+          // Shred Check Badge
+          let overdue = 0;
+          bikes.forEach(b => {
+            b.components.forEach(c => {
+              c.wearItems?.forEach(w => {
+                if (w.currentKm >= w.serviceIntervalKm) overdue++;
+              });
+            });
+          });
+          if (overdue > 0) setShredBadge(`${overdue} fällig`);
+          else setShredBadge(null);
+
+          // Pressure Bot Preview (grab fav bike front pressure)
+          const frontWheel = bikes[0].components.find(c => c.type === 'wheel_front');
+          const pVal = frontWheel?.setupValues?.find(s => s.key === 'Druck')?.value;
+          if (pVal) setPressureSub(`Start-Bike: ${pVal} VR`);
+        }
+      });
+
+      // Load Dialed In
+      syncLoadTable('dialed_in').then(setups => {
+        if (setups && setups.length > 0) {
+          const last = setups.sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0];
+          setDialedSub(`Aktuell: ${last.name}`);
+        }
+      });
+    }, [])
+  );
 
   const saveOrder = useCallback(async (features: Feature[]) => {
     const order = features.map((f) => f.id);
@@ -148,6 +196,15 @@ export default function HomeScreen() {
                   feature={feature}
                   index={index}
                   onPress={() => handleTilePress(feature.route, feature.ready, index)}
+                  dynamicSubtitle={
+                    feature.id === 'ride-log' && lastRideSub ? lastRideSub :
+                      feature.id === 'pressure-bot' && pressureSub ? pressureSub :
+                        feature.id === 'dialed-in' && dialedSub ? dialedSub :
+                          undefined
+                  }
+                  badgeLabel={
+                    feature.id === 'shred-check' && shredBadge ? shredBadge : undefined
+                  }
                 />
               </View>
             </View>

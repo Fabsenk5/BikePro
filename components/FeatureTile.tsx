@@ -23,9 +23,11 @@ interface FeatureTileProps {
     feature: Feature;
     onPress: () => void;
     index: number;
+    dynamicSubtitle?: string;
+    badgeLabel?: string;
 }
 
-export default function FeatureTile({ feature, onPress, index }: FeatureTileProps) {
+export default function FeatureTile({ feature, onPress, index, dynamicSubtitle, badgeLabel }: FeatureTileProps) {
     const { t } = useTranslation();
     const scale = useSharedValue(1);
 
@@ -72,15 +74,20 @@ export default function FeatureTile({ feature, onPress, index }: FeatureTileProp
                 {t(`features.${feature.id}.title`, { defaultValue: feature.title })}
             </Text>
             <Text style={[styles.subtitle, { color: feature.accentColor }]} numberOfLines={1}>
-                {t(`features.${feature.id}.subtitle`, { defaultValue: feature.subtitle })}
+                {dynamicSubtitle || t(`features.${feature.id}.subtitle`, { defaultValue: feature.subtitle })}
             </Text>
 
-            {/* Coming Soon badge */}
-            {!feature.ready && (
+            {/* Custom Active Badge (e.g., Shred Check Warnings) */}
+            {badgeLabel ? (
+                <View style={[styles.badge, styles.badgeActive]}>
+                    <Text style={[styles.badgeText, { color: '#fff' }]}>{badgeLabel}</Text>
+                </View>
+            ) : !feature.ready ? (
+                /* Coming Soon badge */
                 <View style={styles.badge}>
                     <Text style={styles.badgeText}>{t('common.coming_soon', { defaultValue: 'SOON' }).toUpperCase()}</Text>
                 </View>
-            )}
+            ) : null}
         </AnimatedTouchable>
     );
 }
@@ -146,6 +153,10 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
         borderWidth: 1,
         borderColor: theme.colors.border,
+    },
+    badgeActive: {
+        backgroundColor: theme.colors.error,
+        borderColor: theme.colors.error,
     },
     badgeText: {
         color: theme.colors.textMuted,
