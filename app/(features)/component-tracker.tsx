@@ -540,9 +540,12 @@ export default function ComponentTrackerScreen() {
                             <View style={styles.compRowLeft}>
                                 <Text style={styles.compRowType}>{getTypeLabel(comp.type)}</Text>
                                 {(comp.brand || comp.model) ? (
-                                    <Text style={styles.compRowBrand} numberOfLines={1}>
+                                    <Text style={styles.compRowBrand} numberOfLines={2}>
                                         {comp.brand} {comp.model}{comp.weight ? ` · ${comp.weight}g` : ''}
                                     </Text>
+                                ) : null}
+                                {comp.notes ? (
+                                    <Text style={styles.compRowNotes} numberOfLines={2}>{comp.notes}</Text>
                                 ) : null}
                             </View>
                             {comp.setupValues.length > 0 && (
@@ -565,11 +568,8 @@ export default function ComponentTrackerScreen() {
                                     )}
                                 </View>
                             )}
-                            {comp.notes ? (
-                                <Text style={styles.compRowNotes} numberOfLines={1}>{comp.notes}</Text>
-                            ) : null}
                             <TouchableOpacity onPress={() => deleteComp(comp.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.compRowDelete}>
-                                <Text style={{ fontSize: 14 }}>🗑</Text>
+                                <Text style={{ fontSize: 18 }}>🗑</Text>
                             </TouchableOpacity>
                         </View>
                     </TouchableOpacity>
@@ -740,35 +740,38 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: theme.colors.surface,
         borderRadius: theme.radius.md,
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        marginBottom: 6,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        marginBottom: 8,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        gap: 10,
-        flexWrap: 'wrap',
+        gap: 8,
     },
     compRowLeft: {
-        minWidth: 140,
+        flex: 1,
+        gap: 2,
     },
-    compRowType: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
-    compRowBrand: { color: theme.colors.textSecondary, fontSize: 11, marginTop: 1 },
+    compRowType: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
+    compRowBrand: { color: theme.colors.textSecondary, fontSize: 12, lineHeight: 16 },
     compRowChips: {
+        flex: 1,
         flexDirection: 'row',
         flexWrap: 'wrap',
         gap: 4,
-        flex: 1,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
     },
     compRowChip: {
         backgroundColor: theme.colors.elevated,
         borderRadius: theme.radius.sm,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
+        flexShrink: 1,
     },
     compRowChipKey: { color: theme.colors.textMuted, fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
     compRowChipVal: { fontSize: 11, fontWeight: '800' },
-    compRowChipMore: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600', alignSelf: 'center' },
-    compRowNotes: { color: theme.colors.textMuted, fontSize: 10, fontStyle: 'italic', flex: 1 },
+    compRowChipMore: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600', marginLeft: 4 },
+    compRowNotes: { color: theme.colors.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 4 },
     wearSection: {
         marginTop: theme.spacing.md,
         paddingTop: theme.spacing.md,

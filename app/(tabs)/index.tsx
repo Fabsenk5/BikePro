@@ -123,7 +123,7 @@ export default function HomeScreen() {
         {/* Feature grid */}
         <View style={styles.grid}>
           {orderedFeatures.map((feature, index) => (
-            <View key={feature.id} style={{ position: 'relative' }}>
+            <View key={feature.id} style={{ position: 'relative', width: '48%', marginBottom: theme.spacing.md }}>
               {editMode && selectedTile === index && (
                 <View style={styles.moveButtons}>
                   <TouchableOpacity

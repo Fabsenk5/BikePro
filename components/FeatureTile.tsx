@@ -16,8 +16,6 @@ import Animated, {
 } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const TILE_GAP = theme.spacing.md;
-const TILE_WIDTH = (SCREEN_WIDTH - theme.spacing.lg * 2 - TILE_GAP) / 2;
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -89,12 +87,11 @@ export default function FeatureTile({ feature, onPress, index }: FeatureTileProp
 
 const styles = StyleSheet.create({
     tile: {
-        width: TILE_WIDTH,
+        width: '100%',
         backgroundColor: theme.colors.surface,
         borderRadius: theme.radius.lg,
         padding: theme.spacing.md,
         paddingTop: theme.spacing.xs,
-        marginBottom: TILE_GAP,
         borderWidth: 1,
         borderColor: theme.colors.border,
         position: 'relative',
