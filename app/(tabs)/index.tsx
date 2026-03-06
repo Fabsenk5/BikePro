@@ -1,7 +1,7 @@
 import FeatureTile from '@/components/FeatureTile';
 import { theme } from '@/constants/Colors';
 import { Feature, features as defaultFeatures } from '@/constants/Features';
-import { syncLoadBikes, syncLoadPreference, syncLoadRides, syncLoadTable, syncSavePreference } from '@/lib/sync';
+import { syncLoadBikes, syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -47,7 +47,7 @@ export default function HomeScreen() {
       });
 
       // Load Ride Log
-      syncLoadRides().then(rides => {
+      syncLoadTable<any>('rides', '@bikepro_rides').then(rides => {
         if (rides && rides.length > 0) {
           const last = rides.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
           const dateStr = new Date(last.date).toLocaleDateString();
