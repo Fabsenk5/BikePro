@@ -12,6 +12,7 @@ interface AuthContextType {
     user: User | null;
     session: Session | null;
     isAdmin: boolean;
+    isActive: boolean;
     isLoading: boolean;
     isConfigured: boolean;
     signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -23,6 +24,7 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     session: null,
     isAdmin: false,
+    isActive: false,
     isLoading: true,
     isConfigured: false,
     signIn: async () => ({ error: null }),
@@ -37,9 +39,17 @@ const OFFLINE_USER_KEY = '@bikepro_offline_user';
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
+    const [isActive, setIsActive] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState(true);
 
     const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+
+    const checkActivationStatus = async (userId: string) => {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data } = await supabase.from('profiles').select('is_active').eq('id', userId).single();
+        setIsActive(!!data?.is_active);
+    };
 
     useEffect(() => {
         const supabase = getSupabase();
@@ -49,13 +59,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             supabase.auth.getSession().then(({ data: { session } }) => {
                 setSession(session);
                 setUser(session?.user ?? null);
-                setIsLoading(false);
-                if (session?.user) migrateLocalToCloud();
+                if (session?.user) {
+                    checkActivationStatus(session.user.id).then(() => {
+                        setIsLoading(false);
+                        migrateLocalToCloud();
+                    });
+                } else {
+                    setIsLoading(false);
+                }
             });
 
             const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
                 setSession(session);
                 setUser(session?.user ?? null);
+                if (session?.user) {
+                    checkActivationStatus(session.user.id);
+                } else {
+                    setIsActive(false);
+                }
             });
 
             return () => subscription.unsubscribe();
@@ -84,6 +105,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (error) return { error: error.message };
             setUser(data.user);
             setSession(data.session);
+            if (data.user) {
+                await checkActivationStatus(data.user.id);
+            }
             migrateLocalToCloud();
             return { error: null };
         } else {
@@ -112,6 +136,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             setUser(data.user);
             setSession(data.session);
+            if (data.user) {
+                await checkActivationStatus(data.user.id);
+            }
             return { error: null };
         } else {
             return signIn(email, password);
@@ -126,11 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.removeItem(OFFLINE_USER_KEY);
         setUser(null);
         setSession(null);
+        setIsActive(false);
     };
 
     return (
         <AuthContext.Provider value={{
-            user, session, isAdmin, isLoading,
+            user, session, isAdmin, isActive, isLoading,
             isConfigured: isSupabaseConfigured,
             signIn, signUp, signOut,
         }}>

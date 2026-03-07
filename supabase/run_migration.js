@@ -1,13 +1,10 @@
+require('dotenv').config({ path: '../.env' });
 const { Client } = require('pg');
 const fs = require('fs');
 
 async function migrate() {
     const client = new Client({
-        host: 'db.mtlgosbbosclyxvrbxpl.supabase.co',
-        port: 5432,
-        database: 'postgres',
-        user: 'postgres',
-        password: 'SAuWRyxcXrmjHaHZ',
+        connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false },
         connectionTimeoutMillis: 10000,
     });

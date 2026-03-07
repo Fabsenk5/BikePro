@@ -1,12 +1,12 @@
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { theme } from '@/constants/Colors';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import '@/lib/i18n';
 
 export {
@@ -60,13 +60,41 @@ function RootLayoutNav() {
   return (
     <AuthProvider>
       <ThemeProvider value={BikeProTheme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="(features)" options={{ headerShown: false }} />
-          <Stack.Screen name="auth" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        </Stack>
+        <AuthGuard>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="(features)" options={{ headerShown: false }} />
+            <Stack.Screen name="auth" options={{ headerShown: false }} />
+            <Stack.Screen name="pending" options={{ headerShown: false }} />
+            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+          </Stack>
+        </AuthGuard>
       </ThemeProvider>
     </AuthProvider>
   );
+}
+
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, isActive, isAdmin, isLoading, isConfigured } = useAuth();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading || !isConfigured) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+    const inPendingGroup = segments[0] === 'pending';
+
+    if (!user && !inAuthGroup) {
+      // Redirect to login if not authenticated
+      router.replace('/auth');
+    } else if (user && !isActive && !isAdmin && !inPendingGroup) {
+      // Redirect to pending if authenticated but not active
+      router.replace('/pending');
+    } else if (user && (isActive || isAdmin) && (inAuthGroup || inPendingGroup)) {
+      // Redirect to app if authenticated and active
+      router.replace('/(tabs)/profile');
+    }
+  }, [user, isActive, isAdmin, isLoading, isConfigured, segments]);
+
+  return <>{children}</>;
 }
