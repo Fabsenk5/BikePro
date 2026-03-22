@@ -20,7 +20,7 @@ import Animated, {
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'outline';
 type Size = 'sm' | 'md' | 'lg';
 
 interface BPButtonProps {
@@ -123,6 +123,15 @@ function getVariantStyles(variant: Variant, color: string) {
         case 'ghost':
             return {
                 button: { backgroundColor: 'transparent', borderWidth: 0 } as ViewStyle,
+                textColor: color,
+            };
+        case 'outline':
+            return {
+                button: {
+                    backgroundColor: 'transparent',
+                    borderWidth: 1.5,
+                    borderColor: color,
+                } as ViewStyle,
                 textColor: color,
             };
     }
