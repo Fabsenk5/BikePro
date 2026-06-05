@@ -27,6 +27,7 @@ export default function BPInput({
     accentColor = theme.colors.accent,
     containerStyle,
     error,
+    style,
     ...inputProps
 }: BPInputProps) {
     const [focused, setFocused] = useState(false);
@@ -42,7 +43,11 @@ export default function BPInput({
                 ]}
             >
                 <TextInput
-                    style={styles.input}
+                    style={[
+                        styles.input,
+                        inputProps.multiline && { textAlignVertical: 'top' },
+                        style
+                    ]}
                     placeholderTextColor={theme.colors.textMuted}
                     selectionColor={accentColor}
                     onFocus={() => setFocused(true)}
