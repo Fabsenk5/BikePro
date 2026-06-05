@@ -11,7 +11,7 @@
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable } from '@/lib/sync';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -186,6 +186,7 @@ export default function DialedInScreen() {
     const [activeTab, setActiveTab] = useState<'fork' | 'shock' | 'tires'>('fork');
 
     const params = useLocalSearchParams();
+    const router = useRouter();
     const [lastHandledTs, setLastHandledTs] = useState('');
 
     useEffect(() => { loadSetups(); loadBikes(); }, []);
@@ -202,6 +203,8 @@ export default function DialedInScreen() {
             let resetShock = { ...defaultShock, config: { ...defaultConfig } };
 
             let applyBikeId = '';
+            let parsedFork = { ...resetFork };
+            let parsedShock = { ...resetShock };
 
             if (params.bikeId && typeof params.bikeId === 'string' && trackerBikes.some(b => b.id === params.bikeId)) {
                 applyBikeId = params.bikeId;
@@ -216,21 +219,55 @@ export default function DialedInScreen() {
                 if (forkComp && forkComp.setupValues) {
                     const travel = forkComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
                     const stroke = forkComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
-                    if (travel) resetFork.travel = parseInt(travel, 10) || resetFork.travel;
-                    if (stroke) resetFork.stroke = parseInt(stroke, 10) || resetFork.stroke;
+                    if (travel) parsedFork.travel = parseInt(travel, 10) || parsedFork.travel;
+                    if (stroke) parsedFork.stroke = parseInt(stroke, 10) || parsedFork.stroke;
                 }
 
                 const shockComp = bike.components.find((c: any) => c.type === 'shock');
                 if (shockComp && shockComp.setupValues) {
                     const travel = shockComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
                     const stroke = shockComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
-                    if (travel) resetShock.travel = parseInt(travel, 10) || resetShock.travel;
-                    if (stroke) resetShock.stroke = parseInt(stroke, 10) || resetShock.stroke;
+                    if (travel) parsedShock.travel = parseInt(travel, 10) || parsedShock.travel;
+                    if (stroke) parsedShock.stroke = parseInt(stroke, 10) || parsedShock.stroke;
                 }
             }
 
-            setFork(resetFork);
-            setShock(resetShock);
+            // Apply Pressure Bot Overrides
+            if (params.forkPsi) {
+                parsedFork.psi = parseInt(params.forkPsi as string, 10) || parsedFork.psi;
+                setName('Pressure Bot Empfehlung');
+            }
+            if (params.forkClicks) {
+                const c = parseInt(params.forkClicks as string, 10) || parsedFork.reboundClicks;
+                parsedFork.reboundClicks = c;
+                parsedFork.reboundLSR = c;
+                parsedFork.reboundHSR = c;
+            }
+            if (params.forkCompClicks) {
+                const c = parseInt(params.forkCompClicks as string, 10) || parsedFork.compressionClicks;
+                parsedFork.compressionClicks = c;
+                parsedFork.compressionLSC = c;
+                parsedFork.compressionHSC = c;
+            }
+
+            if (params.shockPsi) {
+                parsedShock.psi = parseInt(params.shockPsi as string, 10) || parsedShock.psi;
+            }
+            if (params.shockClicks) {
+                const c = parseInt(params.shockClicks as string, 10) || parsedShock.reboundClicks;
+                parsedShock.reboundClicks = c;
+                parsedShock.reboundLSR = c;
+                parsedShock.reboundHSR = c;
+            }
+            if (params.shockCompClicks) {
+                const c = parseInt(params.shockCompClicks as string, 10) || parsedShock.compressionClicks;
+                parsedShock.compressionClicks = c;
+                parsedShock.compressionLSC = c;
+                parsedShock.compressionHSC = c;
+            }
+
+            setFork(parsedFork);
+            setShock(parsedShock);
 
             setTires(prev => ({
                 ...defaultTires,
@@ -394,6 +431,19 @@ export default function DialedInScreen() {
     };
 
     const activeConfig = activeSuspension?.config ?? defaultConfig;
+
+    // Helper to get max clicks for the active component from the bike
+    const getActiveComponentMaxClicks = () => {
+        if (!bikeId) return 25; // fallback
+        const bike = trackerBikes.find(b => b.id === bikeId);
+        if (!bike) return 25;
+        const comp = bike.components.find(c => c.type === activeTab);
+        if (!comp || !comp.maxClicks) return 25;
+        const parsed = parseInt(comp.maxClicks, 10);
+        return isNaN(parsed) ? 25 : parsed;
+    };
+    
+    const currentMaxClicks = getActiveComponentMaxClicks();
 
     return (
         <View style={styles.container}>
@@ -575,14 +625,14 @@ export default function DialedInScreen() {
                             </View>
 
                             {activeConfig.reboundMode === 'clicks' ? (
-                                <BPSlider label="Rebound Clicks" value={activeSuspension.reboundClicks} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundClicks', v)} />
+                                <BPSlider label="Rebound Clicks" value={activeSuspension.reboundClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundClicks', v)} />
                             ) : (
                                 <View style={styles.inputRow}>
                                     <View style={{ flex: 1 }}>
-                                        <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
+                                        <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={15} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
+                                        <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
                                     </View>
                                 </View>
                             )}
@@ -604,7 +654,7 @@ export default function DialedInScreen() {
                             />
 
                             {activeConfig.compressionMode === 'clicks' && (
-                                <BPSlider label="Compression Clicks" value={activeSuspension.compressionClicks} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionClicks', v)} />
+                                <BPSlider label="Compression Clicks" value={activeSuspension.compressionClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionClicks', v)} />
                             )}
 
                             {activeConfig.compressionMode === 'lever' && (
@@ -614,10 +664,10 @@ export default function DialedInScreen() {
                             {activeConfig.compressionMode === 'hsls' && (
                                 <View style={styles.inputRow}>
                                     <View style={{ flex: 1 }}>
-                                        <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={25} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
+                                        <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={15} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
+                                        <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
                                     </View>
                                 </View>
                             )}

@@ -345,6 +345,11 @@ export default function PressureBotScreen() {
         let forkCompClicks = `${Math.round(compOpenPct)}%`;
         let shockCompClicks = `${Math.round(compOpenPct)}%`;
 
+        let rawForkClicks = Math.round(reboundOpenPct);
+        let rawShockClicks = Math.round(reboundOpenPct);
+        let rawForkCompClicks = Math.round(compOpenPct);
+        let rawShockCompClicks = Math.round(compOpenPct);
+
         if (selectedBikeId) {
             const bike = trackerBikes.find(b => b.id === selectedBikeId);
             if (bike) {
@@ -363,17 +368,25 @@ export default function PressureBotScreen() {
                 const shockMax = shock?.maxClicks ? parseInt(shock.maxClicks) : getClicksForModel(shock?.model || shock?.name);
 
                 if (forkMax) {
-                    forkClicks = `${Math.max(1, Math.round(forkMax * (reboundOpenPct / 100)))} (${forkMax} max)`;
-                    forkCompClicks = `${Math.max(1, Math.round(forkMax * (compOpenPct / 100)))}`;
+                    rawForkClicks = Math.max(1, Math.round(forkMax * (reboundOpenPct / 100)));
+                    rawForkCompClicks = Math.max(1, Math.round(forkMax * (compOpenPct / 100)));
+                    forkClicks = `${rawForkClicks} (${forkMax} max)`;
+                    forkCompClicks = `${rawForkCompClicks}`;
                 }
                 if (shockMax) {
-                    shockClicks = `${Math.max(1, Math.round(shockMax * (reboundOpenPct / 100)))} (${shockMax} max)`;
-                    shockCompClicks = `${Math.max(1, Math.round(shockMax * (compOpenPct / 100)))}`;
+                    rawShockClicks = Math.max(1, Math.round(shockMax * (reboundOpenPct / 100)));
+                    rawShockCompClicks = Math.max(1, Math.round(shockMax * (compOpenPct / 100)));
+                    shockClicks = `${rawShockClicks} (${shockMax} max)`;
+                    shockCompClicks = `${rawShockCompClicks}`;
                 }
             }
         }
 
-        return { forkPsi: fPsi, shockPsi: sPsi, forkClicks, shockClicks, forkCompClicks, shockCompClicks };
+        return { 
+            forkPsi: fPsi, shockPsi: sPsi, 
+            forkClicks, shockClicks, forkCompClicks, shockCompClicks,
+            rawForkClicks, rawShockClicks, rawForkCompClicks, rawShockCompClicks
+        };
     }, [riderWeight, bikeWeight, terrain, tireType, ridingStyle, selectedBikeId, trackerBikes]);
 
     const frontPSI = Math.round(result.front * 14.5038);
@@ -488,6 +501,20 @@ export default function PressureBotScreen() {
                         <View style={styles.notesBox}>
                             <Text style={styles.noteText}>{t('pressure_bot.suspension_note', { defaultValue: '💡 Dies ist ein Näherungswert als Startpunkt (Basis: Fox/RockShox Enduro/Trail). Der exakte Wert hängt von der verbauten Kartusche ab. Bitte SAG prüfen (ca. 20% Gabel, 30% Dämpfer)!' })}</Text>
                             <Text style={[styles.noteText, { marginTop: 4, color: theme.colors.accent }]}>⚠️ Wichtig: Alle Klicks werden von "komplett geschlossen" (im Uhrzeigersinn / +) in Richtung "offen" (gegen den Uhrzeigersinn / -) gezählt!</Text>
+                        </View>
+
+                        <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
+                            <BPButton
+                                title="✅ Setup in Dialed In speichern"
+                                onPress={() => {
+                                    const ts = Date.now().toString();
+                                    router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&ts=${ts}&forkPsi=${suspResult.forkPsi}&forkClicks=${suspResult.rawForkClicks}&forkCompClicks=${suspResult.rawForkCompClicks}&shockPsi=${suspResult.shockPsi}&shockClicks=${suspResult.rawShockClicks}&shockCompClicks=${suspResult.rawShockCompClicks}`);
+                                }}
+                                color={ACCENT}
+                                style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '60', borderWidth: 1 }}
+                                textStyle={{ color: ACCENT }}
+                                fullWidth
+                            />
                         </View>
                     </BPCard>
                 )}
