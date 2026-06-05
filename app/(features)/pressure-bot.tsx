@@ -359,8 +359,8 @@ export default function PressureBotScreen() {
                     return null;
                 };
 
-                const forkMax = getClicksForModel(fork?.model || fork?.name);
-                const shockMax = getClicksForModel(shock?.model || shock?.name);
+                const forkMax = fork?.maxClicks ? parseInt(fork.maxClicks) : getClicksForModel(fork?.model || fork?.name);
+                const shockMax = shock?.maxClicks ? parseInt(shock.maxClicks) : getClicksForModel(shock?.model || shock?.name);
 
                 if (forkMax) {
                     forkClicks = `${Math.max(1, Math.round(forkMax * (reboundOpenPct / 100)))} (${forkMax} max)`;

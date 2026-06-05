@@ -79,6 +79,7 @@ export default function ComponentTrackerScreen() {
     const [compModel, setCompModel] = useState('');
     const [compWeight, setCompWeight] = useState('');
     const [compPrice, setCompPrice] = useState('');
+    const [compMaxClicks, setCompMaxClicks] = useState('');
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
@@ -309,6 +310,7 @@ export default function ComponentTrackerScreen() {
         setCompModel('');
         setCompWeight('');
         setCompPrice('');
+        setCompMaxClicks('');
         setCompNotes('');
         setCompSetup(defaultSetupKeys['handlebar']?.map(s => ({ ...s })) ?? []);
         setCompMoveToBikeId('');
@@ -326,6 +328,7 @@ export default function ComponentTrackerScreen() {
         setCompModel(comp.model);
         setCompWeight(comp.weight);
         setCompPrice(comp.price ?? '');
+        setCompMaxClicks(comp.maxClicks ?? '');
         setCompNotes(comp.notes);
 
         setCompIsWearTracked(comp.isWearTracked ?? false);
@@ -392,6 +395,7 @@ export default function ComponentTrackerScreen() {
             price: compPrice.trim(),
             purchaseDate: editingComp?.purchaseDate ?? getTodayISO(),
             setupValues: compSetup.filter(s => s.value.trim() !== ''),
+            maxClicks: compMaxClicks.trim() || undefined,
             notes: compNotes.trim(),
             isWearTracked: compIsWearTracked,
             wearItems: compIsWearTracked ? compWearItems : [],
@@ -659,6 +663,9 @@ export default function ComponentTrackerScreen() {
                     <BPInput label={t('tracker.weight')} placeholder="0" value={compWeight} onChangeText={setCompWeight} suffix="g" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                     <BPInput label="Preis" placeholder="0.00" value={compPrice} onChangeText={setCompPrice} suffix="€" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
+                {['fork', 'shock'].includes(compType) && (
+                    <BPInput label="Verfügbare Klicks (Max)" placeholder="z.B. 14" value={compMaxClicks} onChangeText={setCompMaxClicks} keyboardType="numeric" accentColor={ACCENT} />
+                )}
 
                 {/* Dynamic setup fields */}
                 {compSetup.length > 0 && (

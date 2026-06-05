@@ -98,6 +98,7 @@ export interface SyncComponent {
     lastServiceDate?: string;
     installedDate?: string;
     wearItems?: WearItem[];
+    maxClicks?: string;
 }
 
 const BIKES_KEY = '@bikepro_bikes';
