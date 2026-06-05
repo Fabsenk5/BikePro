@@ -373,7 +373,7 @@ export default function PressureBotScreen() {
             }
         }
 
-        return { forkPsi, shockPsi, forkClicks, shockClicks, forkCompClicks, shockCompClicks };
+        return { forkPsi: fPsi, shockPsi: sPsi, forkClicks, shockClicks, forkCompClicks, shockCompClicks };
     }, [riderWeight, bikeWeight, terrain, tireType, ridingStyle, selectedBikeId, trackerBikes]);
 
     const frontPSI = Math.round(result.front * 14.5038);
