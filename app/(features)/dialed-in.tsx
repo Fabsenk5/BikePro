@@ -29,8 +29,8 @@ const ACCENT = '#FF6B2C';
 const SETUPS_KEY = '@bikepro_setups';
 
 // --- Types ---
-type ReboundMode = 'clicks' | 'hsls';
-type CompressionMode = 'clicks' | 'lever' | 'hsls';
+type ReboundMode = 'clicks' | 'hsls' | 'none';
+type CompressionMode = 'clicks' | 'lever' | 'hsls' | 'none';
 
 interface SuspensionConfig {
     reboundMode: ReboundMode;
@@ -432,6 +432,27 @@ export default function DialedInScreen() {
 
     const activeConfig = activeSuspension?.config ?? defaultConfig;
 
+    const getActiveComponentConfig = () => {
+        let rMode = activeConfig.reboundMode;
+        let cMode = activeConfig.compressionMode;
+        let isReboundOverridden = false;
+        let isCompressionOverridden = false;
+        
+        if (bikeId) {
+            const bike = trackerBikes.find(b => b.id === bikeId);
+            if (bike) {
+                const comp = bike.components.find(c => c.type === activeTab);
+                if (comp) {
+                    if (comp.reboundMode) { rMode = comp.reboundMode as ReboundMode; isReboundOverridden = true; }
+                    if (comp.compressionMode) { cMode = comp.compressionMode as CompressionMode; isCompressionOverridden = true; }
+                }
+            }
+        }
+        return { rMode, cMode, isReboundOverridden, isCompressionOverridden };
+    };
+
+    const compConfig = getActiveComponentConfig();
+
     // Helper to get max clicks for the active component from the bike
     const getActiveComponentMaxClicks = () => {
         if (!bikeId) return 25; // fallback
@@ -612,66 +633,75 @@ export default function DialedInScreen() {
                         )}
 
                         {/* ─── REBOUND CONFIG ─── */}
-                        <View style={styles.configSection}>
-                            <Text style={styles.subSectionTitle}>{t('dialed.rebound')}</Text>
-                            <View style={styles.configToggle}>
-                                <Text style={styles.configLabel}>{t('dialed.rebound_hsls')}</Text>
-                                <Switch
-                                    value={activeConfig.reboundMode === 'hsls'}
-                                    onValueChange={v => updateConfig('reboundMode', v ? 'hsls' : 'clicks')}
-                                    trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
-                                    thumbColor={activeConfig.reboundMode === 'hsls' ? ACCENT : theme.colors.textMuted}
-                                />
-                            </View>
+                        {compConfig.rMode !== 'none' && (
+                            <View style={styles.configSection}>
+                                <Text style={styles.subSectionTitle}>{t('dialed.rebound')}</Text>
+                                {!compConfig.isReboundOverridden && (
+                                    <View style={styles.configToggle}>
+                                        <Text style={styles.configLabel}>{t('dialed.rebound_hsls')}</Text>
+                                        <Switch
+                                            value={compConfig.rMode === 'hsls'}
+                                            onValueChange={v => updateConfig('reboundMode', v ? 'hsls' : 'clicks')}
+                                            trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
+                                            thumbColor={compConfig.rMode === 'hsls' ? ACCENT : theme.colors.textMuted}
+                                        />
+                                    </View>
+                                )}
 
-                            {activeConfig.reboundMode === 'clicks' ? (
-                                <BPSlider label="Rebound Clicks" value={activeSuspension.reboundClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundClicks', v)} />
-                            ) : (
-                                <View style={styles.inputRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
+                                {compConfig.rMode === 'clicks' && (
+                                    <BPSlider label="Rebound Clicks" value={activeSuspension.reboundClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundClicks', v)} />
+                                )}
+                                {compConfig.rMode === 'hsls' && (
+                                    <View style={styles.inputRow}>
+                                        <View style={{ flex: 1 }}>
+                                            <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
+                                        </View>
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
-                                    </View>
-                                </View>
-                            )}
-                        </View>
+                                )}
+                            </View>
+                        )}
 
                         {/* ─── COMPRESSION CONFIG ─── */}
-                        <View style={styles.configSection}>
-                            <Text style={styles.subSectionTitle}>{t('dialed.compression')}</Text>
-                            <BPPicker
-                                label={t('dialed.compression_type')}
-                                options={[
-                                    { label: t('dialed.clicks'), value: 'clicks' },
-                                    { label: t('dialed.lever'), value: 'lever' },
-                                    { label: t('dialed.hsls'), value: 'hsls' },
-                                ]}
-                                value={activeConfig.compressionMode}
-                                onValueChange={v => updateConfig('compressionMode', v)}
-                                accentColor={ACCENT}
-                            />
+                        {compConfig.cMode !== 'none' && (
+                            <View style={styles.configSection}>
+                                <Text style={styles.subSectionTitle}>{t('dialed.compression')}</Text>
+                                {!compConfig.isCompressionOverridden && (
+                                    <BPPicker
+                                        label={t('dialed.compression_type')}
+                                        options={[
+                                            { label: t('dialed.clicks'), value: 'clicks' },
+                                            { label: t('dialed.lever'), value: 'lever' },
+                                            { label: t('dialed.hsls'), value: 'hsls' },
+                                        ]}
+                                        value={compConfig.cMode}
+                                        onValueChange={v => updateConfig('compressionMode', v)}
+                                        accentColor={ACCENT}
+                                    />
+                                )}
 
-                            {activeConfig.compressionMode === 'clicks' && (
-                                <BPSlider label="Compression Clicks" value={activeSuspension.compressionClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionClicks', v)} />
-                            )}
+                                {compConfig.cMode === 'clicks' && (
+                                    <BPSlider label="Compression Clicks" value={activeSuspension.compressionClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionClicks', v)} />
+                                )}
 
-                            {activeConfig.compressionMode === 'lever' && (
-                                <BPPicker label={t('dialed.lever_pos')} options={leverOptions} value={activeSuspension.compressionLever} onValueChange={v => updateSusValue('compressionLever', v)} accentColor={ACCENT} />
-                            )}
+                                {compConfig.cMode === 'lever' && (
+                                    <BPPicker label={t('dialed.lever_pos')} options={leverOptions} value={activeSuspension.compressionLever} onValueChange={v => updateSusValue('compressionLever', v)} accentColor={ACCENT} />
+                                )}
 
-                            {activeConfig.compressionMode === 'hsls' && (
-                                <View style={styles.inputRow}>
-                                    <View style={{ flex: 1 }}>
-                                        <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
+                                {compConfig.cMode === 'hsls' && (
+                                    <View style={styles.inputRow}>
+                                        <View style={{ flex: 1 }}>
+                                            <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
+                                        </View>
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
-                                    </View>
-                                </View>
-                            )}
-                        </View>
+                                )}
+                            </View>
+                        )}
 
                         <BPPicker label={t('dialed.tokens')} options={tokenOptions} value={activeSuspension.tokens.toString()} onValueChange={v => updateSusValue('tokens', parseInt(v, 10))} accentColor={ACCENT} />
                     </>

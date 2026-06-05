@@ -382,10 +382,16 @@ export default function PressureBotScreen() {
             }
         }
 
+        const forkReboundMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'fork')?.reboundMode;
+        const forkCompMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'fork')?.compressionMode;
+        const shockReboundMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'shock')?.reboundMode;
+        const shockCompMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'shock')?.compressionMode;
+
         return { 
             forkPsi: fPsi, shockPsi: sPsi, 
             forkClicks, shockClicks, forkCompClicks, shockCompClicks,
-            rawForkClicks, rawShockClicks, rawForkCompClicks, rawShockCompClicks
+            rawForkClicks, rawShockClicks, rawForkCompClicks, rawShockCompClicks,
+            forkReboundMode, forkCompMode, shockReboundMode, shockCompMode
         };
     }, [riderWeight, bikeWeight, terrain, tireType, ridingStyle, selectedBikeId, trackerBikes]);
 
@@ -486,16 +492,48 @@ export default function PressureBotScreen() {
                                 <Text style={styles.resultLabel}>{t('pressure_bot.fork_label', { defaultValue: 'Gabel (Fork)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.forkPsi}</Text>
                                 <Text style={styles.resultUnit}>PSI</Text>
-                                <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.forkClicks}</Text>
-                                <Text style={styles.resultPSI}>Compress: {suspResult.forkCompClicks}</Text>
+                                {suspResult.forkReboundMode === 'none' ? null : suspResult.forkReboundMode === 'hsls' ? (
+                                    <>
+                                        <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.forkClicks}</Text>
+                                        <Text style={styles.resultPSI}>Rebound HSR: {suspResult.forkClicks}</Text>
+                                    </>
+                                ) : (
+                                    <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.forkClicks}</Text>
+                                )}
+                                {suspResult.forkCompMode === 'none' ? null : suspResult.forkCompMode === 'hsls' ? (
+                                    <>
+                                        <Text style={styles.resultPSI}>Compress LSC: {suspResult.forkCompClicks}</Text>
+                                        <Text style={styles.resultPSI}>Compress HSC: {suspResult.forkCompClicks}</Text>
+                                    </>
+                                ) : suspResult.forkCompMode === 'lever' ? (
+                                    <Text style={styles.resultPSI}>Compress: {suspResult.forkCompClicks} (Open)</Text>
+                                ) : (
+                                    <Text style={styles.resultPSI}>Compress: {suspResult.forkCompClicks}</Text>
+                                )}
                             </View>
                             <View style={styles.resultDivider} />
                             <View style={styles.resultItem}>
                                 <Text style={styles.resultLabel}>{t('pressure_bot.shock_label', { defaultValue: 'Dämpfer (Shock)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.shockPsi}</Text>
                                 <Text style={styles.resultUnit}>PSI</Text>
-                                <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.shockClicks}</Text>
-                                <Text style={styles.resultPSI}>Compress: {suspResult.shockCompClicks}</Text>
+                                {suspResult.shockReboundMode === 'none' ? null : suspResult.shockReboundMode === 'hsls' ? (
+                                    <>
+                                        <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.shockClicks}</Text>
+                                        <Text style={styles.resultPSI}>Rebound HSR: {suspResult.shockClicks}</Text>
+                                    </>
+                                ) : (
+                                    <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.shockClicks}</Text>
+                                )}
+                                {suspResult.shockCompMode === 'none' ? null : suspResult.shockCompMode === 'hsls' ? (
+                                    <>
+                                        <Text style={styles.resultPSI}>Compress LSC: {suspResult.shockCompClicks}</Text>
+                                        <Text style={styles.resultPSI}>Compress HSC: {suspResult.shockCompClicks}</Text>
+                                    </>
+                                ) : suspResult.shockCompMode === 'lever' ? (
+                                    <Text style={styles.resultPSI}>Compress: {suspResult.shockCompClicks} (Open)</Text>
+                                ) : (
+                                    <Text style={styles.resultPSI}>Compress: {suspResult.shockCompClicks}</Text>
+                                )}
                             </View>
                         </View>
                         <View style={styles.notesBox}>

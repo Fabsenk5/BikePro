@@ -99,6 +99,8 @@ export interface SyncComponent {
     installedDate?: string;
     wearItems?: WearItem[];
     maxClicks?: string;
+    reboundMode?: string;
+    compressionMode?: string;
 }
 
 const BIKES_KEY = '@bikepro_bikes';
@@ -133,6 +135,8 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         installedDate: c.installed_date ?? new Date().toISOString().split('T')[0],
                         wearItems: c.wear_items ?? [],
                         maxClicks: c.max_clicks ?? undefined,
+                        reboundMode: c.rebound_mode ?? undefined,
+                        compressionMode: c.compression_mode ?? undefined,
                         price: c.price,
                     })),
             }));
@@ -189,6 +193,8 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
                     installed_date: c.installedDate,
                     wear_items: c.wearItems ?? [],
                     max_clicks: c.maxClicks,
+                    rebound_mode: c.reboundMode,
+                    compression_mode: c.compressionMode,
                     price: c.price,
                 });
             });

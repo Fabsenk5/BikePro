@@ -80,6 +80,8 @@ export default function ComponentTrackerScreen() {
     const [compWeight, setCompWeight] = useState('');
     const [compPrice, setCompPrice] = useState('');
     const [compMaxClicks, setCompMaxClicks] = useState('');
+    const [compReboundMode, setCompReboundMode] = useState('');
+    const [compCompressionMode, setCompCompressionMode] = useState('');
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
@@ -311,6 +313,8 @@ export default function ComponentTrackerScreen() {
         setCompWeight('');
         setCompPrice('');
         setCompMaxClicks('');
+        setCompReboundMode('');
+        setCompCompressionMode('');
         setCompNotes('');
         setCompSetup(defaultSetupKeys['handlebar']?.map(s => ({ ...s })) ?? []);
         setCompMoveToBikeId('');
@@ -329,6 +333,8 @@ export default function ComponentTrackerScreen() {
         setCompWeight(comp.weight);
         setCompPrice(comp.price ?? '');
         setCompMaxClicks(comp.maxClicks ?? '');
+        setCompReboundMode(comp.reboundMode ?? '');
+        setCompCompressionMode(comp.compressionMode ?? '');
         setCompNotes(comp.notes);
 
         setCompIsWearTracked(comp.isWearTracked ?? false);
@@ -396,6 +402,8 @@ export default function ComponentTrackerScreen() {
             purchaseDate: editingComp?.purchaseDate ?? getTodayISO(),
             setupValues: compSetup.filter(s => s.value.trim() !== ''),
             maxClicks: compMaxClicks.trim() || undefined,
+            reboundMode: compReboundMode || undefined,
+            compressionMode: compCompressionMode || undefined,
             notes: compNotes.trim(),
             isWearTracked: compIsWearTracked,
             wearItems: compIsWearTracked ? compWearItems : [],
@@ -664,7 +672,23 @@ export default function ComponentTrackerScreen() {
                     <BPInput label="Preis" placeholder="0.00" value={compPrice} onChangeText={setCompPrice} suffix="€" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
                 {['fork', 'shock'].includes(compType) && (
-                    <BPInput label="Verfügbare Klicks (Max)" placeholder="z.B. 14" value={compMaxClicks} onChangeText={setCompMaxClicks} keyboardType="numeric" accentColor={ACCENT} />
+                    <>
+                        <BPInput label="Verfügbare Klicks (Max)" placeholder="z.B. 14" value={compMaxClicks} onChangeText={setCompMaxClicks} keyboardType="numeric" accentColor={ACCENT} />
+                        <BPPicker 
+                            label="Rebound Modus" 
+                            options={[{label: 'Wählen... (Standard)', value: ''}, {label: 'Keine Einstellung', value: 'none'}, {label: 'Nur Clicks', value: 'clicks'}, {label: 'High/Low Speed (HSR/LSR)', value: 'hsls'}]} 
+                            value={compReboundMode} 
+                            onValueChange={setCompReboundMode} 
+                            accentColor={ACCENT} 
+                        />
+                        <BPPicker 
+                            label="Compression Modus" 
+                            options={[{label: 'Wählen... (Standard)', value: ''}, {label: 'Keine Einstellung', value: 'none'}, {label: 'Nur Clicks', value: 'clicks'}, {label: 'Hebel (Open/Mid/Closed)', value: 'lever'}, {label: 'High/Low Speed (HSC/LSC)', value: 'hsls'}]} 
+                            value={compCompressionMode} 
+                            onValueChange={setCompCompressionMode} 
+                            accentColor={ACCENT} 
+                        />
+                    </>
                 )}
 
                 {/* Dynamic setup fields */}
