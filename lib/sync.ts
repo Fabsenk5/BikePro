@@ -320,9 +320,9 @@ export async function syncLoadPreference<T>(key: string, storageKey: string): Pr
                 .from('user_preferences')
                 .select('value')
                 .eq('key', key)
-                .single();
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+            if (error) throw error;
 
             if (data) {
                 await AsyncStorage.setItem(storageKey, JSON.stringify(data.value));

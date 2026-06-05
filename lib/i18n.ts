@@ -8,11 +8,16 @@ import en from '../locales/en.json';
 
 const LANGUAGE_KEY = '@bikepro_language';
 
+import { Platform } from 'react-native';
+
 const languageDetector = {
     type: 'languageDetector' as const,
     async: true,
     detect: async (callback: (lng: string) => void) => {
         try {
+            if (Platform.OS === 'web' && typeof window === 'undefined') {
+                return callback('de');
+            }
             // Priority 1: User's manual selection from AsyncStorage
             const storedLang = await AsyncStorage.getItem(LANGUAGE_KEY);
             if (storedLang) {
@@ -35,6 +40,9 @@ const languageDetector = {
     init: () => { },
     cacheUserLanguage: async (lng: string) => {
         try {
+            if (Platform.OS === 'web' && typeof window === 'undefined') {
+                return;
+            }
             await AsyncStorage.setItem(LANGUAGE_KEY, lng);
         } catch (e) {
             console.warn('Error saving language', e);

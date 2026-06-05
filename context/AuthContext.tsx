@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             // Timeout after 5s to prevent infinite loading on network issues
             const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
-            const query = supabase.from('profiles').select('is_active').eq('id', userId).single();
+            const query = supabase.from('profiles').select('is_active').eq('id', userId).maybeSingle();
             const result = await Promise.race([query, timeout]);
             if (result && 'data' in result) {
                 setIsActive(!!result.data?.is_active);
