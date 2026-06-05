@@ -47,8 +47,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const checkActivationStatus = async (userId: string) => {
         const supabase = getSupabase();
         if (!supabase) return;
-        const { data } = await supabase.from('profiles').select('is_active').eq('id', userId).single();
-        setIsActive(!!data?.is_active);
+        try {
+            // Timeout after 5s to prevent infinite loading on network issues
+            const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000));
+            const query = supabase.from('profiles').select('is_active').eq('id', userId).single();
+            const result = await Promise.race([query, timeout]);
+            if (result && 'data' in result) {
+                setIsActive(!!result.data?.is_active);
+            } else {
+                console.warn('[auth] checkActivationStatus timed out, defaulting to inactive');
+                setIsActive(false);
+            }
+        } catch (e) {
+            console.warn('[auth] checkActivationStatus failed:', e);
+            setIsActive(false);
+        }
     };
 
     useEffect(() => {
@@ -56,7 +69,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (isSupabaseConfigured && supabase) {
             // Supabase mode — listen for auth changes
+            // Timeout after 8s to prevent infinite loading on network issues
+            const sessionTimeout = setTimeout(() => {
+                console.warn('[auth] getSession timed out, setting isLoading=false');
+                setIsLoading(false);
+            }, 8000);
+
             supabase.auth.getSession().then(({ data: { session } }) => {
+                clearTimeout(sessionTimeout);
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
@@ -67,6 +87,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 } else {
                     setIsLoading(false);
                 }
+            }).catch((e) => {
+                clearTimeout(sessionTimeout);
+                console.warn('[auth] getSession failed:', e);
+                setIsLoading(false);
             });
 
             const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

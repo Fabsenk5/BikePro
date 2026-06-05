@@ -17,18 +17,6 @@ import { getSupabase, isSupabaseConfigured } from './supabase';
 
 // ─── Generic Helpers ───
 
-function getAuthUserId(): string | null {
-    const supabase = getSupabase();
-    if (!supabase) return null;
-    // We access the session synchronously from the cached data
-    // This works because AuthContext already initializes the session
-    try {
-        // @ts-ignore — accessing internal cached session
-        const session = (supabase.auth as any).currentSession;
-        return session?.user?.id ?? null;
-    } catch { return null; }
-}
-
 /**
  * Check if cloud sync is available (Supabase configured + user authenticated)
  */
@@ -172,7 +160,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
     try {
         const supabase = getSupabase()!;
 
-        // Upsert all bikes
+        // Upsert all bikes (no destructive deletes — deletions are handled explicitly)
         const bikeRows = bikes.map(b => ({
             id: b.id, user_id: userId, name: b.name, type: b.type,
             model: b.model, year: b.year, size: b.size, weight: b.weight ?? null,
@@ -183,11 +171,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
             if (error) console.warn('[sync] Bike upsert error:', error.message);
         }
 
-        // Delete bikes not in the list anymore
-        const existingBikeIds = bikes.map(b => b.id);
-        await supabase.from('bikes').delete().not('id', 'in', `(${existingBikeIds.join(',')})`);
-
-        // Upsert all components
+        // Upsert all components (no destructive deletes)
         const compRows: any[] = [];
         bikes.forEach(b => {
             b.components.forEach(c => {
@@ -211,17 +195,37 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
             const { error } = await supabase.from('components').upsert(compRows, { onConflict: 'id' });
             if (error) console.warn('[sync] Component upsert error:', error.message);
         }
-
-        // Delete orphaned components
-        const allCompIds = compRows.map(c => c.id);
-        if (allCompIds.length > 0) {
-            await supabase.from('components').delete().not('id', 'in', `(${allCompIds.join(',')})`);
-        } else {
-            // If no components, delete all for this user
-            await supabase.from('components').delete().neq('id', '__impossible__');
-        }
     } catch (e) {
         console.warn('[sync] Cloud save bikes failed:', e);
+    }
+}
+
+// ─── EXPLICIT DELETE FUNCTIONS (only called from UI delete actions) ───
+
+export async function syncDeleteBike(bikeId: string): Promise<void> {
+    const { available } = await isCloudAvailable();
+    if (!available) return;
+
+    try {
+        const supabase = getSupabase()!;
+        // Components cascade-delete via FK constraint
+        const { error } = await supabase.from('bikes').delete().eq('id', bikeId);
+        if (error) console.warn('[sync] Delete bike error:', error.message);
+    } catch (e) {
+        console.warn('[sync] Cloud delete bike failed:', e);
+    }
+}
+
+export async function syncDeleteComponent(componentId: string): Promise<void> {
+    const { available } = await isCloudAvailable();
+    if (!available) return;
+
+    try {
+        const supabase = getSupabase()!;
+        const { error } = await supabase.from('components').delete().eq('id', componentId);
+        if (error) console.warn('[sync] Delete component error:', error.message);
+    } catch (e) {
+        console.warn('[sync] Cloud delete component failed:', e);
     }
 }
 
@@ -269,22 +273,38 @@ export async function syncSaveTable<T extends { id: string }>(
     try {
         const supabase = getSupabase()!;
 
-        // Upsert all
+        // Upsert all (no destructive deletes — deletions are handled explicitly)
         const rows = items.map(item => mapLocalToRow(table, item, userId));
         if (rows.length > 0) {
             const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
             if (error) console.warn(`[sync] ${table} upsert error:`, error.message);
         }
-
-        // Delete removed items
-        const ids = items.map(i => i.id);
-        if (ids.length > 0) {
-            await supabase.from(table).delete().not('id', 'in', `(${ids.join(',')})`);
-        } else {
-            await supabase.from(table).delete().neq('id', '__impossible__');
-        }
     } catch (e) {
         console.warn(`[sync] Cloud save ${table} failed:`, e);
+    }
+}
+
+export async function syncDeleteFromTable(table: string, storageKey: string, itemId: string): Promise<void> {
+    // Update local storage
+    try {
+        const data = await AsyncStorage.getItem(storageKey);
+        if (data) {
+            const items = JSON.parse(data).filter((i: any) => i.id !== itemId);
+            await AsyncStorage.setItem(storageKey, JSON.stringify(items));
+        }
+    } catch (e) {
+        console.warn(`[sync] Local delete ${table} failed:`, e);
+    }
+
+    const { available } = await isCloudAvailable();
+    if (!available) return;
+
+    try {
+        const supabase = getSupabase()!;
+        const { error } = await supabase.from(table).delete().eq('id', itemId);
+        if (error) console.warn(`[sync] Delete ${table} error:`, error.message);
+    } catch (e) {
+        console.warn(`[sync] Cloud delete ${table} failed:`, e);
     }
 }
 

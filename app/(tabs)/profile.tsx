@@ -26,6 +26,7 @@ export default function ProfileScreen() {
     const [rideCount, setRideCount] = useState(0);
     const [setupCount, setSetupCount] = useState(0);
     const [componentCount, setComponentCount] = useState(0);
+    const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
     // Profile inputs
     const [weight, setWeight] = useState('');
@@ -38,16 +39,26 @@ export default function ProfileScreen() {
         i18n.changeLanguage(nextLang);
     };
 
+    // Loading timeout — show error state after 8s instead of infinite spinner
     useEffect(() => {
-        syncLoadTable('rides', '@bikepro_rides').then((d) => setRideCount(d.length));
-        syncLoadTable('suspension_setups', '@bikepro_setups').then((d) => setSetupCount(d.length));
-        syncLoadPreference<any[]>('shred_check', '@bikepro_components').then((d) => setComponentCount(d?.length ?? 0));
+        if (!isLoading) {
+            setLoadingTimedOut(false);
+            return;
+        }
+        const timer = setTimeout(() => setLoadingTimedOut(true), 8000);
+        return () => clearTimeout(timer);
+    }, [isLoading]);
+
+    useEffect(() => {
+        syncLoadTable('rides', '@bikepro_rides').then((d) => setRideCount(d.length)).catch(() => {});
+        syncLoadTable('suspension_setups', '@bikepro_setups').then((d) => setSetupCount(d.length)).catch(() => {});
+        syncLoadPreference<any[]>('shred_check', '@bikepro_components').then((d) => setComponentCount(d?.length ?? 0)).catch(() => {});
 
         syncLoadProfile().then((p) => {
             setWeight(p.weight ?? '');
             setHeight(p.height ?? '');
             setInseam(p.inseam ?? '');
-        });
+        }).catch(() => {});
     }, [user]);
 
     const handleSaveProfile = async () => {
@@ -60,10 +71,33 @@ export default function ProfileScreen() {
         await signOut();
     };
 
-    if (isLoading) {
+    if (isLoading && !loadingTimedOut) {
         return (
             <View style={[styles.container, styles.center]}>
                 <ActivityIndicator color={ACCENT} size="large" />
+            </View>
+        );
+    }
+
+    if (isLoading && loadingTimedOut) {
+        return (
+            <View style={[styles.container, styles.center]}>
+                <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
+                <Text style={[styles.title, { fontSize: 20 }]}>Verbindungsproblem</Text>
+                <Text style={[styles.subtitle, { marginBottom: 24 }]}>
+                    Die Verbindung zum Server dauert zu lange. Bitte prüfe deine Internetverbindung.
+                </Text>
+                <View style={{ width: '80%' }}>
+                    <BPButton
+                        title="🔄 Erneut versuchen"
+                        onPress={() => {
+                            setLoadingTimedOut(false);
+                            // Force re-render by navigating to self
+                            router.replace('/(tabs)/profile');
+                        }}
+                        color={ACCENT}
+                    />
+                </View>
             </View>
         );
     }

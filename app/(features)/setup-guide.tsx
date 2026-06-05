@@ -8,7 +8,7 @@
  */
 import { BPCard } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -53,21 +53,21 @@ export default function SetupGuideScreen() {
     const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
-        AsyncStorage.getItem('@bikepro_favorites').then(res => setFavorites(res ? JSON.parse(res) : []));
-        AsyncStorage.getItem('@bikepro_checklists').then(res => setChecklistState(res ? JSON.parse(res) : {}));
+        syncLoadPreference<string[]>('setup_favorites', '@bikepro_favorites').then(res => setFavorites(res ?? []));
+        syncLoadPreference<Record<string, boolean>>('setup_checklists', '@bikepro_checklists').then(res => setChecklistState(res ?? {}));
     }, []);
 
     const toggleFavorite = (id: string) => {
         const next = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
         setFavorites(next);
-        AsyncStorage.setItem('@bikepro_favorites', JSON.stringify(next));
+        syncSavePreference('setup_favorites', '@bikepro_favorites', next);
     };
 
     const toggleCheck = (articleId: string, lineIndex: number) => {
         const key = `${articleId}-${lineIndex}`;
         const next = { ...checklistState, [key]: !checklistState[key] };
         setChecklistState(next);
-        AsyncStorage.setItem('@bikepro_checklists', JSON.stringify(next));
+        syncSavePreference('setup_checklists', '@bikepro_checklists', next);
     };
 
     const categories: WikiCategory[] = [

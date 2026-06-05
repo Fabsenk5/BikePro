@@ -7,7 +7,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, WearItem } from '@/lib/sync';
+import { SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, WearItem } from '@/lib/sync';
 import Slider from '@react-native-community/slider';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -291,7 +291,8 @@ export default function ComponentTrackerScreen() {
             {
                 text: 'Löschen',
                 style: 'destructive',
-                onPress: () => {
+                onPress: async () => {
+                    await syncDeleteBike(id);
                     const updated = bikes.filter((b) => b.id !== id);
                     persist(updated);
                     setSelectedBikeId(updated[0]?.id ?? null);
@@ -442,7 +443,8 @@ export default function ComponentTrackerScreen() {
             {
                 text: 'Löschen',
                 style: 'destructive',
-                onPress: () => {
+                onPress: async () => {
+                    await syncDeleteComponent(compId);
                     const updatedBike = {
                         ...selectedBike,
                         components: selectedBike.components.filter(c => c.id !== compId),

@@ -186,7 +186,7 @@ export default function ShredCheckScreen() {
 
     const handleAddGlobalKm = () => {
         Alert.prompt
-            ? Alert.prompt('Tour erfassen', 'Wie viele Kilometer bist du gefahren?', (val) => {
+            ? Alert.prompt('Tour erfassen', 'Wie viele Kilometer bist du gefahren?', async (val) => {
                 const km = parseFloat(val);
                 if (!isNaN(km) && km > 0) {
                     const updatedBikes = bikes.map(b => ({
@@ -202,7 +202,7 @@ export default function ShredCheckScreen() {
                             };
                         })
                     }));
-                    syncSaveBikes(updatedBikes);
+                    await syncSaveBikes(updatedBikes);
                     setBikes(updatedBikes);
                 }
             })

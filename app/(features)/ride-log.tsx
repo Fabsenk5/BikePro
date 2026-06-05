@@ -8,7 +8,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, syncLoadBikes, syncLoadTable, syncSaveBikes, syncSaveTable } from '@/lib/sync';
+import { SyncBike, syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveBikes, syncSaveTable } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -247,7 +247,10 @@ export default function RideLogScreen() {
             {
                 text: 'Löschen',
                 style: 'destructive',
-                onPress: () => persist(rides.filter((r) => r.id !== rideId)),
+                onPress: async () => {
+                    await syncDeleteFromTable('rides', '@bikepro_rides', rideId);
+                    persist(rides.filter((r) => r.id !== rideId));
+                },
             },
         ]);
     };

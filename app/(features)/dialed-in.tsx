@@ -10,7 +10,7 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncLoadBikes, syncLoadTable, syncSaveTable } from '@/lib/sync';
+import { syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -373,7 +373,7 @@ export default function DialedInScreen() {
     const handleDelete = (id: string) => {
         Alert.alert('Setup löschen?', '', [
             { text: 'Abbrechen', style: 'cancel' },
-            { text: 'Löschen', style: 'destructive', onPress: () => saveSetups(setups.filter(s => s.id !== id)) },
+            { text: 'Löschen', style: 'destructive', onPress: async () => { await syncDeleteFromTable('suspension_setups', '@bikepro_setups', id); saveSetups(setups.filter(s => s.id !== id)); } },
         ]);
     };
 

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS bikes (
     model TEXT DEFAULT '',
     year TEXT DEFAULT '2024',
     size TEXT DEFAULT 'L',
+    weight REAL DEFAULT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS components (
     brand TEXT DEFAULT '',
     model TEXT DEFAULT '',
     weight TEXT DEFAULT '',
+    price TEXT DEFAULT '',
     purchase_date TEXT DEFAULT '',
     setup_values JSONB DEFAULT '[]'::jsonb,
     notes TEXT DEFAULT '',
