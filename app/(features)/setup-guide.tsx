@@ -6,13 +6,16 @@
  * Kategorien: Cockpit, Fahrwerk, Bremsen, Antrieb, Laufräder, Geometrie, Ergonomie
  * Daten: Statische JSON-Struktur, lokal gebündelt
  */
-import { BPCard } from '@/components/ui';
+import { BPCard, BPButton, BPInput } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+    ActivityIndicator,
+    Alert,
+    Modal,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -21,6 +24,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useAuth } from '@/context/AuthContext';
+import { getSupabase } from '@/lib/supabase';
 
 const ACCENT = '#7C4DFF';
 
@@ -44,7 +49,8 @@ interface WikiCategory {
 }
 
 export default function SetupGuideScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const { isAdmin } = useAuth();
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedArticle, setExpandedArticle] = useState<string | null>(null);
@@ -52,10 +58,66 @@ export default function SetupGuideScreen() {
     const [favorites, setFavorites] = useState<string[]>([]);
     const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
 
+    // Editing State
+    const [overrides, setOverrides] = useState<Record<string, Partial<WikiArticle>>>({});
+    const [isEditing, setIsEditing] = useState<WikiArticle | null>(null);
+    const [editForm, setEditForm] = useState<Partial<WikiArticle>>({});
+    const [isSaving, setIsSaving] = useState(false);
+
     useEffect(() => {
         syncLoadPreference<string[]>('setup_favorites', '@bikepro_favorites').then(res => setFavorites(res ?? []));
         syncLoadPreference<Record<string, boolean>>('setup_checklists', '@bikepro_checklists').then(res => setChecklistState(res ?? {}));
-    }, []);
+        fetchOverrides();
+    }, [i18n.language]);
+
+    const fetchOverrides = async () => {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data, error } = await supabase
+            .from('wiki_overrides')
+            .select('*')
+            .eq('locale', i18n.language);
+        if (!error && data) {
+            const overrideMap: Record<string, Partial<WikiArticle>> = {};
+            for (const row of data) {
+                overrideMap[row.article_id] = {
+                    title: row.title || undefined,
+                    summary: row.summary || undefined,
+                    content: row.content || undefined,
+                    values: row.values_text || undefined,
+                    tip: row.tip || undefined,
+                };
+            }
+            setOverrides(overrideMap);
+        }
+    };
+
+    const handleSaveOverride = async () => {
+        if (!isEditing) return;
+        const supabase = getSupabase();
+        if (!supabase) return;
+        setIsSaving(true);
+        const { error } = await supabase
+            .from('wiki_overrides')
+            .upsert({
+                article_id: isEditing.id,
+                locale: i18n.language,
+                title: editForm.title || null,
+                summary: editForm.summary || null,
+                content: editForm.content || null,
+                values_text: editForm.values || null,
+                tip: editForm.tip || null,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'article_id,locale' });
+        
+        setIsSaving(false);
+        if (error) {
+            Alert.alert('Fehler', 'Konnte die Änderungen nicht speichern: ' + error.message);
+        } else {
+            setIsEditing(null);
+            fetchOverrides();
+        }
+    };
 
     const toggleFavorite = (id: string) => {
         const next = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id];
@@ -79,6 +141,7 @@ export default function SetupGuideScreen() {
         { id: 'geometrie', emoji: '📐', title: t('setup_guide.cat_geometry'), description: t('setup_guide.cat_geometry_desc') },
         { id: 'ergonomie', emoji: '🪑', title: t('setup_guide.cat_ergonomics'), description: t('setup_guide.cat_ergonomics_desc') },
         { id: 'pflege', emoji: '🛠️', title: t('setup_guide.cat_maintenance'), description: t('setup_guide.cat_maintenance_desc') },
+        { id: 'baseline', emoji: '🎛️', title: t('setup_guide.cat_baseline'), description: t('setup_guide.cat_baseline_desc') },
     ];
 
     const articles: WikiArticle[] = [
@@ -390,10 +453,56 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_headset_summary'), content: t('setup_guide.art_headset_content'),
             values: t('setup_guide.art_headset_values'), tip: t('setup_guide.art_headset_tip'),
         },
+        // --- Neutral Baseline (5) ---
+        {
+            id: 'base_sag', title: t('setup_guide.art_base_sag_title'), category: 'baseline',
+            tags: ['sag', 'baseline', 'setup', 'neutral'],
+            summary: t('setup_guide.art_base_sag_summary'), content: t('setup_guide.art_base_sag_content'),
+            values: t('setup_guide.art_base_sag_values'), tip: t('setup_guide.art_base_sag_tip'),
+        },
+        {
+            id: 'base_compression', title: t('setup_guide.art_base_compression_title'), category: 'baseline',
+            tags: ['compression', 'druckstufe', 'baseline', 'setup'],
+            summary: t('setup_guide.art_base_compression_summary'), content: t('setup_guide.art_base_compression_content'),
+            values: t('setup_guide.art_base_compression_values'), tip: t('setup_guide.art_base_compression_tip'),
+        },
+        {
+            id: 'base_rebound', title: t('setup_guide.art_base_rebound_title'), category: 'baseline',
+            tags: ['rebound', 'zugstufe', 'baseline', 'setup'],
+            summary: t('setup_guide.art_base_rebound_summary'), content: t('setup_guide.art_base_rebound_content'),
+            values: t('setup_guide.art_base_rebound_values'), tip: t('setup_guide.art_base_rebound_tip'),
+        },
+        {
+            id: 'base_tirepressure', title: t('setup_guide.art_base_tirepressure_title'), category: 'baseline',
+            tags: ['luftdruck', 'reifen', 'baseline', 'setup', 'pressure'],
+            summary: t('setup_guide.art_base_tirepressure_summary'), content: t('setup_guide.art_base_tirepressure_content'),
+            values: t('setup_guide.art_base_tirepressure_values'), tip: t('setup_guide.art_base_tirepressure_tip'),
+        },
+        {
+            id: 'base_procedure', title: t('setup_guide.art_base_procedure_title'), category: 'baseline',
+            tags: ['reihenfolge', 'vorgehensweise', 'baseline', 'setup'],
+            summary: t('setup_guide.art_base_procedure_summary'), content: t('setup_guide.art_base_procedure_content'),
+            values: t('setup_guide.art_base_procedure_values'), tip: t('setup_guide.art_base_procedure_tip'),
+        },
     ];
 
+    const mergedArticles = useMemo(() => {
+        return articles.map(a => {
+            const ov = overrides[a.id];
+            if (!ov) return a;
+            return {
+                ...a,
+                title: ov.title || a.title,
+                summary: ov.summary || a.summary,
+                content: ov.content || a.content,
+                values: ov.values || a.values,
+                tip: ov.tip || a.tip,
+            };
+        });
+    }, [/* articles is static inside component, avoiding dep */ overrides, i18n.language]);
+
     const filteredArticles = useMemo(() => {
-        let result = articles;
+        let result = mergedArticles;
         if (selectedCategory === 'favorites') {
             result = result.filter((a) => favorites.includes(a.id));
         } else if (selectedCategory) {
@@ -409,7 +518,7 @@ export default function SetupGuideScreen() {
             );
         }
         return result;
-    }, [selectedCategory, searchQuery]);
+    }, [selectedCategory, searchQuery, mergedArticles]);
 
     const toggleArticle = (id: string) => {
         setExpandedArticle(expandedArticle === id ? null : id);
@@ -503,7 +612,23 @@ export default function SetupGuideScreen() {
                             <BPCard style={[styles.articleCard, expanded ? styles.articleExpanded : undefined]}>
                                 <View style={styles.articleHeader}>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={styles.articleTitle}>{article.title}</Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                            <Text style={styles.articleTitle}>{article.title}</Text>
+                                            {isAdmin && (
+                                                <TouchableOpacity onPress={() => {
+                                                    setIsEditing(article);
+                                                    setEditForm({
+                                                        title: article.title,
+                                                        summary: article.summary,
+                                                        content: article.content,
+                                                        values: article.values,
+                                                        tip: article.tip
+                                                    });
+                                                }}>
+                                                    <Text style={{ fontSize: 12, color: ACCENT }}>[Edit]</Text>
+                                                </TouchableOpacity>
+                                            )}
+                                        </View>
                                         <Text style={styles.articleSummary}>{article.summary}</Text>
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -577,6 +702,26 @@ export default function SetupGuideScreen() {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Admin Edit Modal */}
+            <Modal visible={!!isEditing} animationType="slide" transparent>
+                <View style={styles.modalBg}>
+                    <BPCard style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>Artikel bearbeiten</Text>
+                        <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+                            <BPInput label="Titel" value={editForm.title} onChangeText={t => setEditForm(p => ({ ...p, title: t }))} />
+                            <BPInput label="Zusammenfassung" value={editForm.summary} onChangeText={t => setEditForm(p => ({ ...p, summary: t }))} multiline />
+                            <BPInput label="Inhalt" value={editForm.content} onChangeText={t => setEditForm(p => ({ ...p, content: t }))} multiline style={{ height: 100 }} />
+                            <BPInput label="Empfohlene Werte" value={editForm.values} onChangeText={t => setEditForm(p => ({ ...p, values: t }))} multiline />
+                            <BPInput label="Tipp" value={editForm.tip} onChangeText={t => setEditForm(p => ({ ...p, tip: t }))} multiline />
+                        </ScrollView>
+                        <View style={styles.modalActions}>
+                            <BPButton title="Abbrechen" variant="secondary" onPress={() => setIsEditing(null)} style={{ flex: 1, marginRight: 8 }} />
+                            <BPButton title={isSaving ? "Speichern..." : "Speichern"} onPress={handleSaveOverride} style={{ flex: 1, marginLeft: 8 }} disabled={isSaving} />
+                        </View>
+                    </BPCard>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -648,4 +793,9 @@ const styles = StyleSheet.create({
     emptyState: { alignItems: 'center', paddingVertical: theme.spacing.xxl * 2 },
     emptyIcon: { fontSize: 48, marginBottom: theme.spacing.md },
     emptyTitle: { color: theme.colors.text, fontSize: 18, fontWeight: '700' },
+
+    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: theme.spacing.lg },
+    modalCard: { width: '100%', padding: theme.spacing.xl, maxHeight: '90%' },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text, marginBottom: theme.spacing.md },
+    modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.lg }
 });

@@ -18,7 +18,21 @@ async function migrate() {
             'utf8'
         );
         await client.query(sql);
-        console.log('Migration complete!');
+        console.log('Main migration complete!');
+
+        const sql002 = fs.readFileSync(
+            require('path').join(__dirname, 'migration_002_add_missing_columns.sql'),
+            'utf8'
+        );
+        await client.query(sql002);
+        console.log('Migration 002 complete!');
+
+        const sql003 = fs.readFileSync(
+            require('path').join(__dirname, 'migration_003_wiki_overrides.sql'),
+            'utf8'
+        );
+        await client.query(sql003);
+        console.log('Migration 003 complete!');
 
         const res = await client.query(
             "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name"
