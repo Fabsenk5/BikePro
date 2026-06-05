@@ -32,6 +32,11 @@ export default function BPModal({
     children,
     maxHeight = SCREEN_HEIGHT * 0.7,
 }: BPModalProps) {
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
+
+    if (!mounted) return null;
+
     return (
         <Modal
             visible={visible}

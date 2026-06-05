@@ -529,6 +529,9 @@ export default function SetupGuideScreen() {
         ...categories
     ];
 
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
     return (
         <View style={styles.container}>
             <Stack.Screen
@@ -704,24 +707,26 @@ export default function SetupGuideScreen() {
             </ScrollView>
 
             {/* Admin Edit Modal */}
-            <Modal visible={!!isEditing} animationType="slide" transparent>
-                <View style={styles.modalBg}>
-                    <BPCard style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Artikel bearbeiten</Text>
-                        <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
-                            <BPInput label="Titel" value={editForm.title} onChangeText={t => setEditForm(p => ({ ...p, title: t }))} />
-                            <BPInput label="Zusammenfassung" value={editForm.summary} onChangeText={t => setEditForm(p => ({ ...p, summary: t }))} multiline />
-                            <BPInput label="Inhalt" value={editForm.content} onChangeText={t => setEditForm(p => ({ ...p, content: t }))} multiline style={{ height: 100 }} />
-                            <BPInput label="Empfohlene Werte" value={editForm.values} onChangeText={t => setEditForm(p => ({ ...p, values: t }))} multiline />
-                            <BPInput label="Tipp" value={editForm.tip} onChangeText={t => setEditForm(p => ({ ...p, tip: t }))} multiline />
-                        </ScrollView>
-                        <View style={styles.modalActions}>
-                            <BPButton title="Abbrechen" variant="secondary" onPress={() => setIsEditing(null)} style={{ flex: 1, marginRight: 8 }} />
-                            <BPButton title={isSaving ? "Speichern..." : "Speichern"} onPress={handleSaveOverride} style={{ flex: 1, marginLeft: 8 }} disabled={isSaving} />
-                        </View>
-                    </BPCard>
-                </View>
-            </Modal>
+            {mounted && (
+                <Modal visible={!!isEditing} animationType="slide" transparent>
+                    <View style={styles.modalBg}>
+                        <BPCard style={styles.modalCard}>
+                            <Text style={styles.modalTitle}>Artikel bearbeiten</Text>
+                            <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+                                <BPInput label="Titel" value={editForm.title} onChangeText={t => setEditForm(p => ({ ...p, title: t }))} />
+                                <BPInput label="Zusammenfassung" value={editForm.summary} onChangeText={t => setEditForm(p => ({ ...p, summary: t }))} multiline />
+                                <BPInput label="Inhalt" value={editForm.content} onChangeText={t => setEditForm(p => ({ ...p, content: t }))} multiline style={{ height: 100 }} />
+                                <BPInput label="Empfohlene Werte" value={editForm.values} onChangeText={t => setEditForm(p => ({ ...p, values: t }))} multiline />
+                                <BPInput label="Tipp" value={editForm.tip} onChangeText={t => setEditForm(p => ({ ...p, tip: t }))} multiline />
+                            </ScrollView>
+                            <View style={styles.modalActions}>
+                                <BPButton title="Abbrechen" variant="secondary" onPress={() => setIsEditing(null)} style={{ flex: 1, marginRight: 8 }} />
+                                <BPButton title={isSaving ? "Speichern..." : "Speichern"} onPress={handleSaveOverride} style={{ flex: 1, marginLeft: 8 }} disabled={isSaving} />
+                            </View>
+                        </BPCard>
+                    </View>
+                </Modal>
+            )}
         </View>
     );
 }

@@ -146,6 +146,9 @@ export default function AdminScreen() {
         </BPCard>
     );
 
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ title: 'Admin Dashboard', headerShown: true, headerStyle: { backgroundColor: theme.colors.surface }, headerTintColor: theme.colors.text }} />
@@ -162,27 +165,29 @@ export default function AdminScreen() {
                 {activeUsers.map(u => renderUser(u, false))}
             </ScrollView>
 
-            <Modal visible={pwdModalVisible} animationType="slide" transparent>
-                <View style={styles.modalBg}>
-                    <BPCard style={styles.modalCard}>
-                        <Text style={styles.modalTitle}>Passwort ändern</Text>
-                        <Text style={styles.modalSub}>Für Benutzer: {pwdTargetUser?.email}</Text>
+            {mounted && (
+                <Modal visible={pwdModalVisible} animationType="slide" transparent>
+                    <View style={styles.modalBg}>
+                        <BPCard style={styles.modalCard}>
+                            <Text style={styles.modalTitle}>Passwort ändern</Text>
+                            <Text style={styles.modalSub}>Für Benutzer: {pwdTargetUser?.email}</Text>
 
-                        <BPInput
-                            label="Neues Passwort"
-                            placeholder="Z.b. Shred123"
-                            secureTextEntry
-                            value={newPassword}
-                            onChangeText={setNewPassword}
-                        />
+                            <BPInput
+                                label="Neues Passwort"
+                                placeholder="Z.b. Shred123"
+                                secureTextEntry
+                                value={newPassword}
+                                onChangeText={setNewPassword}
+                            />
 
-                        <View style={styles.modalActions}>
-                            <BPButton title="Abbrechen" variant="secondary" onPress={() => setPwdModalVisible(false)} style={{ flex: 1, marginRight: 8 }} />
-                            <BPButton title="Speichern" onPress={handlePasswordChange} style={{ flex: 1, marginLeft: 8 }} />
-                        </View>
-                    </BPCard>
-                </View>
-            </Modal>
+                            <View style={styles.modalActions}>
+                                <BPButton title="Abbrechen" variant="secondary" onPress={() => setPwdModalVisible(false)} style={{ flex: 1, marginRight: 8 }} />
+                                <BPButton title="Speichern" onPress={handlePasswordChange} style={{ flex: 1, marginLeft: 8 }} />
+                            </View>
+                        </BPCard>
+                    </View>
+                </Modal>
+            )}
         </View>
     );
 }
