@@ -133,6 +133,7 @@ export default function SetupGuideScreen() {
     };
 
     const categories: WikiCategory[] = [
+        { id: 'baseline', emoji: '🎛️', title: t('setup_guide.cat_baseline'), description: t('setup_guide.cat_baseline_desc') },
         { id: 'cockpit', emoji: '🔩', title: t('setup_guide.cat_cockpit'), description: t('setup_guide.cat_cockpit_desc') },
         { id: 'fahrwerk', emoji: '🔱', title: t('setup_guide.cat_suspension'), description: t('setup_guide.cat_suspension_desc') },
         { id: 'bremsen', emoji: '🛑', title: t('setup_guide.cat_brakes'), description: t('setup_guide.cat_brakes_desc') },
@@ -141,7 +142,6 @@ export default function SetupGuideScreen() {
         { id: 'geometrie', emoji: '📐', title: t('setup_guide.cat_geometry'), description: t('setup_guide.cat_geometry_desc') },
         { id: 'ergonomie', emoji: '🪑', title: t('setup_guide.cat_ergonomics'), description: t('setup_guide.cat_ergonomics_desc') },
         { id: 'pflege', emoji: '🛠️', title: t('setup_guide.cat_maintenance'), description: t('setup_guide.cat_maintenance_desc') },
-        { id: 'baseline', emoji: '🎛️', title: t('setup_guide.cat_baseline'), description: t('setup_guide.cat_baseline_desc') },
     ];
 
     const articles: WikiArticle[] = [
@@ -455,6 +455,12 @@ export default function SetupGuideScreen() {
         },
         // --- Neutral Baseline (5) ---
         {
+            id: 'base_procedure', title: t('setup_guide.art_base_procedure_title'), category: 'baseline',
+            tags: ['reihenfolge', 'vorgehensweise', 'baseline', 'setup'],
+            summary: t('setup_guide.art_base_procedure_summary'), content: t('setup_guide.art_base_procedure_content'),
+            values: t('setup_guide.art_base_procedure_values'), tip: t('setup_guide.art_base_procedure_tip'),
+        },
+        {
             id: 'base_sag', title: t('setup_guide.art_base_sag_title'), category: 'baseline',
             tags: ['sag', 'baseline', 'setup', 'neutral'],
             summary: t('setup_guide.art_base_sag_summary'), content: t('setup_guide.art_base_sag_content'),
@@ -477,12 +483,6 @@ export default function SetupGuideScreen() {
             tags: ['luftdruck', 'reifen', 'baseline', 'setup', 'pressure'],
             summary: t('setup_guide.art_base_tirepressure_summary'), content: t('setup_guide.art_base_tirepressure_content'),
             values: t('setup_guide.art_base_tirepressure_values'), tip: t('setup_guide.art_base_tirepressure_tip'),
-        },
-        {
-            id: 'base_procedure', title: t('setup_guide.art_base_procedure_title'), category: 'baseline',
-            tags: ['reihenfolge', 'vorgehensweise', 'baseline', 'setup'],
-            summary: t('setup_guide.art_base_procedure_summary'), content: t('setup_guide.art_base_procedure_content'),
-            values: t('setup_guide.art_base_procedure_values'), tip: t('setup_guide.art_base_procedure_tip'),
         },
     ];
 
