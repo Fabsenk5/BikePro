@@ -63,10 +63,14 @@ export default function SetupGuideScreen() {
     const [isEditing, setIsEditing] = useState<WikiArticle | null>(null);
     const [editForm, setEditForm] = useState<Partial<WikiArticle>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
+    const [articleOrder, setArticleOrder] = useState<string[]>([]);
 
     useEffect(() => {
         syncLoadPreference<string[]>('setup_favorites', '@bikepro_favorites').then(res => setFavorites(res ?? []));
         syncLoadPreference<Record<string, boolean>>('setup_checklists', '@bikepro_checklists').then(res => setChecklistState(res ?? {}));
+        syncLoadPreference<string[]>('wiki_category_order', '@bikepro_category_order').then(res => setCategoryOrder(res ?? []));
+        syncLoadPreference<string[]>('wiki_article_order', '@bikepro_article_order').then(res => setArticleOrder(res ?? []));
         fetchOverrides();
     }, [i18n.language]);
 
@@ -145,7 +149,6 @@ export default function SetupGuideScreen() {
     ];
 
     const articles: WikiArticle[] = [
-        // --- Cockpit (5) ---
         {
             id: 'backsweep', title: t('setup_guide.art_backsweep_title'), category: 'cockpit',
             tags: ['lenker', 'ergonomie', 'winkel', 'handlebars'],
@@ -176,7 +179,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_leverpos_summary'), content: t('setup_guide.art_leverpos_content'),
             values: t('setup_guide.art_leverpos_values'), tip: t('setup_guide.art_leverpos_tip'),
         },
-        // --- Fahrwerk (6) ---
         {
             id: 'sag', title: t('setup_guide.art_sag_title'), category: 'fahrwerk',
             tags: ['gabel', 'dämpfer', 'setup', 'federweg', 'sag'],
@@ -213,7 +215,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_coilvsair_summary'), content: t('setup_guide.art_coilvsair_content'),
             values: t('setup_guide.art_coilvsair_values'), tip: t('setup_guide.art_coilvsair_tip'),
         },
-        // --- Bremsen (6) ---
         {
             id: 'bremsscheiben', title: t('setup_guide.art_bremsscheiben_title'), category: 'bremsen',
             tags: ['bremse', 'scheibe', 'mm', 'rotors'],
@@ -250,7 +251,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_brakelever_summary'), content: t('setup_guide.art_brakelever_content'),
             values: t('setup_guide.art_brakelever_values'), tip: t('setup_guide.art_brakelever_tip'),
         },
-        // --- Antrieb (5) ---
         {
             id: 'chainlength', title: t('setup_guide.art_chainlength_title'), category: 'antrieb',
             tags: ['kette', 'länge', 'glieder', 'chain'],
@@ -281,7 +281,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_chaincare_summary'), content: t('setup_guide.art_chaincare_content'),
             values: t('setup_guide.art_chaincare_values'), tip: t('setup_guide.art_chaincare_tip'),
         },
-        // --- Laufräder (7) ---
         {
             id: 'tubeless', title: t('setup_guide.art_tubeless_title'), category: 'laufraeder',
             tags: ['tubeless', 'reifen', 'dichtmilch', 'sealant'],
@@ -324,7 +323,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_inserts_summary'), content: t('setup_guide.art_inserts_content'),
             values: t('setup_guide.art_inserts_values'), tip: t('setup_guide.art_inserts_tip'),
         },
-        // --- Geometrie (6) ---
         {
             id: 'reach', title: t('setup_guide.art_reach_title'), category: 'geometrie',
             tags: ['geometrie', 'reach', 'rahmengröße'],
@@ -361,7 +359,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_seatangle_summary'), content: t('setup_guide.art_seatangle_content'),
             values: t('setup_guide.art_seatangle_values'), tip: t('setup_guide.art_seatangle_tip'),
         },
-        // --- Ergonomie (5) ---
         {
             id: 'sattelhoehe', title: t('setup_guide.art_sattelhoehe_title'), category: 'ergonomie',
             tags: ['sattel', 'höhe', 'dropper', 'saddle'],
@@ -392,7 +389,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_saddle_summary'), content: t('setup_guide.art_saddle_content'),
             values: t('setup_guide.art_saddle_values'), tip: t('setup_guide.art_saddle_tip'),
         },
-        // --- Pflege & Wartung (10) ---
         {
             id: 'cleaning', title: t('setup_guide.art_cleaning_title'), category: 'pflege',
             tags: ['reinigung', 'waschen', 'pflege', 'cleaning'],
@@ -453,7 +449,6 @@ export default function SetupGuideScreen() {
             summary: t('setup_guide.art_headset_summary'), content: t('setup_guide.art_headset_content'),
             values: t('setup_guide.art_headset_values'), tip: t('setup_guide.art_headset_tip'),
         },
-        // --- Neutral Baseline (5) ---
         {
             id: 'base_procedure', title: t('setup_guide.art_base_procedure_title'), category: 'baseline',
             tags: ['reihenfolge', 'vorgehensweise', 'baseline', 'setup'],
@@ -499,10 +494,25 @@ export default function SetupGuideScreen() {
                 tip: ov.tip || a.tip,
             };
         });
-    }, [/* articles is static inside component, avoiding dep */ overrides, i18n.language]);
+    }, [overrides, i18n.language]);
+
+    const sortedArticles = useMemo(() => {
+        const arts = [...mergedArticles];
+        if (articleOrder.length > 0) {
+            arts.sort((a, b) => {
+                const iA = articleOrder.indexOf(a.id);
+                const iB = articleOrder.indexOf(b.id);
+                if (iA === -1 && iB === -1) return 0;
+                if (iA === -1) return 1;
+                if (iB === -1) return -1;
+                return iA - iB;
+            });
+        }
+        return arts;
+    }, [mergedArticles, articleOrder]);
 
     const filteredArticles = useMemo(() => {
-        let result = mergedArticles;
+        let result = sortedArticles;
         if (selectedCategory === 'favorites') {
             result = result.filter((a) => favorites.includes(a.id));
         } else if (selectedCategory) {
@@ -518,16 +528,62 @@ export default function SetupGuideScreen() {
             );
         }
         return result;
-    }, [selectedCategory, searchQuery, mergedArticles]);
+    }, [selectedCategory, searchQuery, sortedArticles]);
 
     const toggleArticle = (id: string) => {
         setExpandedArticle(expandedArticle === id ? null : id);
     };
 
+    const sortedCategories = useMemo(() => {
+        const cats = [...categories];
+        if (categoryOrder.length > 0) {
+            cats.sort((a, b) => {
+                const iA = categoryOrder.indexOf(a.id);
+                const iB = categoryOrder.indexOf(b.id);
+                if (iA === -1 && iB === -1) return 0;
+                if (iA === -1) return 1;
+                if (iB === -1) return -1;
+                return iA - iB;
+            });
+        }
+        return cats;
+    }, [categoryOrder, categories]);
+
     const augmentedCategories = [
         ...(favorites.length > 0 ? [{ id: 'favorites', emoji: '⭐', title: 'Favoriten', description: `${favorites.length} gespeicherte Artikel` }] : []),
-        ...categories
+        ...sortedCategories
     ];
+
+    const moveCategory = (id: string, direction: -1 | 1) => {
+        const order = categoryOrder.length ? [...categoryOrder] : categories.map(c => c.id);
+        const idx = order.indexOf(id);
+        if (idx === -1) return;
+        const newIdx = idx + direction;
+        if (newIdx < 0 || newIdx >= order.length) return;
+        
+        [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
+        setCategoryOrder(order);
+        syncSavePreference('wiki_category_order', '@bikepro_category_order', order);
+    };
+
+    const moveArticle = (id: string, direction: -1 | 1, catId: string) => {
+        const order = articleOrder.length ? [...articleOrder] : articles.map(a => a.id);
+        const catArticles = sortedArticles.filter(a => a.category === catId).map(a => a.id);
+        const catIdx = catArticles.indexOf(id);
+        if (catIdx === -1) return;
+        const newCatIdx = catIdx + direction;
+        if (newCatIdx < 0 || newCatIdx >= catArticles.length) return;
+
+        const swapId = catArticles[newCatIdx];
+        const idx1 = order.indexOf(id);
+        const idx2 = order.indexOf(swapId);
+
+        if (idx1 !== -1 && idx2 !== -1) {
+            [order[idx1], order[idx2]] = [order[idx2], order[idx1]];
+            setArticleOrder(order);
+            syncSavePreference('wiki_article_order', '@bikepro_article_order', order);
+        }
+    };
 
     const [mounted, setMounted] = useState(false);
     useEffect(() => setMounted(true), []);
@@ -547,7 +603,6 @@ export default function SetupGuideScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Search bar */}
                 <View style={styles.searchWrap}>
                     <Text style={styles.searchIcon}>🔍</Text>
                     <TextInput
@@ -568,7 +623,6 @@ export default function SetupGuideScreen() {
                     )}
                 </View>
 
-                {/* Category grid */}
                 {!selectedCategory && !searchQuery && (
                     <View style={styles.categoryGrid}>
                         {augmentedCategories.map((cat) => {
@@ -584,13 +638,18 @@ export default function SetupGuideScreen() {
                                     <Text style={styles.catTitle}>{cat.title}</Text>
                                     <Text style={styles.catDesc}>{cat.description}</Text>
                                     <Text style={styles.catCount}>{t('setup_guide.articles_count', { count })}</Text>
+                                    {isAdmin && cat.id !== 'favorites' && (
+                                        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
+                                            <TouchableOpacity onPress={() => moveCategory(cat.id, -1)} style={{ padding: 4, marginRight: 8 }}><Text>⬆️</Text></TouchableOpacity>
+                                            <TouchableOpacity onPress={() => moveCategory(cat.id, 1)} style={{ padding: 4 }}><Text>⬇️</Text></TouchableOpacity>
+                                        </View>
+                                    )}
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
                 )}
 
-                {/* Category header with back */}
                 {selectedCategory && (
                     <View style={styles.catHeaderRow}>
                         <TouchableOpacity onPress={() => setSelectedCategory(null)}>
@@ -603,7 +662,6 @@ export default function SetupGuideScreen() {
                     </View>
                 )}
 
-                {/* Articles */}
                 {filteredArticles.map((article) => {
                     const expanded = expandedArticle === article.id;
                     return (
@@ -618,18 +676,22 @@ export default function SetupGuideScreen() {
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                             <Text style={styles.articleTitle}>{article.title}</Text>
                                             {isAdmin && (
-                                                <TouchableOpacity onPress={() => {
-                                                    setIsEditing(article);
-                                                    setEditForm({
-                                                        title: article.title,
-                                                        summary: article.summary,
-                                                        content: article.content,
-                                                        values: article.values,
-                                                        tip: article.tip
-                                                    });
-                                                }}>
-                                                    <Text style={{ fontSize: 12, color: ACCENT }}>[Edit]</Text>
-                                                </TouchableOpacity>
+                                                <View style={{ flexDirection: 'row', gap: 12, marginLeft: 'auto' }}>
+                                                    <TouchableOpacity onPress={() => moveArticle(article.id, -1, article.category)}><Text style={{ fontSize: 16 }}>⬆️</Text></TouchableOpacity>
+                                                    <TouchableOpacity onPress={() => moveArticle(article.id, 1, article.category)}><Text style={{ fontSize: 16 }}>⬇️</Text></TouchableOpacity>
+                                                    <TouchableOpacity onPress={() => {
+                                                        setIsEditing(article);
+                                                        setEditForm({
+                                                            title: article.title,
+                                                            summary: article.summary,
+                                                            content: article.content,
+                                                            values: article.values,
+                                                            tip: article.tip
+                                                        });
+                                                    }}>
+                                                        <Text style={{ fontSize: 16 }}>✏️</Text>
+                                                    </TouchableOpacity>
+                                                </View>
                                             )}
                                         </View>
                                         <Text style={styles.articleSummary}>{article.summary}</Text>

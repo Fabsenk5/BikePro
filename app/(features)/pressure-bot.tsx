@@ -333,8 +333,48 @@ export default function PressureBotScreen() {
         let fPsi = Math.round(riderWeight * 1.05 + (terrain === 'bikepark' ? 5 : 0) + (tireType === 'dh' ? 5 : 0));
         let sPsi = Math.round(riderWeight * 2.3 + (terrain === 'bikepark' ? 10 : 0) + (tireType === 'dh' ? 10 : 0));
         if (bikeWeight > 18) { fPsi += 3; sPsi += 8; } // E-Bike compensation
-        return { forkPsi: fPsi, shockPsi: sPsi };
-    }, [riderWeight, bikeWeight, terrain, tireType]);
+
+        // Click recommendations (Rebound)
+        // Heavier rider = higher pressure = more rebound damping (less clicks from closed)
+        const reboundOpenPct = Math.max(10, Math.min(100, 100 - ((riderWeight - 40) / 80 * 100)));
+        // Aggressive riding style needs more compression damping
+        const compOpenPct = ridingStyle === 'race' ? 30 : ridingStyle === 'aggressive' ? 50 : 80;
+
+        let forkClicks = `${Math.round(reboundOpenPct)}%`;
+        let shockClicks = `${Math.round(reboundOpenPct)}%`;
+        let forkCompClicks = `${Math.round(compOpenPct)}%`;
+        let shockCompClicks = `${Math.round(compOpenPct)}%`;
+
+        if (selectedBikeId) {
+            const bike = trackerBikes.find(b => b.id === selectedBikeId);
+            if (bike) {
+                const fork = bike.components.find((c: any) => c.type === 'fork');
+                const shock = bike.components.find((c: any) => c.type === 'shock');
+
+                const getClicksForModel = (model: string = '') => {
+                    const m = model.toLowerCase();
+                    if (m.includes('fox 38') || m.includes('fox 36') || m.includes('grip2') || m.includes('float x2')) return 14; 
+                    if (m.includes('zeb') || m.includes('lyrik') || m.includes('super deluxe')) return 18;
+                    if (m.includes('ohlins') || m.includes('öhlins') || m.includes('ttx')) return 15;
+                    return null;
+                };
+
+                const forkMax = getClicksForModel(fork?.model || fork?.name);
+                const shockMax = getClicksForModel(shock?.model || shock?.name);
+
+                if (forkMax) {
+                    forkClicks = `${Math.max(1, Math.round(forkMax * (reboundOpenPct / 100)))} (${forkMax} max)`;
+                    forkCompClicks = `${Math.max(1, Math.round(forkMax * (compOpenPct / 100)))}`;
+                }
+                if (shockMax) {
+                    shockClicks = `${Math.max(1, Math.round(shockMax * (reboundOpenPct / 100)))} (${shockMax} max)`;
+                    shockCompClicks = `${Math.max(1, Math.round(shockMax * (compOpenPct / 100)))}`;
+                }
+            }
+        }
+
+        return { forkPsi, shockPsi, forkClicks, shockClicks, forkCompClicks, shockCompClicks };
+    }, [riderWeight, bikeWeight, terrain, tireType, ridingStyle, selectedBikeId, trackerBikes]);
 
     const frontPSI = Math.round(result.front * 14.5038);
     const rearPSI = Math.round(result.rear * 14.5038);
@@ -433,16 +473,21 @@ export default function PressureBotScreen() {
                                 <Text style={styles.resultLabel}>{t('pressure_bot.fork_label', { defaultValue: 'Gabel (Fork)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.forkPsi}</Text>
                                 <Text style={styles.resultUnit}>PSI</Text>
+                                <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.forkClicks}</Text>
+                                <Text style={styles.resultPSI}>Compress: {suspResult.forkCompClicks}</Text>
                             </View>
                             <View style={styles.resultDivider} />
                             <View style={styles.resultItem}>
                                 <Text style={styles.resultLabel}>{t('pressure_bot.shock_label', { defaultValue: 'Dämpfer (Shock)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.shockPsi}</Text>
                                 <Text style={styles.resultUnit}>PSI</Text>
+                                <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.shockClicks}</Text>
+                                <Text style={styles.resultPSI}>Compress: {suspResult.shockCompClicks}</Text>
                             </View>
                         </View>
                         <View style={styles.notesBox}>
                             <Text style={styles.noteText}>{t('pressure_bot.suspension_note', { defaultValue: '💡 Dies ist ein Näherungswert als Startpunkt (Basis: Fox/RockShox Enduro/Trail). Der exakte Wert hängt von der verbauten Kartusche ab. Bitte SAG prüfen (ca. 20% Gabel, 30% Dämpfer)!' })}</Text>
+                            <Text style={[styles.noteText, { marginTop: 4, color: theme.colors.accent }]}>⚠️ Wichtig: Alle Klicks werden von "komplett geschlossen" (im Uhrzeigersinn / +) in Richtung "offen" (gegen den Uhrzeigersinn / -) gezählt!</Text>
                         </View>
                     </BPCard>
                 )}
