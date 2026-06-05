@@ -132,6 +132,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         lastServiceDate: c.last_service_date ?? new Date().toISOString().split('T')[0],
                         installedDate: c.installed_date ?? new Date().toISOString().split('T')[0],
                         wearItems: c.wear_items ?? [],
+                        maxClicks: c.max_clicks ?? undefined,
                         price: c.price,
                     })),
             }));
@@ -187,6 +188,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
                     last_service_date: c.lastServiceDate,
                     installed_date: c.installedDate,
                     wear_items: c.wearItems ?? [],
+                    max_clicks: c.maxClicks,
                     price: c.price,
                 });
             });
