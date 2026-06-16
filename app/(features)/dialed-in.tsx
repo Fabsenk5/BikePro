@@ -90,6 +90,18 @@ interface TrackerBike {
     components: any[];
 }
 
+interface WizardIssue {
+    label: string;
+    solution: string;
+}
+
+interface WizardCategory {
+    id: string;
+    title: string;
+    icon: string;
+    issues: WizardIssue[];
+}
+
 const defaultConfig: SuspensionConfig = { reboundMode: 'clicks', compressionMode: 'clicks' };
 
 const defaultFork: SuspensionValues = {
@@ -131,6 +143,8 @@ export default function DialedInScreen() {
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
 
     const [wizardVisible, setWizardVisible] = useState(false);
+    const [wizardStep, setWizardStep] = useState<'category' | 'issue' | 'solution'>('category');
+    const [selectedCategory, setSelectedCategory] = useState<WizardCategory | null>(null);
     const [wizardSolution, setWizardSolution] = useState('');
 
     const TAG_OPTIONS = [
@@ -143,12 +157,52 @@ export default function DialedInScreen() {
         { label: '🏁 Race', value: 'race' }
     ];
 
-    const tuningIssues = [
-        { label: 'Gabel taucht stark beim Bremsen/Kurven', solution: 'Erhöhe die Low-Speed Compression (LSC) um 2-3 Klicks. Wenn sie auch oft durchschlägt, füge 1 Token hinzu oder erhöhe den Druck um 5-10 PSI.' },
-        { label: 'Gabel fühlt sich harsch an kleinen Schlägen an', solution: 'Reduziere die LSC um 1-2 Klicks. Mach den Rebound (LSR) 1-2 Klicks schneller, damit sie nicht im Federweg stecken bleibt.' },
-        { label: 'Dämpfer schlägt oft durch', solution: 'Baue einen Volume Spacer (Token) ein, um die Endprogression zu erhöhen. Alternativ +10 PSI Druck oder mehr HSC.' },
-        { label: 'Bike kickt beim Absprung vom Kicker nach vorn', solution: 'Rebound am Dämpfer ist zu schnell! LSR um 1-2 Klicks schließen (langsamer machen).' },
-        { label: 'Fahrwerk fühlt sich leblos an / Bike saugt sich am Boden fest', solution: 'Rebound ist generell zu langsam gedämpft. Öffne LSR (und HSR) vorne und hinten um 2-4 Klicks (schneller). Evtl. etwas mehr Druck.' },
+    const tuningCategories: WizardCategory[] = [
+        {
+            id: 'grip',
+            title: 'Grip & Traktion',
+            icon: '🏁',
+            issues: [
+                { label: 'Vorderrad wäscht in flachen Kurven schnell aus', solution: 'Reifendruck vorne minimal senken (0.1 bar). LSC an der Gabel 1-2 Klicks öffnen. Rebound (LSR) an der Gabel evtl. 1 Klick langsamer, um das Rad ruhiger am Boden zu halten.' },
+                { label: 'Hinterrad dreht bergauf auf Wurzeln durch', solution: 'Reifendruck hinten senken. LSC am Dämpfer öffnen. Rebound (LSR) Dämpfer minimal schneller, damit das Rad in Kuhlen folgen kann.' }
+            ]
+        },
+        {
+            id: 'balance',
+            title: 'Balance & Körperhaltung',
+            icon: '🚲',
+            issues: [
+                { label: 'Gabel taucht stark beim Bremsen/Kurven weg', solution: 'Erhöhe die Low-Speed Compression (LSC) um 2-3 Klicks. Wenn sie auch oft durchschlägt, füge 1 Token hinzu oder erhöhe den Druck um 5-10 PSI.' },
+                { label: 'Bike kickt beim Absprung vom Kicker nach vorn', solution: 'Rebound am Dämpfer (LSR) ist zu schnell! LSR um 1-2 Klicks schließen (langsamer machen).' }
+            ]
+        },
+        {
+            id: 'harsh',
+            title: 'Harte Schläge & Durchschläge',
+            icon: '⛰️',
+            issues: [
+                { label: 'Dämpfer schlägt bei normalen Jumps oft hart durch', solution: 'Falls SAG (>30%) zu weich: Luftdruck erhöhen. Falls SAG stimmt (ca. 25-30%): Baue einen Volume Spacer (Token) ein, um die Endprogression zu erhöhen, oder erhöhe die HSC (High-Speed Compression).' },
+                { label: 'Gabel schlägt bei harten Landungen durch', solution: 'Falls SAG stimmt: +1 Token in die Gabel einbauen oder HSC (falls vorhanden) um 1-2 Klicks schließen.' }
+            ]
+        },
+        {
+            id: 'pedaling',
+            title: 'Antrieb & Treten',
+            icon: '🦵',
+            issues: [
+                { label: 'Starkes Wippen beim Pedalieren bergauf', solution: 'LSC (Low-Speed Compression) am Dämpfer erhöhen (oder Lockout/Climb-Switch nutzen). Evtl. etwas mehr Luftdruck in den Dämpfer, falls der SAG über 30% liegt.' },
+                { label: 'Spürbarer Pedal Kickback (Rückschlag in den Pedalen) bei rauen Passagen', solution: 'Oft kinematikbedingt. Ein höheres Setup (mehr Luftdruck / weniger SAG) hält das Bike höher im Federweg, wo der Kickback meist geringer ist. Rebound Dämpfer minimal schneller machen kann helfen, dass das Bike sich zwischen Schlägen erholt und nicht tief im Federweg "hängen" bleibt.' }
+            ]
+        },
+        {
+            id: 'chatter',
+            title: 'Kleine Unebenheiten (Chatter)',
+            icon: '🪨',
+            issues: [
+                { label: 'Gabel reicht kleine Schläge extrem harsch an die Hände weiter', solution: 'Reifendruck vorne prüfen (evtl. zu hoch). LSC reduzieren. Rebound (LSR) 1-2 Klicks schneller machen (öffnen), damit die Gabel bei vielen schnellen Schlägen nicht im Federweg stecken bleibt ("Packing").' },
+                { label: 'Bremswellen verursachen starken Armpump / Ermüdung', solution: 'Reifendruck checken. LSC an der Gabel öffnen, damit sie feinfühliger anspricht. Rebound prüfen: Ist er zu langsam, verhärtet die Gabel in schnellen Schlägen. Ist er zu schnell, springt sie unkontrolliert.' }
+            ]
+        }
     ];
 
     const leverOptions = [
@@ -474,7 +528,7 @@ export default function DialedInScreen() {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.btnRow}>
                     <BPButton title={t('dialed.add_setup')} onPress={openNewSetup} color={ACCENT} size="md" style={{ flex: 2 }} />
-                    <BPButton title="🧙 Wizard" onPress={() => { setWizardSolution(''); setWizardVisible(true); }} color={theme.colors.accentCyan} size="md" style={{ flex: 1 }} />
+                    <BPButton title="🧙 Wizard" onPress={() => { setWizardStep('category'); setSelectedCategory(null); setWizardSolution(''); setWizardVisible(true); }} color={theme.colors.accentCyan} size="md" style={{ flex: 1 }} />
                 </View>
 
                 {setups.length === 0 ? (
@@ -764,13 +818,34 @@ export default function DialedInScreen() {
 
             {/* Tuning Wizard Modal */}
             <BPModal visible={wizardVisible} onClose={() => setWizardVisible(false)} title="🧙 Tuning Wizard">
-                {!wizardSolution ? (
+                {wizardStep === 'category' && (
                     <>
-                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>Was ist das Problem mit deinem Fahrwerk?</Text>
-                        {tuningIssues.map((issue, idx) => (
+                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>In welchem Bereich suchst du nach Hilfe?</Text>
+                        {tuningCategories.map((cat) => (
+                            <TouchableOpacity
+                                key={cat.id}
+                                onPress={() => { setSelectedCategory(cat); setWizardStep('issue'); }}
+                                style={{
+                                    backgroundColor: theme.colors.surface,
+                                    padding: 16, borderRadius: theme.radius.md,
+                                    borderWidth: 1, borderColor: theme.colors.border,
+                                    marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 12
+                                }}
+                            >
+                                <Text style={{ fontSize: 24 }}>{cat.icon}</Text>
+                                <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>{cat.title}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </>
+                )}
+
+                {wizardStep === 'issue' && selectedCategory && (
+                    <>
+                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>Was ist dein spezifisches Problem?</Text>
+                        {selectedCategory.issues.map((issue, idx) => (
                             <TouchableOpacity
                                 key={idx}
-                                onPress={() => setWizardSolution(issue.solution)}
+                                onPress={() => { setWizardSolution(issue.solution); setWizardStep('solution'); }}
                                 style={{
                                     backgroundColor: theme.colors.surface,
                                     padding: 16, borderRadius: theme.radius.md,
@@ -781,8 +856,11 @@ export default function DialedInScreen() {
                                 <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>{issue.label}</Text>
                             </TouchableOpacity>
                         ))}
+                        <BPButton title="Zurück zu Kategorien" onPress={() => setWizardStep('category')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
                     </>
-                ) : (
+                )}
+
+                {wizardStep === 'solution' && (
                     <>
                         <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.sm, fontSize: 13, textTransform: 'uppercase', fontWeight: '700', letterSpacing: 1 }}>Empfehlung</Text>
                         <View style={{ backgroundColor: theme.colors.accentCyan + '20', padding: 16, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.accentCyan + '60', marginBottom: theme.spacing.lg }}>
@@ -792,7 +870,7 @@ export default function DialedInScreen() {
                             setWizardVisible(false);
                             openNewSetup();
                         }} color={ACCENT} fullWidth />
-                        <BPButton title="Zurück" onPress={() => setWizardSolution('')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
+                        <BPButton title="Zurück" onPress={() => setWizardStep('issue')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
                     </>
                 )}
             </BPModal>
