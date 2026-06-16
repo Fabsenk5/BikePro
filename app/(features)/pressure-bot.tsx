@@ -6,7 +6,7 @@
  *         Tubeless/Schlauch, Reifentyp, Casing, Fahrstil, Untergrund, Wetterlage
  * Logik: Erweiterte Matrix basierend auf Hersteller-Empfehlungen + Praxis-Werte
  */
-import { BPButton, BPCard, BPPicker, BPSlider } from '@/components/ui';
+import { BPButton, BPCard, BPInput, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { SyncBike, syncLoadBikes, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useRouter } from 'expo-router';
@@ -38,6 +38,10 @@ export default function PressureBotScreen() {
     const [tireType, setTireType] = useState('enduro');
     const [casing, setCasing] = useState('standard');
     const [ridingStyle, setRidingStyle] = useState('normal');
+
+    const [shockType, setShockType] = useState('air');
+    const [rearTravel, setRearTravel] = useState('160');
+    const [shockStroke, setShockStroke] = useState('60');
 
     const router = useRouter();
     const [trackerBikes, setTrackerBikes] = useState<SyncBike[]>([]);
@@ -100,42 +104,23 @@ export default function PressureBotScreen() {
             else if (setupStr.includes('latex')) setSetup('tube_latex');
             else if (setupStr.includes('insert') || setupStr.includes('cushcore') || setupStr.includes('noodle')) setSetup('insert');
         }
+
+        const shock = bike.components.find((c: any) => c.type === 'shock');
+        if (shock) {
+            if (shock.model?.toLowerCase().includes('coil') || shock.name?.toLowerCase().includes('coil')) {
+                setShockType('coil');
+            } else {
+                setShockType('air');
+            }
+            if (shock.setupValues) {
+                const travelVal = shock.setupValues.find((s: any) => s.key === 'Federweg')?.value;
+                if (travelVal) setRearTravel(travelVal.replace(/[^0-9]/g, ''));
+                const strokeVal = shock.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                if (strokeVal) setShockStroke(strokeVal.replace(/[^0-9]/g, ''));
+            }
+        }
     };
 
-    const handleSaveToBike = async () => {
-        if (!selectedBikeId) return;
-        setSavingToBike(true);
-
-        const fbStr = `${result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
-        const rbStr = `${result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
-
-        const updatedBikes = trackerBikes.map(b => {
-            if (b.id !== selectedBikeId) return b;
-            const updatedComps = b.components.map(c => {
-                if (c.type === 'wheel_front') {
-                    const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
-                    const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
-                    if (dIdx >= 0) newSetup[dIdx].value = fbStr;
-                    else newSetup.push({ key: 'Druck', value: fbStr });
-                    return { ...c, setupValues: newSetup };
-                }
-                if (c.type === 'wheel_rear') {
-                    const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
-                    const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
-                    if (dIdx >= 0) newSetup[dIdx].value = rbStr;
-                    else newSetup.push({ key: 'Druck', value: rbStr });
-                    return { ...c, setupValues: newSetup };
-                }
-                return c;
-            });
-            return { ...b, components: updatedComps };
-        });
-
-        await syncSaveBikes(updatedBikes);
-        setTrackerBikes(updatedBikes);
-
-        setTimeout(() => setSavingToBike(false), 800);
-    };
 
     const terrainOptions = [
         { label: t('pressure_bot.terrain_hardpack'), value: 'hardpack' },
@@ -334,6 +319,14 @@ export default function PressureBotScreen() {
         let sPsi = Math.round(riderWeight * 2.3 + (terrain === 'bikepark' ? 10 : 0) + (tireType === 'dh' ? 10 : 0));
         if (bikeWeight > 18) { fPsi += 3; sPsi += 8; } // E-Bike compensation
 
+        if (shockType === 'coil') {
+            const rt = parseFloat(rearTravel) || 160;
+            const st = parseFloat(shockStroke) || 60;
+            let springRate = (riderWeight * 2.2046 * (rt / st)) / 1.15;
+            if (bikeWeight > 18) springRate += 25; 
+            sPsi = Math.max(150, Math.round(springRate / 25) * 25);
+        }
+
         // Click recommendations (Rebound)
         // Heavier rider = higher pressure = more rebound damping (less clicks from closed)
         const reboundOpenPct = Math.max(10, Math.min(100, 100 - ((riderWeight - 40) / 80 * 100)));
@@ -393,10 +386,72 @@ export default function PressureBotScreen() {
             rawForkClicks, rawShockClicks, rawForkCompClicks, rawShockCompClicks,
             forkReboundMode, forkCompMode, shockReboundMode, shockCompMode
         };
-    }, [riderWeight, bikeWeight, terrain, tireType, ridingStyle, selectedBikeId, trackerBikes]);
+    }, [riderWeight, bikeWeight, terrain, tireType, ridingStyle, selectedBikeId, trackerBikes, shockType, rearTravel, shockStroke]);
 
     const frontPSI = Math.round(result.front * 14.5038);
     const rearPSI = Math.round(result.rear * 14.5038);
+
+    const handleSaveToBike = async () => {
+        if (!selectedBikeId) return;
+        setSavingToBike(true);
+
+        const updatedBikes = trackerBikes.map(b => {
+            if (b.id !== selectedBikeId) return b;
+            const updatedComps = b.components.map(c => {
+                if (activeTab === 'tires') {
+                    const fbStr = `${result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
+                    const rbStr = `${result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
+                    if (c.type === 'wheel_front') {
+                        const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
+                        const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
+                        if (dIdx >= 0) newSetup[dIdx].value = fbStr;
+                        else newSetup.push({ key: 'Druck', value: fbStr });
+                        return { ...c, setupValues: newSetup };
+                    }
+                    if (c.type === 'wheel_rear') {
+                        const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
+                        const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
+                        if (dIdx >= 0) newSetup[dIdx].value = rbStr;
+                        else newSetup.push({ key: 'Druck', value: rbStr });
+                        return { ...c, setupValues: newSetup };
+                    }
+                } else if (activeTab === 'suspension') {
+                    if (c.type === 'fork') {
+                        const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
+                        const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
+                        const vStr = `${suspResult.forkPsi} PSI`;
+                        if (dIdx >= 0) newSetup[dIdx].value = vStr;
+                        else newSetup.push({ key: 'Druck', value: vStr });
+                        return { ...c, setupValues: newSetup };
+                    }
+                    if (c.type === 'shock') {
+                        const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
+                        const keyName = shockType === 'coil' ? 'Federhärte' : 'Druck';
+                        const dIdx = newSetup.findIndex((s: any) => s.key === keyName);
+                        const vStr = shockType === 'coil' ? `${suspResult.shockPsi} lbs` : `${suspResult.shockPsi} PSI`;
+                        if (dIdx >= 0) newSetup[dIdx].value = vStr;
+                        else newSetup.push({ key: keyName, value: vStr });
+                        
+                        if (shockType === 'coil') {
+                            const tIdx = newSetup.findIndex((s: any) => s.key === 'Federweg');
+                            if (tIdx < 0 && rearTravel) newSetup.push({ key: 'Federweg', value: `${rearTravel} mm` });
+                            const stIdx = newSetup.findIndex((s: any) => s.key === 'Hub');
+                            if (stIdx < 0 && shockStroke) newSetup.push({ key: 'Hub', value: `${shockStroke} mm` });
+                        }
+
+                        return { ...c, setupValues: newSetup };
+                    }
+                }
+                return c;
+            });
+            return { ...b, components: updatedComps };
+        });
+
+        await syncSaveBikes(updatedBikes);
+        setTrackerBikes(updatedBikes);
+
+        setTimeout(() => setSavingToBike(false), 800);
+    };
 
     return (
         <View style={styles.container}>
@@ -515,7 +570,7 @@ export default function PressureBotScreen() {
                             <View style={styles.resultItem}>
                                 <Text style={styles.resultLabel}>{t('pressure_bot.shock_label', { defaultValue: 'Dämpfer (Shock)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.shockPsi}</Text>
-                                <Text style={styles.resultUnit}>PSI</Text>
+                                <Text style={styles.resultUnit}>{shockType === 'coil' ? 'lbs' : 'PSI'}</Text>
                                 {suspResult.shockReboundMode === 'none' ? null : suspResult.shockReboundMode === 'hsls' ? (
                                     <>
                                         <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.shockClicks}</Text>
@@ -585,6 +640,20 @@ export default function PressureBotScreen() {
                         <BPPicker label={t('pressure_bot.tire_type_label')} options={tireTypeOptions} value={tireType} onValueChange={setTireType} accentColor={ACCENT} />
                         <BPPicker label={t('pressure_bot.casing_label')} options={casingOptions} value={casing} onValueChange={setCasing} accentColor={ACCENT} />
                         <BPPicker label={t('pressure_bot.setup_label')} options={setupOptions} value={setup} onValueChange={setSetup} accentColor={ACCENT} />
+                    </BPCard>
+                )}
+
+                {/* Fahrwerk */}
+                {activeTab === 'suspension' && (
+                    <BPCard style={styles.sectionCard}>
+                        <Text style={styles.sectionTitle}>Fahrwerks-Typ</Text>
+                        <BPPicker label="Dämpfer-Typ" options={[{label:'Luft (Air)', value:'air'}, {label:'Stahlfeder (Coil)', value:'coil'}]} value={shockType} onValueChange={setShockType} accentColor={ACCENT} />
+                        {shockType === 'coil' && (
+                            <View style={{flexDirection: 'row', gap: 10}}>
+                                <BPInput label="Federweg (mm)" value={rearTravel} onChangeText={setRearTravel} keyboardType="numeric" containerStyle={{flex:1}} accentColor={ACCENT} />
+                                <BPInput label="Dämpferhub (mm)" value={shockStroke} onChangeText={setShockStroke} keyboardType="numeric" containerStyle={{flex:1}} accentColor={ACCENT} />
+                            </View>
+                        )}
                     </BPCard>
                 )}
 

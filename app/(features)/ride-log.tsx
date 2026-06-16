@@ -217,7 +217,7 @@ export default function RideLogScreen() {
                 const updatedBikes = bikes.map(b => {
                     if (b.id !== rideBikeId) return b;
                     const updatedComps = b.components.map(c => {
-                        if (!c.isWearTracked || !c.wearItems || c.wearItems.length === 0) return c;
+                        if (!c.wearItems || c.wearItems.length === 0) return c;
                         const updatedWearItems = c.wearItems.map(w => ({
                             ...w,
                             currentKm: w.currentKm + parsedDistance
@@ -350,10 +350,22 @@ export default function RideLogScreen() {
                                             <Text style={styles.metricLabel}>min</Text>
                                         </View>
                                     )}
+                                    {ride.distanceKm > 0 && ride.durationMin > 0 && (
+                                        <View style={styles.metric}>
+                                            <Text style={styles.metricValue}>{(ride.distanceKm / (ride.durationMin / 60)).toFixed(1)}</Text>
+                                            <Text style={styles.metricLabel}>km/h</Text>
+                                        </View>
+                                    )}
                                     {ride.elevationM > 0 && (
                                         <View style={styles.metric}>
                                             <Text style={styles.metricValue}>{ride.elevationM}</Text>
                                             <Text style={styles.metricLabel}>hm</Text>
+                                        </View>
+                                    )}
+                                    {ride.distanceKm > 0 && ride.elevationM > 0 && (
+                                        <View style={styles.metric}>
+                                            <Text style={styles.metricValue}>{Math.round(ride.elevationM / ride.distanceKm)}</Text>
+                                            <Text style={styles.metricLabel}>m/km</Text>
                                         </View>
                                     )}
                                     <View style={styles.metric}>

@@ -65,13 +65,13 @@ const componentTypes = [
 
 // Default service intervals in km (realistische Werte basierend auf Herstellerempfehlungen)
 const defaultIntervals: Record<string, number> = {
-    fork_small: 100,     // Alle ~50h → Lower legs service
-    fork_full: 200,      // Alle ~100-200h → Full service mit Ölwechsel
-    shock_small: 125,    // Alle ~50h → Luftkammer-Service
-    shock_full: 250,     // Alle ~100-200h → Full service
-    chain: 400,          // Alle 300-500km je nach Bedingungen
-    tire_front: 1200,    // Abhängig von Compound und Terrain
-    tire_rear: 800,      // Hinterreifen verschleißt schneller
+    fork_small: 750,     // Alle ~50h → Lower legs service
+    fork_full: 1500,     // Alle ~100-200h → Full service mit Ölwechsel
+    shock_small: 750,    // Alle ~50h → Luftkammer-Service
+    shock_full: 1500,    // Alle ~100-200h → Full service
+    chain: 500,          // Alle 300-500km je nach Bedingungen
+    tire_front: 1000,    // Abhängig von Compound und Terrain
+    tire_rear: 600,      // Hinterreifen verschleißt schneller
     brake_front: 500,    // Abhängig von Bremsstil (Bikepark = schneller)
     brake_rear: 350,     // Hinten wird mehr gebremst
     brake_fluid: 1500,   // Jährlich oder bei schwammigem Griff
