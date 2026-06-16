@@ -561,15 +561,12 @@ export default function DialedInScreen() {
                                         <Text style={styles.valueRow}>
                                             <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.fork.psi}</Text>
                                             <Text style={styles.valueLabel}> PSI  </Text>
-                                            {setup.fork.stroke && setup.fork.sagPercent ? (
+                                            {setup.fork.travel && setup.fork.sagPercent ? (
                                                 <Text>
                                                     <Text style={[styles.valueNum, { color: theme.colors.text }]}>
-                                                        {Math.round(setup.fork.stroke * (setup.fork.sagPercent / 100))}
+                                                        {Math.round(setup.fork.travel * (setup.fork.sagPercent / 100))}
                                                     </Text>
-                                                    <Text style={styles.valueLabel}> mm </Text>
-                                                    <Text style={[styles.valueLabel, { fontStyle: 'italic', fontSize: 10 }]}>
-                                                        ({setup.fork.sagPercent}%)
-                                                    </Text>
+                                                    <Text style={styles.valueLabel}> mm SAG ({setup.fork.sagPercent}%)</Text>
                                                 </Text>
                                             ) : (
                                                 <Text>
