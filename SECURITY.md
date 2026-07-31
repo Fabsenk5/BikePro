@@ -15,57 +15,30 @@ If you discover a security vulnerability, please report it responsibly:
 3. Include: description, reproduction steps, potential impact
 4. Expected response time: **48 hours**
 
-## Security Audit Results (v1.0.0)
+## Current Architecture (v1.0.x)
 
-**Audit Date:** 2026-03-04
-**Auditor:** Automated + Manual Review
-**Result:** ✅ No critical vulnerabilities found
+- **Authentication:** Supabase Auth (email + password). New accounts require beta activation (`profiles.is_active = true`) by an admin before they can use cloud features.
+- **Database:** Supabase/Postgres. Row-Level Security (RLS) is enabled on all tables; policies enforce both ownership (`auth.uid() = user_id`) and activation (`is_active_user()`).
+- **Cloud Sync:** Authenticated + activated users sync data to Supabase; without login the app works fully offline via `AsyncStorage` (local-only fallback).
+- **Admin RPCs:** User management (list, activate/deactivate, delete, set password) runs through `SECURITY DEFINER` functions gated by an `is_admin()` check, with a fixed `search_path`. Admin-set passwords must be at least 8 characters (enforced server-side).
+- **Web headers:** CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy and HSTS are set via `vercel.json`.
 
-### Dependency Audit
+## Data Privacy
 
-| Check | Result |
-|-------|--------|
-| `npm audit` | 0 vulnerabilities |
-| Known CVEs in dependencies | None |
-| Outdated packages with security patches | None |
+- **PII collected:** Email address only (required for login). No name, location, or tracking data.
+- **Data ownership:** All user-generated data (bikes, components, setups, rides) belongs to the user's account and is only readable/writable by that account (RLS).
+- **Deletion:** Users can delete individual records in the app at any time. Account deletion (including all associated data) is available on request via the admin contact above.
+- **Telemetry:** No analytics, crash reporting, or ad SDKs.
+- **Third parties:** Data is stored on Supabase infrastructure; no other third parties receive data.
 
-### Code Security Analysis
+## Security Configuration
 
-| Area | Status | Details |
-|------|--------|---------|
-| **Code Injection** | ✅ Safe | No `eval()`, `exec()`, `spawn()` usage |
-| **XSS** | ✅ Safe | Single `dangerouslySetInnerHTML` in `+html.tsx` uses a static CSS string — no user input involved |
-| **External Requests** | ✅ Safe | Zero `fetch()`, `XMLHttpRequest`, or HTTP requests in application code |
-| **Data Storage** | ✅ Local only | All data stored via `AsyncStorage` (device-local). No data leaves the device |
-| **Authentication** | ✅ N/A | No auth system — no credentials to leak |
-| **PII Collection** | ✅ None | No personal data collected (name, email, location, etc.) |
-| **External Links** | ⚠️ Curated | `Linking.openURL()` used for bikepark websites and YouTube — all URLs are hardcoded/curated |
-| **Third-party SDKs** | ✅ Minimal | Only Expo SDK + AsyncStorage — no analytics, tracking, or ad SDKs |
+- Supabase credentials are injected via environment variables (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`) — only the public anon key, which is safe to expose with RLS enabled; no secrets in the repo.
+- All `SECURITY DEFINER` functions use a fixed `search_path` (`public, auth, pg_temp`) to prevent search-path hijacking.
+- Password minimum: 8 characters (client-side and server-side).
 
-### Data Privacy
+## Recommendations
 
-- **Storage:** All user data (setups, rides, components) is stored locally on the device via `AsyncStorage`
-- **Network:** The app makes **zero** network requests (except loading the app itself on web)
-- **Telemetry:** No analytics, crash reporting, or telemetry is collected
-- **Third-party:** No data is shared with third parties
-- **GDPR:** No personal data processing — GDPR compliance is not required at current scope
-
-### Supabase Migration Note
-
-The codebase contains placeholder Supabase credentials in `lib/supabase.ts`:
-```
-SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co'
-SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key'
-```
-These are **non-functional placeholders**. When Supabase integration is activated:
-- Use environment variables (`EXPO_PUBLIC_*`) — never commit real keys
-- Implement Row-Level Security (RLS) policies
-- Add authentication before enabling cloud storage
-- Review the Supabase security checklist
-
-### Recommendations
-
-1. **Before production with user accounts:** Add authentication (e.g., Supabase Auth)
-2. **Before storing PII:** Implement encryption-at-rest for sensitive data
-3. **Before cloud sync:** Enable Supabase RLS and audit database policies
-4. **Ongoing:** Run `npm audit` regularly and update dependencies
+1. Run `npm audit` regularly and update dependencies.
+2. Keep Supabase RLS policies under review when adding new tables.
+3. Rotate credentials immediately if the anon key handling model changes (e.g., introducing service-role keys anywhere client-adjacent).

@@ -15,6 +15,8 @@ interface AuthContextType {
     isActive: boolean;
     isLoading: boolean;
     isConfigured: boolean;
+    /** True while the session comes from a password-recovery link (show reset form). */
+    isPasswordRecovery: boolean;
     /** True once the activation check for the current user has finished (success or gave up). */
     activationChecked: boolean;
     /** Set when the activation check failed after all retries. */
@@ -33,6 +35,7 @@ const AuthContext = createContext<AuthContextType>({
     isActive: false,
     isLoading: true,
     isConfigured: false,
+    isPasswordRecovery: false,
     activationChecked: false,
     activationError: null,
     retryActivation: async () => { },
@@ -70,6 +73,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [isActive, setIsActive] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
     const [activationChecked, setActivationChecked] = useState(false);
     const [activationError, setActivationError] = useState<string | null>(null);
     // Deduplicates concurrent activation checks for the same user
@@ -161,7 +165,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setIsLoading(false);
             });
 
-            const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'PASSWORD_RECOVERY') {
+                    setIsPasswordRecovery(true);
+                } else if (event === 'SIGNED_OUT') {
+                    setIsPasswordRecovery(false);
+                }
                 setSession(session);
                 setUser(session?.user ?? null);
                 if (session?.user) {
@@ -233,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (data.user) {
                 await checkActivationStatus(data.user.id);
             }
+            migrateLocalToCloud().catch((e) => console.warn('[sync] migrateLocalToCloud failed:', e));
             return { error: null };
         } else {
             return signIn(email, password);
@@ -265,6 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
         setSession(null);
         setIsActive(false);
+        setIsPasswordRecovery(false);
         setActivationChecked(false);
         setActivationError(null);
     };
@@ -273,6 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <AuthContext.Provider value={{
             user, session, isAdmin, isActive, isLoading,
             isConfigured: isSupabaseConfigured,
+            isPasswordRecovery,
             activationChecked, activationError, retryActivation,
             signIn, signUp, signOut,
         }}>

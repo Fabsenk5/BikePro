@@ -1,15 +1,16 @@
 /**
- * Auth Screen — Login / Register
+ * Auth Screen — Login / Register / Password Reset
  * Styled consistently with BikePro dark theme.
  */
-import { BPButton, BPCard, BPInput } from '@/components/ui';
+import { BPButton, BPCard, BPInput, screenContentStyle } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
+import { showAlert } from '@/lib/dialog';
+import { getSupabase } from '@/lib/supabase';
 import { Stack, router } from 'expo-router';
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -22,10 +23,12 @@ import {
 
 const ACCENT = theme.colors.accent;
 
+type Mode = 'login' | 'register' | 'forgot';
+
 export default function AuthScreen() {
-    const { signIn, signUp, isConfigured } = useAuth();
+    const { signIn, signUp, signOut, isConfigured, isPasswordRecovery } = useAuth();
     const { t } = useTranslation();
-    const [isLogin, setIsLogin] = useState(true);
+    const [mode, setMode] = useState<Mode>('login');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -37,7 +40,7 @@ export default function AuthScreen() {
             setError(t('auth.error_missing'));
             return;
         }
-        if (password.length < 6) {
+        if (password.length < 8) {
             setError(t('auth.error_short'));
             return;
         }
@@ -46,7 +49,7 @@ export default function AuthScreen() {
         setError(null);
         setSuccess(null);
 
-        const result = isLogin
+        const result = mode === 'login'
             ? await signIn(email.trim(), password)
             : await signUp(email.trim(), password);
 
@@ -55,13 +58,80 @@ export default function AuthScreen() {
         if (result.error) {
             setError(result.error);
         } else {
-            if (!isLogin && isConfigured) {
+            if (mode === 'register' && isConfigured) {
                 setSuccess(t('auth.success_register'));
             } else {
                 router.replace('/(tabs)/profile');
             }
         }
     };
+
+    const handleResetRequest = async () => {
+        if (!email.trim()) {
+            setError(t('auth.error_missing_email'));
+            return;
+        }
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        setLoading(true);
+        setError(null);
+        setSuccess(null);
+
+        const redirectTo = Platform.OS === 'web' ? window.location.origin : undefined;
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+            email.trim(),
+            { redirectTo }
+        );
+
+        setLoading(false);
+
+        if (resetError) {
+            showAlert(t('auth.title'), resetError.message);
+        } else {
+            setSuccess(t('auth.success_reset_email'));
+        }
+    };
+
+    const handleSetNewPassword = async () => {
+        if (password.length < 8) {
+            setError(t('auth.error_short'));
+            return;
+        }
+        const supabase = getSupabase();
+        if (!supabase) return;
+
+        setLoading(true);
+        setError(null);
+
+        const { error: updateError } = await supabase.auth.updateUser({ password });
+
+        setLoading(false);
+
+        if (updateError) {
+            setError(updateError.message);
+        } else {
+            showAlert(t('auth.title'), t('auth.success_password_updated'));
+            // Sign out so the user logs in fresh with the new password
+            await signOut();
+            setPassword('');
+            setMode('login');
+        }
+    };
+
+    const switchMode = (next: Mode) => {
+        setMode(next);
+        setError(null);
+        setSuccess(null);
+    };
+
+    const subtitle = isPasswordRecovery
+        ? t('auth.recovery_title')
+        : mode === 'login'
+            ? t('auth.welcome_back')
+            : mode === 'register'
+                ? t('auth.create_account')
+                : t('auth.forgot_title');
 
     return (
         <View style={styles.container}>
@@ -86,9 +156,7 @@ export default function AuthScreen() {
                     <View style={styles.logoWrap}>
                         <Text style={styles.logoEmoji}>🚵</Text>
                         <Text style={styles.logoTitle}>BikePro</Text>
-                        <Text style={styles.logoSub}>
-                            {isLogin ? t('auth.welcome_back') : t('auth.create_account')}
-                        </Text>
+                        <Text style={styles.logoSub}>{subtitle}</Text>
                     </View>
 
                     {/* Mode info */}
@@ -100,61 +168,142 @@ export default function AuthScreen() {
                         </View>
                     )}
 
-                    {/* Form */}
-                    <BPCard style={styles.formCard}>
-                        <BPInput
-                            label={t('auth.email_label')}
-                            placeholder={t('auth.email_placeholder')}
-                            value={email}
-                            onChangeText={(t) => { setEmail(t); setError(null); }}
-                            keyboardType="email-address"
-                            selectionColor={ACCENT}
-                        />
+                    {/* Password recovery form (arrived via reset link) */}
+                    {isPasswordRecovery ? (
+                        <BPCard style={styles.formCard}>
+                            <BPInput
+                                label={t('auth.new_password_label')}
+                                placeholder={t('auth.password_placeholder')}
+                                value={password}
+                                onChangeText={(v) => { setPassword(v); setError(null); }}
+                                secureTextEntry
+                                selectionColor={ACCENT}
+                            />
 
-                        <BPInput
-                            label={t('auth.password_label')}
-                            placeholder={t('auth.password_placeholder')}
-                            value={password}
-                            onChangeText={(t) => { setPassword(t); setError(null); }}
-                            secureTextEntry
-                            selectionColor={ACCENT}
-                        />
+                            {error && (
+                                <View style={styles.errorBox}>
+                                    <Text style={styles.errorText}>❌ {error}</Text>
+                                </View>
+                            )}
 
-                        {error && (
-                            <View style={styles.errorBox}>
-                                <Text style={styles.errorText}>❌ {error}</Text>
-                            </View>
-                        )}
-
-                        {success && (
-                            <View style={styles.successBox}>
-                                <Text style={styles.successText}>✅ {success}</Text>
-                            </View>
-                        )}
-
-                        <View style={{ marginTop: theme.spacing.md }}>
-                            {loading ? (
-                                <ActivityIndicator color={ACCENT} size="large" />
-                            ) : (
+                            <View style={{ marginTop: theme.spacing.md }}>
                                 <BPButton
-                                    title={isLogin ? t('auth.btn_login') : t('auth.btn_register')}
+                                    title={t('auth.btn_set_password')}
+                                    onPress={handleSetNewPassword}
+                                    color={ACCENT}
+                                    loading={loading}
+                                />
+                            </View>
+                        </BPCard>
+                    ) : mode === 'forgot' ? (
+                        /* Forgot-password form */
+                        <BPCard style={styles.formCard}>
+                            <Text style={styles.hintText}>{t('auth.forgot_hint')}</Text>
+
+                            <BPInput
+                                label={t('auth.email_label')}
+                                placeholder={t('auth.email_placeholder')}
+                                value={email}
+                                onChangeText={(v) => { setEmail(v); setError(null); }}
+                                keyboardType="email-address"
+                                selectionColor={ACCENT}
+                            />
+
+                            {error && (
+                                <View style={styles.errorBox}>
+                                    <Text style={styles.errorText}>❌ {error}</Text>
+                                </View>
+                            )}
+
+                            {success && (
+                                <View style={styles.successBox}>
+                                    <Text style={styles.successText}>✅ {success}</Text>
+                                </View>
+                            )}
+
+                            <View style={{ marginTop: theme.spacing.md }}>
+                                <BPButton
+                                    title={t('auth.btn_send_reset')}
+                                    onPress={handleResetRequest}
+                                    color={ACCENT}
+                                    loading={loading}
+                                />
+                            </View>
+
+                            <BPButton
+                                title={t('auth.back_to_login')}
+                                onPress={() => switchMode('login')}
+                                variant="ghost"
+                                color={ACCENT}
+                                size="sm"
+                                style={styles.toggleBtn}
+                            />
+                        </BPCard>
+                    ) : (
+                        /* Login / Register form */
+                        <BPCard style={styles.formCard}>
+                            <BPInput
+                                label={t('auth.email_label')}
+                                placeholder={t('auth.email_placeholder')}
+                                value={email}
+                                onChangeText={(v) => { setEmail(v); setError(null); }}
+                                keyboardType="email-address"
+                                selectionColor={ACCENT}
+                            />
+
+                            <BPInput
+                                label={t('auth.password_label')}
+                                placeholder={t('auth.password_placeholder')}
+                                value={password}
+                                onChangeText={(v) => { setPassword(v); setError(null); }}
+                                secureTextEntry
+                                selectionColor={ACCENT}
+                            />
+
+                            {mode === 'login' && isConfigured && (
+                                <TouchableOpacity
+                                    onPress={() => switchMode('forgot')}
+                                    style={styles.forgotBtn}
+                                >
+                                    <Text style={styles.forgotText}>
+                                        {t('auth.forgot_password')}
+                                    </Text>
+                                </TouchableOpacity>
+                            )}
+
+                            {error && (
+                                <View style={styles.errorBox}>
+                                    <Text style={styles.errorText}>❌ {error}</Text>
+                                </View>
+                            )}
+
+                            {success && (
+                                <View style={styles.successBox}>
+                                    <Text style={styles.successText}>✅ {success}</Text>
+                                </View>
+                            )}
+
+                            <View style={{ marginTop: theme.spacing.md }}>
+                                <BPButton
+                                    title={mode === 'login' ? t('auth.btn_login') : t('auth.btn_register')}
                                     onPress={handleSubmit}
                                     color={ACCENT}
+                                    loading={loading}
                                 />
-                            )}
-                        </View>
+                            </View>
 
-                        <TouchableOpacity
-                            onPress={() => { setIsLogin(!isLogin); setError(null); setSuccess(null); }}
-                            style={styles.toggleBtn}
-                        >
-                            <Text style={styles.toggleText}>
-                                {isLogin
+                            <BPButton
+                                title={mode === 'login'
                                     ? t('auth.toggle_to_register')
                                     : t('auth.toggle_to_login')}
-                            </Text>
-                        </TouchableOpacity>
-                    </BPCard>
+                                onPress={() => switchMode(mode === 'login' ? 'register' : 'login')}
+                                variant="ghost"
+                                color={ACCENT}
+                                size="sm"
+                                style={styles.toggleBtn}
+                            />
+                        </BPCard>
+                    )}
                 </ScrollView>
             </KeyboardAvoidingView>
         </View>
@@ -164,6 +313,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
     scrollContent: {
+        ...screenContentStyle,
         padding: theme.spacing.lg,
         paddingBottom: theme.spacing.xxl,
         justifyContent: 'center',
@@ -185,6 +335,7 @@ const styles = StyleSheet.create({
     },
     offlineText: { color: theme.colors.accentOrange, fontSize: 12, fontWeight: '600' },
     formCard: { padding: theme.spacing.lg },
+    hintText: { color: theme.colors.textSecondary, fontSize: 13, marginBottom: theme.spacing.md },
     errorBox: {
         backgroundColor: '#F4433620', borderRadius: theme.radius.md,
         padding: theme.spacing.sm, marginTop: theme.spacing.sm,
@@ -195,6 +346,7 @@ const styles = StyleSheet.create({
         padding: theme.spacing.sm, marginTop: theme.spacing.sm,
     },
     successText: { color: '#4CAF50', fontSize: 13, fontWeight: '600' },
-    toggleBtn: { marginTop: theme.spacing.lg, alignItems: 'center' },
-    toggleText: { color: ACCENT, fontSize: 14, fontWeight: '700' },
+    toggleBtn: { marginTop: theme.spacing.lg, alignSelf: 'center' },
+    forgotBtn: { alignSelf: 'flex-end', marginTop: theme.spacing.xs },
+    forgotText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
 });
