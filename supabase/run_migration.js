@@ -30,9 +30,33 @@ async function migrate() {
         await client.connect();
         console.log('Connected to Supabase DB');
 
+        // Track applied migrations so re-runs skip them
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS public.schema_migrations (
+                filename TEXT PRIMARY KEY,
+                applied_at TIMESTAMPTZ DEFAULT now()
+            )
+        `);
+        const applied = await client.query('SELECT filename FROM public.schema_migrations');
+        const done = new Set(applied.rows.map(r => r.filename));
+
         for (const file of MIGRATIONS) {
+            if (done.has(file)) {
+                console.log(`${file} already applied — skipped`);
+                continue;
+            }
             const sql = fs.readFileSync(path.join(__dirname, file), 'utf8');
-            await client.query(sql);
+            try {
+                await client.query(sql);
+            } catch (err) {
+                // 42P07 duplicate_table / 42710 duplicate_object: ran before tracking existed
+                if (err.code === '42P07' || err.code === '42710' || /already exists/.test(err.message)) {
+                    console.log(`${file} already applied (legacy) — marked as done`);
+                } else {
+                    throw err;
+                }
+            }
+            await client.query('INSERT INTO public.schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file]);
             console.log(`${file} complete!`);
         }
 
