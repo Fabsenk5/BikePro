@@ -2,10 +2,11 @@
  * Profile Screen — Shows user info, admin badge, stats, and logout.
  * If not logged in, shows login prompt.
  */
-import { BPButton, BPCard, BPInput } from '@/components/ui';
+import { BPButton, BPCard, BPInput, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
-import { syncLoadPreference, syncLoadProfile, syncLoadTable, syncSaveProfile } from '@/lib/sync';
+import { showAlert } from '@/lib/dialog';
+import { syncLoadBikes, syncLoadPreference, syncLoadProfile, syncLoadTable, syncSavePreference, syncSaveProfile } from '@/lib/sync';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +21,27 @@ import {
 
 const ACCENT = theme.colors.accent;
 
+const UNITS_KEY = '@bikepro_units';
+const LB_PER_KG = 2.20462;
+
+interface UnitsPref {
+    pressure: 'bar' | 'psi';
+    weight: 'kg' | 'lb';
+}
+
+/** Format a kg value (stored string) for display in the given weight unit */
+function formatWeightForUnit(kgStr: string, unit: 'kg' | 'lb'): string {
+    const kg = parseFloat(kgStr);
+    if (isNaN(kg)) return kgStr;
+    if (unit === 'lb') return String(Math.round(kg * LB_PER_KG * 10) / 10);
+    return kgStr;
+}
+
+/** Convert a user input value in the given unit to a kg string (internal storage unit) */
+function weightInputToKg(input: number, unit: 'kg' | 'lb'): number {
+    return unit === 'lb' ? input / LB_PER_KG : input;
+}
+
 export default function ProfileScreen() {
     const { user, isAdmin, isLoading, isConfigured, signOut } = useAuth();
     const { t, i18n } = useTranslation();
@@ -33,6 +55,15 @@ export default function ProfileScreen() {
     const [height, setHeight] = useState('');
     const [inseam, setInseam] = useState('');
     const [savingProfile, setSavingProfile] = useState(false);
+    const [weightError, setWeightError] = useState('');
+    const [heightError, setHeightError] = useState('');
+    const [inseamError, setInseamError] = useState('');
+
+    // Units preference (pressure bar/psi, weight kg/lb); weight is stored internally in kg
+    const [units, setUnits] = useState<UnitsPref>({
+        pressure: i18n.language.startsWith('de') ? 'bar' : 'psi',
+        weight: 'kg',
+    });
 
     const toggleLanguage = () => {
         const nextLang = i18n.language.startsWith('de') ? 'en' : 'de';
@@ -52,19 +83,62 @@ export default function ProfileScreen() {
     useEffect(() => {
         syncLoadTable('rides', '@bikepro_rides').then((d) => setRideCount(d.length)).catch(() => {});
         syncLoadTable('suspension_setups', '@bikepro_setups').then((d) => setSetupCount(d.length)).catch(() => {});
-        syncLoadPreference<any[]>('shred_check', '@bikepro_components').then((d) => setComponentCount(d?.length ?? 0)).catch(() => {});
+        syncLoadBikes().then((bikes) => setComponentCount(bikes.reduce((sum, b) => sum + b.components.length, 0))).catch(() => {});
 
-        syncLoadProfile().then((p) => {
-            setWeight(p.weight ?? '');
-            setHeight(p.height ?? '');
-            setInseam(p.inseam ?? '');
-        }).catch(() => {});
+        (async () => {
+            const stored = await syncLoadPreference<UnitsPref>('units', UNITS_KEY).catch(() => null);
+            const pref: UnitsPref = stored ?? {
+                pressure: i18n.language.startsWith('de') ? 'bar' : 'psi',
+                weight: 'kg',
+            };
+            setUnits(pref);
+            try {
+                const p = await syncLoadProfile();
+                setWeight(p.weight ? formatWeightForUnit(p.weight, pref.weight) : '');
+                setHeight(p.height ?? '');
+                setInseam(p.inseam ?? '');
+            } catch {}
+        })();
     }, [user]);
 
+    const handleUnitsChange = (patch: Partial<UnitsPref>) => {
+        // Keep the displayed weight value consistent when toggling kg/lb
+        if (patch.weight && patch.weight !== units.weight && weight.trim()) {
+            const parsed = parseFloat(weight.replace(',', '.'));
+            if (!isNaN(parsed)) {
+                const kg = weightInputToKg(parsed, units.weight);
+                setWeight(formatWeightForUnit(String(kg), patch.weight));
+            }
+        }
+        const next = { ...units, ...patch };
+        setUnits(next);
+        syncSavePreference('units', UNITS_KEY, next);
+    };
+
     const handleSaveProfile = async () => {
+        // Validate numeric fields (accept comma as decimal separator); empty = unset
+        const wInput = weight.trim() ? parseFloat(weight.replace(',', '.')) : null;
+        const h = height.trim() ? parseFloat(height.replace(',', '.')) : null;
+        const i = inseam.trim() ? parseFloat(inseam.replace(',', '.')) : null;
+
+        // Weight input is in the selected unit; validate and store internally in kg
+        const wKg = wInput !== null && !isNaN(wInput) ? weightInputToKg(wInput, units.weight) : wInput;
+
+        const wErr = wKg !== null && (isNaN(wKg) || wKg < 20 || wKg > 300) ? t('profile.error_weight') : '';
+        const hErr = h !== null && (isNaN(h) || h < 50 || h > 250) ? t('profile.error_height') : '';
+        const iErr = i !== null && (isNaN(i) || i < 30 || i > 120) ? t('profile.error_inseam') : '';
+        setWeightError(wErr);
+        setHeightError(hErr);
+        setInseamError(iErr);
+        if (wErr || hErr || iErr) return;
+
         setSavingProfile(true);
-        await syncSaveProfile({ weight, height, inseam });
-        setTimeout(() => setSavingProfile(false), 500); // small delay for UX
+        const weightKg = wKg !== null && !isNaN(wKg) ? String(Math.round(wKg * 10) / 10) : '';
+        const ok = await syncSaveProfile({ weight: weightKg, height, inseam });
+        setSavingProfile(false);
+        if (!ok) {
+            showAlert(t('profile.save_error_title'), t('profile.save_error_msg'));
+        }
     };
 
     const handleLogout = async () => {
@@ -83,13 +157,13 @@ export default function ProfileScreen() {
         return (
             <View style={[styles.container, styles.center]}>
                 <Text style={{ fontSize: 48, marginBottom: 16 }}>⚠️</Text>
-                <Text style={[styles.title, { fontSize: 20 }]}>Verbindungsproblem</Text>
+                <Text style={[styles.title, { fontSize: 20 }]}>{t('profile.connection_title')}</Text>
                 <Text style={[styles.subtitle, { marginBottom: 24 }]}>
-                    Die Verbindung zum Server dauert zu lange. Bitte prüfe deine Internetverbindung.
+                    {t('profile.connection_msg')}
                 </Text>
                 <View style={{ width: '80%' }}>
                     <BPButton
-                        title="🔄 Erneut versuchen"
+                        title={t('profile.retry')}
                         onPress={() => {
                             setLoadingTimedOut(false);
                             // Force re-render by navigating to self
@@ -146,7 +220,7 @@ export default function ProfileScreen() {
 
                     {!isConfigured && (
                         <View style={styles.offlineBadge}>
-                            <Text style={styles.offlineText}>⚡ Offline-Modus</Text>
+                            <Text style={styles.offlineText}>{t('profile.offline_badge')}</Text>
                         </View>
                     )}
                 </View>
@@ -178,30 +252,30 @@ export default function ProfileScreen() {
                         <Text style={styles.infoValue}>{user.email}</Text>
                     </View>
                     <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Rolle</Text>
+                        <Text style={styles.infoLabel}>{t('profile.role_label')}</Text>
                         <Text style={[styles.infoValue, isAdmin && { color: theme.colors.accentOrange }]}>
-                            {isAdmin ? '👑 Admin' : '🚵 User'}
+                            {isAdmin ? t('profile.role_admin') : t('profile.role_user')}
                         </Text>
                     </View>
                     <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>Modus</Text>
+                        <Text style={styles.infoLabel}>{t('profile.mode_label')}</Text>
                         <Text style={styles.infoValue}>
-                            {isConfigured ? '☁️ Cloud (Supabase)' : '📱 Offline (Lokal)'}
+                            {isConfigured ? t('profile.mode_cloud') : t('profile.mode_offline')}
                         </Text>
                     </View>
                 </BPCard>
                 {/* Rider Profile (Body metrics) */}
                 <BPCard style={[styles.infoCard, { marginBottom: theme.spacing.md }]}>
-                    <Text style={styles.sectionTitle}>⚖️ {t('profile.body_metrics', { defaultValue: 'Körperdaten (Für Berechnungen)' })}</Text>
+                    <Text style={styles.sectionTitle}>⚖️ {t('profile.body_metrics')}</Text>
                     <View style={styles.inputRow}>
-                        <BPInput label="Gewicht (fahrfertig)" placeholder="z.B. 82" value={weight} onChangeText={setWeight} suffix="kg" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} />
+                        <BPInput label={t('profile.weight_label')} placeholder="z.B. 82" value={weight} onChangeText={setWeight} suffix={units.weight} keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} error={weightError} />
                     </View>
                     <View style={styles.inputRow}>
-                        <BPInput label="Körpergröße" placeholder="z.B. 182" value={height} onChangeText={setHeight} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} />
-                        <BPInput label="Schrittinnenlänge" placeholder="z.B. 86" value={inseam} onChangeText={setInseam} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} />
+                        <BPInput label={t('profile.height_label')} placeholder="z.B. 182" value={height} onChangeText={setHeight} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} error={heightError} />
+                        <BPInput label={t('profile.inseam_label')} placeholder="z.B. 86" value={inseam} onChangeText={setInseam} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} error={inseamError} />
                     </View>
                     <View style={{ marginTop: theme.spacing.md }}>
-                        <BPButton title={savingProfile ? "Speichere..." : "Daten speichern"} onPress={handleSaveProfile} color={theme.colors.accentCyan} size="md" variant={savingProfile ? 'secondary' : 'primary'} />
+                        <BPButton title={savingProfile ? t('profile.saving') : t('profile.save_data')} onPress={handleSaveProfile} color={theme.colors.accentCyan} size="md" variant={savingProfile ? 'secondary' : 'primary'} />
                     </View>
                 </BPCard>
 
@@ -217,6 +291,26 @@ export default function ProfileScreen() {
                             fullWidth
                         />
                     </View>
+                </BPCard>
+
+                {/* Units */}
+                <BPCard style={styles.infoCard}>
+                    <Text style={styles.sectionTitle}>📏 {t('profile.units.title')}</Text>
+                    <BPPicker
+                        label={t('profile.units.pressure')}
+                        options={[{ label: 'bar', value: 'bar' }, { label: 'psi', value: 'psi' }]}
+                        value={units.pressure}
+                        onValueChange={(v) => handleUnitsChange({ pressure: v as UnitsPref['pressure'] })}
+                        accentColor={ACCENT}
+                    />
+                    <BPPicker
+                        label={t('profile.units.weight')}
+                        options={[{ label: 'kg', value: 'kg' }, { label: 'lb', value: 'lb' }]}
+                        value={units.weight}
+                        onValueChange={(v) => handleUnitsChange({ weight: v as UnitsPref['weight'] })}
+                        accentColor={ACCENT}
+                        containerStyle={{ marginBottom: 0 }}
+                    />
                 </BPCard>
 
                 {/* Logout */}

@@ -1,8 +1,12 @@
 import FeatureTile from '@/components/FeatureTile';
+import { BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { Feature, features as defaultFeatures } from '@/constants/Features';
-import { syncLoadBikes, syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
+import { loadFromStorage } from '@/lib/supabase';
+import { SyncBike, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,10 +19,73 @@ import {
 } from 'react-native';
 
 const TILE_ORDER_KEY = '@bikepro_tile_order';
+const PRIMARY_BIKE_KEY = '@bikepro_primary_bike';
+const CACHE_TTL_MS = 30_000;
+
+interface HomeData {
+  tileOrder: string[] | null;
+  rides: any[];
+  bikes: SyncBike[];
+  setups: { id: string; name: string; createdAt: string }[];
+  primaryBikeId: string | null;
+  offline: boolean;
+  ts: number;
+}
+
+// Cache across focus events: avoids 3 full table downloads + repeated
+// getSession calls on every tab focus. Offline mode loads once per session.
+let homeCache: HomeData | null = null;
+
+async function loadLocalPref<T>(key: string): Promise<T | null> {
+  try {
+    const d = await AsyncStorage.getItem(key);
+    return d ? JSON.parse(d) : null;
+  } catch { return null; }
+}
+
+async function loadHomeData(isAuthed: boolean): Promise<HomeData> {
+  // Reuse cache when fresh (TTL) or when offline (no cloud reload per focus)
+  if (homeCache && homeCache.offline === !isAuthed) {
+    if (Date.now() - homeCache.ts < CACHE_TTL_MS || homeCache.offline) return homeCache;
+  }
+
+  const [tileOrder, rides, bikes, setups, primaryBikeId] = isAuthed
+    ? await Promise.all([
+        syncLoadPreference<string[]>('tile_order', TILE_ORDER_KEY),
+        syncLoadTable<any>('rides', '@bikepro_rides'),
+        syncLoadBikes(),
+        syncLoadTable<{ id: string; name: string; createdAt: string }>('suspension_setups', '@bikepro_setups'),
+        syncLoadPreference<string>('primary_bike', PRIMARY_BIKE_KEY),
+      ])
+    : await Promise.all([
+        loadLocalPref<string[]>(TILE_ORDER_KEY),
+        loadFromStorage<any>('@bikepro_rides'),
+        loadFromStorage<SyncBike>('@bikepro_bikes'),
+        loadFromStorage<{ id: string; name: string; createdAt: string }>('@bikepro_setups'),
+        loadLocalPref<string>(PRIMARY_BIKE_KEY),
+      ]);
+
+  homeCache = { tileOrder, rides, bikes, setups, primaryBikeId, offline: !isAuthed, ts: Date.now() };
+  return homeCache;
+}
+
+function primaryOf(bikes: SyncBike[], primaryId: string | null): SyncBike | undefined {
+  return bikes.find(b => b.id === primaryId) ?? bikes[0];
+}
+
+function pressureSubtitle(bikes: SyncBike[], primaryId: string | null): string | null {
+  const primary = primaryOf(bikes, primaryId);
+  if (!primary) return null;
+  const frontWheel = primary.components.find(c => c.type === 'wheel_front');
+  // Semantic key 'pressure'; 'Druck' kept as fallback for unmigrated legacy data
+  const pVal = frontWheel?.setupValues?.find(s => s.key === 'pressure' || s.key === 'Druck')?.value;
+  return pVal ? `${primary.name}: ${pVal} VR` : null;
+}
 
 export default function HomeScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [orderedFeatures, setOrderedFeatures] = useState<Feature[]>(defaultFeatures);
   const [selectedTile, setSelectedTile] = useState<number | null>(null);
@@ -28,69 +95,80 @@ export default function HomeScreen() {
   const [lastRideSub, setLastRideSub] = useState<string | null>(null);
   const [pressureSub, setPressureSub] = useState<string | null>(null);
   const [dialedSub, setDialedSub] = useState<string | null>(null);
+  const [bikes, setBikes] = useState<SyncBike[]>([]);
+  const [primaryBikeId, setPrimaryBikeId] = useState<string | null>(null);
+
+  const applyData = useCallback((d: HomeData) => {
+    // Tile order
+    if (d.tileOrder) {
+      const reordered: Feature[] = [];
+      d.tileOrder.forEach((id) => {
+        const feature = defaultFeatures.find((f) => f.id === id);
+        if (feature) reordered.push(feature);
+      });
+      defaultFeatures.forEach((f) => {
+        if (!reordered.find((r) => r.id === f.id)) reordered.push(f);
+      });
+      setOrderedFeatures(reordered);
+    }
+
+    // Last ride subtitle (guard against empty/invalid date and missing distance)
+    if (d.rides.length > 0) {
+      const last = [...d.rides].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+      const parsed = new Date(last.date);
+      const dateStr = last.date && !isNaN(parsed.getTime()) ? parsed.toLocaleDateString() : null;
+      const dist = last.distanceKm ?? last.distance;
+      setLastRideSub(dateStr ? t('home.last_ride', { date: dateStr, dist: dist ? ` (${dist}km)` : '' }) : null);
+    } else {
+      setLastRideSub(null);
+    }
+
+    // Shred Check badge
+    let overdue = 0;
+    d.bikes.forEach(b => {
+      b.components.forEach(c => {
+        c.wearItems?.forEach(w => {
+          if (w.currentKm >= w.serviceIntervalKm) overdue++;
+        });
+      });
+    });
+    setShredBadge(overdue > 0 ? t('home.overdue_badge', { count: overdue }) : null);
+
+    // Pressure Bot preview (primary bike front pressure)
+    setPressureSub(pressureSubtitle(d.bikes, d.primaryBikeId));
+
+    // Dialed In subtitle
+    if (d.setups.length > 0) {
+      const last = [...d.setups].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0];
+      setDialedSub(t('home.current_setup', { name: last.name }));
+    } else {
+      setDialedSub(null);
+    }
+
+    setBikes(d.bikes);
+    setPrimaryBikeId(d.primaryBikeId);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      // Load Order
-      syncLoadPreference<string[]>('tile_order', TILE_ORDER_KEY).then((order) => {
-        if (order) {
-          const reordered: Feature[] = [];
-          order.forEach((id) => {
-            const feature = defaultFeatures.find((f) => f.id === id);
-            if (feature) reordered.push(feature);
-          });
-          defaultFeatures.forEach((f) => {
-            if (!reordered.find((r) => r.id === f.id)) reordered.push(f);
-          });
-          setOrderedFeatures(reordered);
-        }
-      });
-
-      // Load Ride Log
-      syncLoadTable<any>('rides', '@bikepro_rides').then(rides => {
-        if (rides && rides.length > 0) {
-          const last = rides.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-          const dateStr = new Date(last.date).toLocaleDateString();
-          setLastRideSub(`Zuletzt: ${dateStr} (${last.distance}km)`);
-        }
-      });
-
-      // Load Shred Check & Pressure Bot
-      syncLoadBikes().then(bikes => {
-        if (bikes && bikes.length > 0) {
-          // Shred Check Badge
-          let overdue = 0;
-          bikes.forEach(b => {
-            b.components.forEach(c => {
-              c.wearItems?.forEach(w => {
-                if (w.currentKm >= w.serviceIntervalKm) overdue++;
-              });
-            });
-          });
-          if (overdue > 0) setShredBadge(`${overdue} fällig`);
-          else setShredBadge(null);
-
-          // Pressure Bot Preview (grab fav bike front pressure)
-          const frontWheel = bikes[0].components.find(c => c.type === 'wheel_front');
-          const pVal = frontWheel?.setupValues?.find(s => s.key === 'Druck')?.value;
-          if (pVal) setPressureSub(`Start-Bike: ${pVal} VR`);
-        }
-      });
-
-      // Load Dialed In
-      syncLoadTable<{ id: string; name: string; createdAt: string }>('suspension_setups', '@bikepro_setups').then(setups => {
-        if (setups && setups.length > 0) {
-          const last = setups.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())[0];
-          setDialedSub(`Aktuell: ${last.name}`);
-        }
-      });
-    }, [])
+      let active = true;
+      loadHomeData(!!user).then(d => { if (active) applyData(d); });
+      return () => { active = false; };
+    }, [user, applyData])
   );
 
   const saveOrder = useCallback(async (features: Feature[]) => {
     const order = features.map((f) => f.id);
+    if (homeCache) homeCache.tileOrder = order;
     await syncSavePreference('tile_order', TILE_ORDER_KEY, order);
   }, []);
+
+  const handleSetPrimaryBike = useCallback((bikeId: string) => {
+    setPrimaryBikeId(bikeId);
+    if (homeCache) homeCache.primaryBikeId = bikeId;
+    setPressureSub(pressureSubtitle(bikes, bikeId));
+    syncSavePreference('primary_bike', PRIMARY_BIKE_KEY, bikeId);
+  }, [bikes]);
 
   const handleTilePress = (route: string, ready: boolean, index: number) => {
     if (editMode) {
@@ -113,7 +191,7 @@ export default function HomeScreen() {
       return;
     }
     if (ready) {
-      router.push(route as any);
+      router.push(route as Href);
     }
   };
 
@@ -166,6 +244,17 @@ export default function HomeScreen() {
               {t('home.edit_hint')}
             </Text>
           </View>
+        )}
+
+        {/* Primary bike picker (only when more than one bike exists) */}
+        {bikes.length > 1 && (
+          <BPPicker
+            label={t('home.primary_bike')}
+            options={bikes.map(b => ({ label: b.name, value: b.id }))}
+            value={primaryOf(bikes, primaryBikeId)?.id ?? ''}
+            onValueChange={handleSetPrimaryBike}
+            containerStyle={{ marginBottom: theme.spacing.md }}
+          />
         )}
 
         {/* Feature grid */}
