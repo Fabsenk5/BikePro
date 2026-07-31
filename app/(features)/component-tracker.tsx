@@ -5,11 +5,10 @@
  * Bike-Master + Komponenten CRUD + flexible Setup-Werte (Torque, Angle etc.)
  * Storage: AsyncStorage (Supabase later)
  */
-import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
-import { theme } from '@/constants/Colors';
-import { confirmDialog } from '@/lib/dialog';
-import { newId, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
-import Slider from '@react-native-community/slider';
+import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPSlider, BPToggle, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
+import { confirmDialog, showAlert } from '@/lib/dialog';
+import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,22 +18,15 @@ import {
     Share,
     StatusBar,
     StyleSheet,
-    Switch,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
 
-const ACCENT = '#26A69A';
+const ACCENT = featureColors['component-tracker'];
 
 type Bike = SyncBike;
 type Component = SyncComponent;
-
-export interface SetupValue {
-    key: string;
-    value: string;
-    unit: string;
-}
 
 interface UnitsPref {
     pressure: 'bar' | 'psi';
@@ -265,9 +257,15 @@ export default function ComponentTrackerScreen() {
         }, [])
     );
 
-    const persist = async (updated: Bike[]) => {
+    // Structural changes (bike add/rename/delete, component move/delete) rewrite the
+    // whole bikes table. The mutation is applied to a FRESH copy so km updates made
+    // meanwhile by Shred-Check / Ride-Log are not overwritten with stale state.
+    const persistStructural = async (mutate: (fresh: Bike[]) => Bike[]): Promise<Bike[]> => {
+        const fresh = await syncLoadBikes();
+        const updated = mutate(fresh);
         await syncSaveBikes(updated);
         setBikes(updated);
+        return updated;
     };
 
     const selectedBike = bikes.find((b) => b.id === selectedBikeId) ?? null;
@@ -308,14 +306,13 @@ export default function ComponentTrackerScreen() {
             size: bikeSize,
             components: editingBike?.components ?? [],
         };
-        let updated: Bike[];
-        if (editingBike) {
-            updated = bikes.map((b) => (b.id === editingBike.id ? bikeData : b));
-        } else {
-            updated = [...bikes, bikeData];
-            setSelectedBikeId(bikeData.id);
-        }
-        persist(updated);
+        await persistStructural(fresh =>
+            editingBike
+                // Keep fresh components — they may have newer km than the screen state
+                ? fresh.map((b) => (b.id === editingBike.id ? { ...bikeData, components: b.components } : b))
+                : [...fresh, bikeData]
+        );
+        if (!editingBike) setSelectedBikeId(bikeData.id);
 
         // Propagate renames to linked suspension setups
         if (editingBike && editingBike.name !== bikeData.name && setups.some(s => s.bikeId === editingBike.id)) {
@@ -332,13 +329,13 @@ export default function ComponentTrackerScreen() {
     const deleteBike = async (id: string) => {
         const confirmed = await confirmDialog(
             t('tracker.delete_bike_title'),
-            t('tracker.delete_bike_message')
+            t('tracker.delete_bike_message'),
+            t('common.cancel')
         );
         if (!confirmed) return;
 
         await syncDeleteBike(id);
-        const updated = bikes.filter((b) => b.id !== id);
-        persist(updated);
+        const updated = await persistStructural(fresh => fresh.filter((b) => b.id !== id));
         setSelectedBikeId(updated[0]?.id ?? null);
 
         // Unlink suspension setups referencing this bike (rides keep their stored snapshot)
@@ -471,25 +468,29 @@ export default function ComponentTrackerScreen() {
             installedDate: compIsWearTracked && compWearItems.length > 0 ? compWearItems[0].installedDate : getTodayISO(),
         };
 
-        // Move to different bike? (structural change → full resave)
+        // Move to different bike? (structural change → full resave on fresh state)
         if (editingComp && compMoveToBikeId && compMoveToBikeId !== selectedBike.id) {
-            let updatedBikes = [...bikes];
-            // Remove from current bike
-            updatedBikes = updatedBikes.map(b =>
-                b.id === selectedBike.id
-                    ? { ...b, components: b.components.filter(c => c.id !== editingComp.id) }
-                    : b
-            );
-            // Add to target bike
-            updatedBikes = updatedBikes.map(b =>
-                b.id === compMoveToBikeId
-                    ? { ...b, components: [...b.components, compData] }
-                    : b
-            );
-            persist(updatedBikes);
+            await persistStructural(fresh => {
+                // Remove from current bike
+                let updatedBikes = fresh.map(b =>
+                    b.id === selectedBike.id
+                        ? { ...b, components: b.components.filter(c => c.id !== editingComp.id) }
+                        : b
+                );
+                // Add to target bike
+                updatedBikes = updatedBikes.map(b =>
+                    b.id === compMoveToBikeId
+                        ? { ...b, components: [...b.components, compData] }
+                        : b
+                );
+                return updatedBikes;
+            });
         } else {
             // Normal save (edit or create on current bike) → targeted single-row write
-            await syncUpdateComponent(selectedBike.id, compData);
+            const ok = await syncUpdateComponent(selectedBike.id, compData);
+            if (!ok) {
+                showAlert(t('common.sync_pending_title'), t('common.sync_pending_msg'));
+            }
             setBikes(bikes.map(b => b.id === selectedBike.id
                 ? {
                     ...b,
@@ -508,16 +509,18 @@ export default function ComponentTrackerScreen() {
         if (!selectedBike) return;
         const confirmed = await confirmDialog(
             t('tracker.delete_component_title'),
-            t('tracker.delete_component_message')
+            t('tracker.delete_component_message'),
+            t('common.cancel')
         );
         if (!confirmed) return;
 
         await syncDeleteComponent(compId);
-        const updatedBike = {
-            ...selectedBike,
-            components: selectedBike.components.filter(c => c.id !== compId),
-        };
-        persist(bikes.map(b => b.id === selectedBike.id ? updatedBike : b));
+        await persistStructural(fresh =>
+            fresh.map(b => b.id === selectedBike.id
+                ? { ...b, components: b.components.filter(c => c.id !== compId) }
+                : b
+            )
+        );
     };
     const handleShareBike = async () => {
         if (!selectedBike) return;
@@ -533,7 +536,12 @@ export default function ComponentTrackerScreen() {
             return `- ${getTypeLabel(c.type)}: ${c.brand} ${c.model} (${!isNaN(w) ? w + 'g' : '-'} | ${p > 0 ? p.toFixed(2) + '€' : '-'})`;
         });
 
-        const msg = `🚴 ${selectedBike.name} Build\n\n${lines.join('\n')}\n\n⚖️ Gesamtgewicht Teile: ${Math.round(totalWeight * 10) / 10}g\n💶 Gesamtwert Teile: ${totalPrice.toFixed(2)}€`;
+        const msg = t('tracker.share_msg', {
+            name: selectedBike.name,
+            lines: lines.join('\n'),
+            weight: Math.round(totalWeight * 10) / 10,
+            price: totalPrice.toFixed(2),
+        });
         try {
             await Share.share({ message: msg });
         } catch (error) {
@@ -545,9 +553,7 @@ export default function ComponentTrackerScreen() {
         <View style={styles.container}>
             <Stack.Screen
                 options={{
-                    title: `🔩 ${t('features.component-tracker.title', { defaultValue: 'Component Tracker' })}`,
-                    headerStyle: { backgroundColor: theme.colors.surface },
-                    headerTintColor: theme.colors.text,
+                    title: t('features.component-tracker.title', { defaultValue: 'Component Tracker' }),
                 }}
             />
             <StatusBar barStyle="light-content" />
@@ -634,64 +640,47 @@ export default function ComponentTrackerScreen() {
 
                 {/* Components list */}
                 {selectedBike?.components.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>🔩</Text>
-                        <Text style={styles.emptyTitle}>{t('tracker.components')}</Text>
-                        <Text style={styles.emptySubtitle}>—</Text>
-                    </View>
+                    <BPEmptyState icon="🔩" title={t('tracker.components')} subtitle="—" />
                 )}
 
                 {!loading && !selectedBike && bikes.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>🚵</Text>
-                        <Text style={styles.emptyTitle}>{t('tracker.no_bikes')}</Text>
-                        <Text style={styles.emptySubtitle}>{t('tracker.add_first_bike')}</Text>
-                    </View>
+                    <BPEmptyState icon="🚵" title={t('tracker.no_bikes')} subtitle={t('tracker.add_first_bike')} />
                 )}
 
                 {selectedBike?.components.map((comp) => (
-                    <TouchableOpacity
+                    <BPCard
                         key={comp.id}
                         onPress={() => openEditComp(comp)}
-                        activeOpacity={0.8}
+                        style={styles.compRow}
                     >
-                        <View style={styles.compRow}>
-                            <View style={styles.compRowLeft}>
-                                <Text style={styles.compRowType}>{getTypeLabel(comp.type)}</Text>
-                                {(comp.brand || comp.model) ? (
-                                    <Text style={styles.compRowBrand} numberOfLines={2}>
-                                        {comp.brand} {comp.model}{comp.weight ? ` · ${comp.weight}g` : ''}
-                                    </Text>
-                                ) : null}
-                                {comp.notes ? (
-                                    <Text style={styles.compRowNotes} numberOfLines={2}>{comp.notes}</Text>
-                                ) : null}
-                            </View>
-                            {comp.setupValues.length > 0 && (
-                                <View style={styles.compRowChips}>
-                                    {comp.setupValues.slice(0, 3).map((sv, i) => (
-                                        <Text key={i} style={styles.compRowChip}>
-                                            <Text style={styles.compRowChipKey}>{setupLabel(sv.key)} </Text>
-                                            <Text style={[styles.compRowChipVal, { color: ACCENT }]}>{sv.value}{sv.unit}</Text>
-                                        </Text>
-                                    ))}
-                                    {comp.setupValues.length > 3 && (
-                                        <Text style={styles.compRowChipMore}>+{comp.setupValues.length - 3}</Text>
-                                    )}
-                                    {['fork', 'shock', 'wheel_front', 'wheel_rear'].includes(comp.type) && setups.filter(s => s.bikeId === selectedBike?.id).length > 0 && (
-                                        <View style={{ backgroundColor: ACCENT + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 4 }}>
-                                            <Text style={{ color: ACCENT, fontSize: 10, fontWeight: '700' }}>
-                                                🎯 {setups.filter(s => s.bikeId === selectedBike?.id).length} Setups
-                                            </Text>
-                                        </View>
-                                    )}
-                                </View>
-                            )}
-                            <TouchableOpacity onPress={() => deleteComp(comp.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.compRowDelete}>
-                                <Text style={{ fontSize: 18 }}>🗑</Text>
-                            </TouchableOpacity>
+                        <View style={styles.compRowLeft}>
+                            <Text style={styles.compRowType}>{getTypeLabel(comp.type)}</Text>
+                            {(comp.brand || comp.model) ? (
+                                <Text style={styles.compRowBrand} numberOfLines={2}>
+                                    {comp.brand} {comp.model}{comp.weight ? ` · ${comp.weight}g` : ''}
+                                </Text>
+                            ) : null}
+                            {comp.notes ? (
+                                <Text style={styles.compRowNotes} numberOfLines={2}>{comp.notes}</Text>
+                            ) : null}
                         </View>
-                    </TouchableOpacity>
+                        {comp.setupValues.length > 0 && (
+                            <View style={styles.compRowChips}>
+                                {comp.setupValues.slice(0, 3).map((sv, i) => (
+                                    <BPChip key={i} small label={`${setupLabel(sv.key)} ${sv.value}${sv.unit}`} />
+                                ))}
+                                {comp.setupValues.length > 3 && (
+                                    <BPChip small label={`+${comp.setupValues.length - 3}`} />
+                                )}
+                                {['fork', 'shock', 'wheel_front', 'wheel_rear'].includes(comp.type) && setups.filter(s => s.bikeId === selectedBike?.id).length > 0 && (
+                                    <BPChip small selected color={ACCENT} label={`🎯 ${setups.filter(s => s.bikeId === selectedBike?.id).length} Setups`} />
+                                )}
+                            </View>
+                        )}
+                        <TouchableOpacity onPress={() => deleteComp(comp.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.compRowDelete}>
+                            <Text style={{ fontSize: 18 }}>🗑</Text>
+                        </TouchableOpacity>
+                    </BPCard>
                 ))}
             </ScrollView>
 
@@ -761,23 +750,17 @@ export default function ComponentTrackerScreen() {
                             }
                             if (sv.key === 'Breite' && compType === 'handlebar') {
                                 return (
-                                    <View key={i} style={{ marginBottom: theme.spacing.lg }}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{setupLabel(sv.key)}</Text>
-                                            <Text style={{ color: ACCENT, fontWeight: '600' }}>{parseFloat(sv.value || '780').toFixed(0)} {sv.unit}</Text>
-                                        </View>
-                                        <Slider
-                                            style={{ height: 40 }}
-                                            minimumValue={700}
-                                            maximumValue={820}
-                                            step={5}
-                                            value={parseFloat(sv.value || '780')}
-                                            onValueChange={(val) => updateSetupValue(i, val.toFixed(0))}
-                                            minimumTrackTintColor={ACCENT}
-                                            maximumTrackTintColor={theme.colors.border}
-                                            thumbTintColor={ACCENT}
-                                        />
-                                    </View>
+                                    <BPSlider
+                                        key={i}
+                                        label={setupLabel(sv.key)}
+                                        value={parseFloat(sv.value || '780')}
+                                        min={700}
+                                        max={820}
+                                        step={5}
+                                        accentColor={ACCENT}
+                                        formatValue={(v) => `${v.toFixed(0)} ${sv.unit}`}
+                                        onValueChange={(val) => updateSetupValue(i, val.toFixed(0))}
+                                    />
                                 )
                             }
                             if (sv.key === 'width') {
@@ -803,23 +786,17 @@ export default function ComponentTrackerScreen() {
                                     ? fallback
                                     : Math.min(max, Math.max(min, convertPressure(parsed, sv.unit || tirePressureUnit, tirePressureUnit)));
                                 return (
-                                    <View key={i} style={{ marginBottom: theme.spacing.lg }}>
-                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{setupLabel(sv.key)}</Text>
-                                            <Text style={{ color: ACCENT, fontWeight: '600' }}>{displayVal.toFixed(isBar ? 1 : 0)} {tirePressureUnit}</Text>
-                                        </View>
-                                        <Slider
-                                            style={{ height: 40 }}
-                                            minimumValue={min}
-                                            maximumValue={max}
-                                            step={isBar ? 0.1 : 1}
-                                            value={displayVal}
-                                            onValueChange={(val) => updateSetupValue(i, isBar ? val.toFixed(1) : val.toFixed(0), tirePressureUnit)}
-                                            minimumTrackTintColor={ACCENT}
-                                            maximumTrackTintColor={theme.colors.border}
-                                            thumbTintColor={ACCENT}
-                                        />
-                                    </View>
+                                    <BPSlider
+                                        key={i}
+                                        label={setupLabel(sv.key)}
+                                        value={displayVal}
+                                        min={min}
+                                        max={max}
+                                        step={isBar ? 0.1 : 1}
+                                        accentColor={ACCENT}
+                                        formatValue={(v) => `${v.toFixed(isBar ? 1 : 0)} ${tirePressureUnit}`}
+                                        onValueChange={(val) => updateSetupValue(i, isBar ? val.toFixed(1) : val.toFixed(0), tirePressureUnit)}
+                                    />
                                 )
                             }
                             return (
@@ -841,52 +818,49 @@ export default function ComponentTrackerScreen() {
 
                 {/* --- Wear Tracking Section --- */}
                 <View style={styles.wearSection}>
-                    <View style={styles.wearToggleRow}>
-                        <Text style={styles.wearSectionTitle}>♻️ {t('tracker.wear_tracking', { defaultValue: 'Verschleiß erfassen?' })}</Text>
-                        <Switch
-                            value={compIsWearTracked}
-                            onValueChange={setCompIsWearTracked}
-                            trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
-                            thumbColor={compIsWearTracked ? ACCENT : theme.colors.textMuted}
-                        />
-                    </View>
+                    <BPToggle
+                        label={`♻️ ${t('tracker.wear_tracking', { defaultValue: 'Verschleiß erfassen?' })}`}
+                        value={compIsWearTracked}
+                        onValueChange={setCompIsWearTracked}
+                        accentColor={ACCENT}
+                    />
 
                     {compIsWearTracked && compWearItems.map((item, index) => (
                         <View key={item.id} style={{ marginTop: 12, padding: 12, backgroundColor: theme.colors.background, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border }}>
                             <Text style={{ fontWeight: 'bold', color: theme.colors.text, marginBottom: 8 }}>{item.label}</Text>
                             <View style={styles.inputRow}>
-                                <BPInput label="Aktuelle km" value={item.currentKm.toString()} onChangeText={(val) => updateWearItem(index, 'currentKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                                <BPInput label="Intervall" value={item.serviceIntervalKm.toString()} onChangeText={(val) => updateWearItem(index, 'serviceIntervalKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label={t('tracker.wear_current_km')} value={item.currentKm.toString()} onChangeText={(val) => updateWearItem(index, 'currentKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label={t('tracker.wear_interval')} value={item.serviceIntervalKm.toString()} onChangeText={(val) => updateWearItem(index, 'serviceIntervalKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                             </View>
                             <View style={[styles.inputRow, { alignItems: 'center', marginTop: 8 }]}>
-                                <BPInput label="Einbaudatum" value={item.installedDate} onChangeText={(val) => updateWearItem(index, 'installedDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                                <BPInput label="Letzter Service" value={item.lastServiceDate} onChangeText={(val) => updateWearItem(index, 'lastServiceDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label={t('tracker.wear_installed')} value={item.installedDate} onChangeText={(val) => updateWearItem(index, 'installedDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                <BPInput label={t('tracker.wear_last_service')} value={item.lastServiceDate} onChangeText={(val) => updateWearItem(index, 'lastServiceDate', val)} placeholder="YYYY-MM-DD" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                             </View>
                             {/* Service Log Injection */}
                             <View style={{ marginTop: 4, alignItems: 'flex-start' }}>
-                                <BPButton title="Service loggen..." onPress={() => setAddingServiceForIndex(addingServiceForIndex === index ? -1 : index)} size="sm" variant="secondary" color={ACCENT} />
+                                <BPButton title={t('tracker.wear_log_service')} onPress={() => setAddingServiceForIndex(addingServiceForIndex === index ? -1 : index)} size="sm" variant="secondary" color={ACCENT} />
                             </View>
 
                             {addingServiceForIndex === index && (
                                 <View style={{ marginTop: 8, padding: 8, backgroundColor: theme.colors.surface, borderRadius: theme.radius.sm }}>
-                                    <Text style={{ fontSize: 13, fontWeight: '700', marginBottom: 4, color: theme.colors.text }}>➕ Neuen Service eintragen</Text>
-                                    <BPInput label="Notiz (was wurde gemacht?)" placeholder="z.B. Ölwechsel, Dichtungen neu" value={newServiceNote} onChangeText={setNewServiceNote} accentColor={ACCENT} />
+                                    <Text style={{ fontSize: 13, fontWeight: '700', marginBottom: 4, color: theme.colors.text }}>{t('tracker.wear_add_service')}</Text>
+                                    <BPInput label={t('tracker.wear_service_note')} placeholder={t('tracker.wear_service_note_placeholder')} value={newServiceNote} onChangeText={setNewServiceNote} accentColor={ACCENT} />
                                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                                        <BPButton title="Speichern & km Reset" onPress={() => {
+                                        <BPButton title={t('tracker.wear_save_reset')} onPress={() => {
                                             const today = getTodayISO();
                                             const updatedHistory = [...(item.serviceHistory ?? []), { date: today, note: newServiceNote, type: 'maintenance' }];
                                             setCompWearItems(prev => prev.map((w, i) => i === index ? { ...w, currentKm: 0, lastServiceDate: today, serviceHistory: updatedHistory } : w));
                                             setAddingServiceForIndex(-1);
                                             setNewServiceNote('');
                                         }} size="sm" color={theme.colors.accentCyan} style={{ flex: 1 }} />
-                                        <BPButton title="Abbrechen" onPress={() => { setAddingServiceForIndex(-1); setNewServiceNote(''); }} size="sm" variant="secondary" color={theme.colors.textMuted} />
+                                        <BPButton title={t('common.cancel')} onPress={() => { setAddingServiceForIndex(-1); setNewServiceNote(''); }} size="sm" variant="secondary" color={theme.colors.textMuted} />
                                     </View>
                                 </View>
                             )}
 
                             {item.serviceHistory && item.serviceHistory.length > 0 && (
                                 <View style={{ marginTop: 12 }}>
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textMuted, textTransform: 'uppercase', marginBottom: 4 }}>Service-Historie</Text>
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: theme.colors.textMuted, textTransform: 'uppercase', marginBottom: 4 }}>{t('tracker.wear_history')}</Text>
                                     {item.serviceHistory.map((sh, idx) => (
                                         <View key={idx} style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
                                             <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600', width: 80 }}>{sh.date}</Text>
@@ -929,7 +903,7 @@ export default function ComponentTrackerScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
-    scrollContent: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
+    scrollContent: { ...screenContentStyle, padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
     btnRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
     bikeCard: { marginBottom: theme.spacing.md, padding: theme.spacing.md },
     bikeHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
@@ -939,19 +913,10 @@ const styles = StyleSheet.create({
     actionIcon: { fontSize: 16, padding: 4 },
     compCount: { color: theme.colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 8, textTransform: 'uppercase', letterSpacing: 1 },
     emptyState: { alignItems: 'center', paddingVertical: theme.spacing.xxl * 2 },
-    emptyIcon: { fontSize: 48, marginBottom: theme.spacing.md },
-    emptyTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '700' },
-    emptySubtitle: { color: theme.colors.textMuted, fontSize: 14, marginTop: 8 },
     compRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.md,
-        paddingVertical: 12,
-        paddingHorizontal: 12,
-        marginBottom: 8,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        marginBottom: theme.spacing.sm,
         gap: 8,
     },
     compRowLeft: {
@@ -968,32 +933,12 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         alignItems: 'center',
     },
-    compRowChip: {
-        backgroundColor: theme.colors.elevated,
-        borderRadius: theme.radius.sm,
-        paddingHorizontal: 6,
-        paddingVertical: 4,
-        flexShrink: 1,
-    },
-    compRowChipKey: { color: theme.colors.textMuted, fontSize: 9, fontWeight: '600', textTransform: 'uppercase' },
-    compRowChipVal: { fontSize: 11, fontWeight: '800' },
-    compRowChipMore: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600', marginLeft: 4 },
     compRowNotes: { color: theme.colors.textMuted, fontSize: 11, fontStyle: 'italic', marginTop: 4 },
     wearSection: {
         marginTop: theme.spacing.md,
         paddingTop: theme.spacing.md,
         borderTopWidth: 1,
         borderColor: theme.colors.border,
-    },
-    wearToggleRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    wearSectionTitle: {
-        color: theme.colors.text,
-        fontSize: 16,
-        fontWeight: '700',
     },
     compRowDelete: { padding: 4 },
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
