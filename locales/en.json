@@ -60,7 +60,10 @@
         "logout": "Logout",
         "login_register": "Login / Register",
         "coming_soon": "Coming Soon",
-        "search": "Search..."
+        "search": "Search...",
+        "back": "Back",
+        "sync_pending_title": "Cloud sync pending",
+        "sync_pending_msg": "Saved locally, cloud sync pending. Data will be synced on the next successful save."
     },
     "profile": {
         "language": "Language",
@@ -112,7 +115,7 @@
         "delete_title": "Delete user",
         "delete_confirm": "Do you really want to permanently delete the user {{email}}?",
         "delete_error": "Could not delete user: {{message}}",
-        "pwd_too_short": "Password must be at least 6 characters.",
+        "pwd_too_short": "Password must be at least 8 characters.",
         "pwd_error": "Password could not be changed: {{message}}",
         "pwd_success": "Password for {{email}} was changed successfully.",
         "btn_unlock": "Activate",
@@ -136,12 +139,23 @@
         "password_label": "Password",
         "password_placeholder": "••••••••",
         "error_missing": "Please enter email and password.",
-        "error_short": "Password must be at least 6 characters.",
+        "error_missing_email": "Please enter your email.",
+        "error_short": "Password must be at least 8 characters.",
         "success_register": "Registration successful! Check your email to confirm.",
         "btn_login": "🔐 Sign In",
         "btn_register": "🚀 Register",
         "toggle_to_register": "No account yet? → Register",
-        "toggle_to_login": "Already registered? → Sign In"
+        "toggle_to_login": "Already registered? → Sign In",
+        "forgot_password": "Forgot password?",
+        "forgot_title": "Reset password",
+        "forgot_hint": "We'll email you a link to reset your password.",
+        "btn_send_reset": "Send reset link",
+        "back_to_login": "← Back to sign in",
+        "success_reset_email": "Reset email sent. Please check your inbox.",
+        "recovery_title": "Set new password",
+        "new_password_label": "New password",
+        "btn_set_password": "Save password",
+        "success_password_updated": "Password updated! Please sign in with your new password."
     },
     "tracker": {
         "title": "Bikes & Setups",
@@ -193,7 +207,18 @@
         "type_stem": "🎯 Stem",
         "type_battery": "🔋 Battery",
         "type_motor": "⚡ Motor",
-        "type_other": "🔧 Other"
+        "type_other": "🔧 Other",
+        "share_msg": "🚴 {{name}} build\n\n{{lines}}\n\n⚖️ Total parts weight: {{weight}}g\n💶 Total parts value: {{price}}€",
+        "wear_current_km": "Current km",
+        "wear_interval": "Interval",
+        "wear_installed": "Installed",
+        "wear_last_service": "Last service",
+        "wear_log_service": "Log service...",
+        "wear_add_service": "➕ Add service entry",
+        "wear_service_note": "Note (what was done?)",
+        "wear_service_note_placeholder": "e.g. oil change, new seals",
+        "wear_save_reset": "Save & reset km",
+        "wear_history": "Service history"
     },
     "dialed": {
         "title": "⚙️ Dialed In",
@@ -241,7 +266,8 @@
         "closed": "🔴 Closed",
         "tokens": "Volume Spacers / Tokens",
         "notes": "Notes",
-        "notes_placeholder": "e.g. Perfect in wet, rear a bit soft"
+        "notes_placeholder": "e.g. Perfect in wet, rear a bit soft",
+        "wizard_back_categories": "Back to categories"
     },
     "shred": {
         "title": "🔧 Shred Check",
@@ -275,7 +301,9 @@
         "km_label": "Kilometers",
         "km_invalid": "Please enter a number greater than 0.",
         "log_ride": "Log ride",
-        "select_bike": "Bike for this ride"
+        "select_bike": "Bike for this ride",
+        "service_confirm_title": "Service done?",
+        "service_confirm_msg": "{{label}} ({{component}}) — reset km counter?"
     },
     "ridelog": {
         "title": "📖 Ride Log",
@@ -379,6 +407,9 @@
         "categories_back": "← Categories",
         "articles_count": "{{count}} Articles",
         "no_articles": "No articles found",
+        "save_error_title": "Error",
+        "save_error_msg": "Could not save the changes.",
+        "saving": "Saving...",
         "recommended_values": "📏 Recommended Values",
         "tip": "💡 Tip",
         "cat_cockpit": "Cockpit",
@@ -754,5 +785,10 @@
         "error_title": "Connection problem",
         "error_msg": "Your account status could not be checked. Please check your internet connection and try again.",
         "retry": "Try again"
+    },
+    "not_found": {
+        "title": "Page not found",
+        "message": "This page does not exist or has been moved.",
+        "home": "Go to home screen"
     }
 }

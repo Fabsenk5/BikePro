@@ -1,17 +1,26 @@
+import BPCard from '@/components/ui/BPCard';
+import BPButton from '@/components/ui/BPButton';
 import { theme } from '@/constants/Colors';
-import { Link, Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 export default function NotFoundScreen() {
+  const { t } = useTranslation();
+
   return (
     <>
-      <Stack.Screen options={{ title: 'Oops!' }} />
+      <Stack.Screen options={{ title: t('not_found.title') }} />
       <View style={styles.container}>
-        <Text style={styles.title}>This screen doesn't exist.</Text>
-
-        <Link href="/" style={styles.link}>
-          <Text style={styles.linkText}>Go to home screen!</Text>
-        </Link>
+        <BPCard style={styles.card}>
+          <Text style={styles.title}>{t('not_found.title')}</Text>
+          <Text style={styles.message}>{t('not_found.message')}</Text>
+          <BPButton
+            title={t('not_found.home')}
+            onPress={() => router.replace('/')}
+            fullWidth
+          />
+        </BPCard>
       </View>
     </>
   );
@@ -22,20 +31,23 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: theme.spacing.lg,
     backgroundColor: theme.colors.background,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    gap: theme.spacing.md,
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: theme.colors.text,
   },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
-  linkText: {
+  message: {
     fontSize: 14,
-    color: theme.colors.accent,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
   },
 });

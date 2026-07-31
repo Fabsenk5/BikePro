@@ -60,7 +60,10 @@
         "logout": "Ausloggen",
         "login_register": "Anmelden / Registrieren",
         "coming_soon": "Demnächst",
-        "search": "Suchen..."
+        "search": "Suchen...",
+        "back": "Zurück",
+        "sync_pending_title": "Cloud-Sync ausstehend",
+        "sync_pending_msg": "Lokal gespeichert, Cloud-Sync ausstehend. Die Daten werden beim nächsten erfolgreichen Speichern synchronisiert."
     },
     "profile": {
         "language": "Sprache",
@@ -112,7 +115,7 @@
         "delete_title": "Benutzer löschen",
         "delete_confirm": "Willst du den Benutzer {{email}} wirklich unwiderruflich löschen?",
         "delete_error": "Konnte Benutzer nicht löschen: {{message}}",
-        "pwd_too_short": "Das Passwort muss mindestens 6 Zeichen lang sein.",
+        "pwd_too_short": "Das Passwort muss mindestens 8 Zeichen lang sein.",
         "pwd_error": "Passwort konnte nicht geändert werden: {{message}}",
         "pwd_success": "Das Passwort für {{email}} wurde erfolgreich geändert.",
         "btn_unlock": "Freischalten",
@@ -136,12 +139,23 @@
         "password_label": "Passwort",
         "password_placeholder": "••••••••",
         "error_missing": "Bitte E-Mail und Passwort eingeben.",
-        "error_short": "Passwort muss mindestens 6 Zeichen lang sein.",
+        "error_missing_email": "Bitte E-Mail eingeben.",
+        "error_short": "Passwort muss mindestens 8 Zeichen lang sein.",
         "success_register": "Registrierung erfolgreich! Prüfe deine E-Mail zur Bestätigung.",
         "btn_login": "🔐 Einloggen",
         "btn_register": "🚀 Registrieren",
         "toggle_to_register": "Noch kein Account? → Registrieren",
-        "toggle_to_login": "Schon registriert? → Einloggen"
+        "toggle_to_login": "Schon registriert? → Einloggen",
+        "forgot_password": "Passwort vergessen?",
+        "forgot_title": "Passwort zurücksetzen",
+        "forgot_hint": "Wir senden dir einen Link zum Zurücksetzen per E-Mail.",
+        "btn_send_reset": "Reset-Link senden",
+        "back_to_login": "← Zurück zum Login",
+        "success_reset_email": "Reset-E-Mail wurde gesendet. Bitte prüfe dein Postfach.",
+        "recovery_title": "Neues Passwort setzen",
+        "new_password_label": "Neues Passwort",
+        "btn_set_password": "Passwort speichern",
+        "success_password_updated": "Passwort aktualisiert! Bitte melde dich mit dem neuen Passwort an."
     },
     "tracker": {
         "title": "Bikes & Setups",
@@ -193,7 +207,18 @@
         "type_stem": "🎯 Vorbau",
         "type_battery": "🔋 Akku",
         "type_motor": "⚡ Motor",
-        "type_other": "🔧 Andere"
+        "type_other": "🔧 Andere",
+        "share_msg": "🚴 {{name}} Build\n\n{{lines}}\n\n⚖️ Gesamtgewicht Teile: {{weight}}g\n💶 Gesamtwert Teile: {{price}}€",
+        "wear_current_km": "Aktuelle km",
+        "wear_interval": "Intervall",
+        "wear_installed": "Einbaudatum",
+        "wear_last_service": "Letzter Service",
+        "wear_log_service": "Service loggen...",
+        "wear_add_service": "➕ Neuen Service eintragen",
+        "wear_service_note": "Notiz (was wurde gemacht?)",
+        "wear_service_note_placeholder": "z.B. Ölwechsel, Dichtungen neu",
+        "wear_save_reset": "Speichern & km Reset",
+        "wear_history": "Service-Historie"
     },
     "setup_guide": {
         "title": "📚 Setup Guide",
@@ -201,6 +226,9 @@
         "categories_back": "← Kategorien",
         "articles_count": "{{count}} Artikel",
         "no_articles": "Keine Artikel gefunden",
+        "save_error_title": "Fehler",
+        "save_error_msg": "Konnte die Änderungen nicht speichern.",
+        "saving": "Speichern...",
         "recommended_values": "📏 Empfohlene Werte",
         "tip": "💡 Tipp",
         "cat_cockpit": "Cockpit",
@@ -639,7 +667,8 @@
         "closed": "🔴 Geschlossen",
         "tokens": "Volume Spacer / Tokens",
         "notes": "Notizen",
-        "notes_placeholder": "z.B. Perfekt bei Nässe, Heck etwas weich"
+        "notes_placeholder": "z.B. Perfekt bei Nässe, Heck etwas weich",
+        "wizard_back_categories": "Zurück zu Kategorien"
     },
     "shred": {
         "title": "🔧 Shred Check",
@@ -673,7 +702,9 @@
         "km_label": "Kilometer",
         "km_invalid": "Bitte eine Zahl größer als 0 eingeben.",
         "log_ride": "Tour erfassen",
-        "select_bike": "Bike für diese Tour"
+        "select_bike": "Bike für diese Tour",
+        "service_confirm_title": "Service durchgeführt?",
+        "service_confirm_msg": "{{label}} ({{component}}) — km-Zähler zurücksetzen?"
     },
     "ridelog": {
         "title": "📖 Ride Log",
@@ -754,5 +785,10 @@
         "error_title": "Verbindungsproblem",
         "error_msg": "Der Status deines Accounts konnte nicht geprüft werden. Bitte prüfe deine Internetverbindung und versuche es erneut.",
         "retry": "Erneut versuchen"
+    },
+    "not_found": {
+        "title": "Seite nicht gefunden",
+        "message": "Diese Seite existiert nicht oder wurde verschoben.",
+        "home": "Zur Startseite"
     }
 }

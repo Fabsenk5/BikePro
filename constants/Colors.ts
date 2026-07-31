@@ -45,6 +45,8 @@ export const theme = {
     accentBlue,
     accentRed,
     error: accentRed,
+    // Text/icons rendered on top of accent-colored backgrounds
+    onAccent: '#000',
   },
   spacing: {
     xs: 4,
@@ -75,4 +77,6 @@ export const featureColors: Record<string, string> = {
   'pressure-bot': accentYellow,
   'ride-log': accentPurple,
   'gps-tracker': accentBlue,
+  'component-tracker': '#26A69A',
+  'setup-guide': '#7C4DFF',
 };

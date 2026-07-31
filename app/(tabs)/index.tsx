@@ -1,5 +1,5 @@
 import FeatureTile from '@/components/FeatureTile';
-import { BPPicker } from '@/components/ui';
+import { BPButton, BPPicker, screenContentStyle } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { Feature, features as defaultFeatures } from '@/constants/Features';
 import { useAuth } from '@/context/AuthContext';
@@ -10,11 +10,12 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  DimensionValue,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
+  useWindowDimensions,
   View
 } from 'react-native';
 
@@ -60,7 +61,9 @@ async function loadHomeData(isAuthed: boolean): Promise<HomeData> {
     : await Promise.all([
         loadLocalPref<string[]>(TILE_ORDER_KEY),
         loadFromStorage<any>('@bikepro_rides'),
-        loadFromStorage<SyncBike>('@bikepro_bikes'),
+        // syncLoadBikes works offline via the local cache and applies the
+        // legacy setup-key migration (no raw loadFromStorage here)
+        syncLoadBikes(),
         loadFromStorage<{ id: string; name: string; createdAt: string }>('@bikepro_setups'),
         loadLocalPref<string>(PRIMARY_BIKE_KEY),
       ]);
@@ -77,8 +80,8 @@ function pressureSubtitle(bikes: SyncBike[], primaryId: string | null): string |
   const primary = primaryOf(bikes, primaryId);
   if (!primary) return null;
   const frontWheel = primary.components.find(c => c.type === 'wheel_front');
-  // Semantic key 'pressure'; 'Druck' kept as fallback for unmigrated legacy data
-  const pVal = frontWheel?.setupValues?.find(s => s.key === 'pressure' || s.key === 'Druck')?.value;
+  // Semantic key 'pressure' (legacy keys are migrated on load via syncLoadBikes)
+  const pVal = frontWheel?.setupValues?.find(s => s.key === 'pressure')?.value;
   return pVal ? `${primary.name}: ${pVal} VR` : null;
 }
 
@@ -97,6 +100,11 @@ export default function HomeScreen() {
   const [dialedSub, setDialedSub] = useState<string | null>(null);
   const [bikes, setBikes] = useState<SyncBike[]>([]);
   const [primaryBikeId, setPrimaryBikeId] = useState<string | null>(null);
+
+  // Responsive grid: 2 columns on phones, 3 on tablets, 4 on wide desktop
+  const { width: windowWidth } = useWindowDimensions();
+  const columns = windowWidth < 600 ? 2 : windowWidth <= 1000 ? 3 : 4;
+  const tileWidth: DimensionValue = columns === 2 ? '48%' : columns === 3 ? '32%' : '23.5%';
 
   const applyData = useCallback((d: HomeData) => {
     // Tile order
@@ -228,14 +236,14 @@ export default function HomeScreen() {
         </View>
 
         {/* Edit mode toggle */}
-        <TouchableOpacity
+        <BPButton
+          title={editMode ? t('home.edit_done') : t('home.edit_sort')}
           onPress={toggleEditMode}
-          style={[styles.editBtn, editMode && styles.editBtnActive]}
-        >
-          <Text style={[styles.editBtnText, editMode && styles.editBtnTextActive]}>
-            {editMode ? t('home.edit_done') : t('home.edit_sort')}
-          </Text>
-        </TouchableOpacity>
+          variant="secondary"
+          size="sm"
+          color={editMode ? theme.colors.accent : theme.colors.textSecondary}
+          style={styles.editBtn}
+        />
 
         {/* Edit mode instructions */}
         {editMode && (
@@ -260,21 +268,21 @@ export default function HomeScreen() {
         {/* Feature grid */}
         <View style={styles.grid}>
           {orderedFeatures.map((feature, index) => (
-            <View key={feature.id} style={{ position: 'relative', width: '48%', marginBottom: theme.spacing.md }}>
+            <View key={feature.id} style={{ position: 'relative', width: tileWidth, marginBottom: theme.spacing.md }}>
               {editMode && selectedTile === index && (
                 <View style={styles.moveButtons}>
-                  <TouchableOpacity
+                  <BPButton
+                    title="◀"
                     onPress={() => moveTile(index, 'up')}
-                    style={styles.moveBtn}
-                  >
-                    <Text style={styles.moveBtnText}>◀</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                    variant="secondary"
+                    size="sm"
+                  />
+                  <BPButton
+                    title="▶"
                     onPress={() => moveTile(index, 'down')}
-                    style={styles.moveBtn}
-                  >
-                    <Text style={styles.moveBtnText}>▶</Text>
-                  </TouchableOpacity>
+                    variant="secondary"
+                    size="sm"
+                  />
                 </View>
               )}
               <View style={[
@@ -317,6 +325,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   scrollContent: {
+    ...screenContentStyle,
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.xxl + theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
@@ -345,25 +354,7 @@ const styles = StyleSheet.create({
   },
   editBtn: {
     alignSelf: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: theme.radius.full,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
     marginBottom: theme.spacing.md,
-  },
-  editBtnActive: {
-    borderColor: theme.colors.accent,
-    backgroundColor: theme.colors.accent + '20',
-  },
-  editBtnText: {
-    color: theme.colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  editBtnTextActive: {
-    color: theme.colors.accent,
   },
   editHint: {
     backgroundColor: theme.colors.surface,
@@ -402,19 +393,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     zIndex: 10,
-  },
-  moveBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: theme.radius.full,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moveBtnText: {
-    color: '#000',
-    fontSize: 12,
-    fontWeight: '900',
   },
   footer: {
     alignItems: 'center',

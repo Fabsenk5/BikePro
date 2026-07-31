@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { theme } from '@/constants/Colors';
+import ToastHost from '@/components/ToastHost';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import '@/lib/i18n';
 
@@ -71,6 +72,7 @@ function RootLayoutNav() {
             <Stack.Screen name="pending" options={{ headerShown: false }} />
           </Stack>
         </AuthGuard>
+        <ToastHost />
       </ThemeProvider>
     </AuthProvider>
   );

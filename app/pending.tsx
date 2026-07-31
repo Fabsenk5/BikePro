@@ -60,6 +60,9 @@ const styles = StyleSheet.create({
         padding: theme.spacing.lg,
     },
     card: {
+        width: '100%',
+        maxWidth: 480,
+        alignSelf: 'center',
         padding: theme.spacing.xl,
         alignItems: 'center',
     },
