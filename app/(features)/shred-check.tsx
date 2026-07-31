@@ -7,14 +7,14 @@
  * Integration: Liest Ride-Log km für automatische Aggregation (später)
  * UI Supervisor: Wear & Tear Fortschrittsbalken
  */
-import { BPButton, BPCard, BPProgressBar } from '@/components/ui';
+import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPProgressBar } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, SyncComponent, syncLoadBikes, syncSaveBikes, WearItem } from '@/lib/sync';
+import { confirmDialog } from '@/lib/dialog';
+import { SyncBike, SyncComponent, syncLoadBikes, syncUpdateComponent, WearItem } from '@/lib/sync';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Alert,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -24,77 +24,24 @@ import {
 } from 'react-native';
 
 const ACCENT = '#FF5252'; // Shred-Check accent
-const STORAGE_KEY = '@bikepro_components';
 
-// --- Types ---
-interface BikeComponent {
-    id: string;
-    name: string;
-    type: string;
-    currentKm: number;
-    serviceIntervalKm: number;
-    lastServiceDate: string;
-    installedDate: string;
-    notes: string;
-}
-
-const componentTypes = [
-    { label: '🔱 Gabel (kleiner Service)', value: 'fork_small' },
-    { label: '🔱 Gabel (großer Service)', value: 'fork_full' },
-    { label: '🔩 Dämpfer (kleiner Service)', value: 'shock_small' },
-    { label: '🔩 Dämpfer (großer Service)', value: 'shock_full' },
-    { label: '⛓️ Kette', value: 'chain' },
-    { label: '🛞 Reifen VR', value: 'tire_front' },
-    { label: '🛞 Reifen HR', value: 'tire_rear' },
-    { label: '🛑 Bremsbeläge VR', value: 'brake_front' },
-    { label: '🛑 Bremsbeläge HR', value: 'brake_rear' },
-    { label: '💧 Bremsflüssigkeit', value: 'brake_fluid' },
-    { label: '🔗 Bremsscheibe VR', value: 'disc_front' },
-    { label: '🔗 Bremsscheibe HR', value: 'disc_rear' },
-    { label: '🔗 Schaltwerk', value: 'derailleur' },
-    { label: '⚙️ Kassette', value: 'cassette' },
-    { label: '🔄 Steuersatzlager', value: 'headset' },
-    { label: '🔄 Tretlager', value: 'bb' },
-    { label: '🔄 Hinterbaulager', value: 'pivot' },
-    { label: '🔄 Nabenlager', value: 'hub' },
-    { label: '🎗️ Felgenband', value: 'rimtape' },
-    { label: '💧 Dichtmilch', value: 'sealant' },
-    { label: '🧵 Züge / Leitungen', value: 'cables' },
-    { label: '🔧 Andere', value: 'other' },
-];
-
-// Default service intervals in km (realistische Werte basierend auf Herstellerempfehlungen)
-const defaultIntervals: Record<string, number> = {
-    fork_small: 750,     // Alle ~50h → Lower legs service
-    fork_full: 1500,     // Alle ~100-200h → Full service mit Ölwechsel
-    shock_small: 750,    // Alle ~50h → Luftkammer-Service
-    shock_full: 1500,    // Alle ~100-200h → Full service
-    chain: 500,          // Alle 300-500km je nach Bedingungen
-    tire_front: 1000,    // Abhängig von Compound und Terrain
-    tire_rear: 600,      // Hinterreifen verschleißt schneller
-    brake_front: 500,    // Abhängig von Bremsstil (Bikepark = schneller)
-    brake_rear: 350,     // Hinten wird mehr gebremst
-    brake_fluid: 1500,   // Jährlich oder bei schwammigem Griff
-    disc_front: 5000,    // Hält sehr lange
-    disc_rear: 3000,     // Hinterrad verschleißt schneller
-    derailleur: 2000,    // Hauptsächlich Schaltauge prüfen
-    cassette: 1500,      // Alle 2-3 Ketten
-    headset: 3000,       // Kontrollieren, fetten
-    bb: 2000,            // Alle 1-2 Jahre (je nach Lager-Typ)
-    pivot: 1000,         // Häufiger bei Matsch / Bikepark
-    hub: 3000,           // Alle 1-2 Jahre
-    rimtape: 2000,       // Bei Tubeless regelmäßig prüfen
-    sealant: 300,        // Alle 3-6 Monate nachfüllen
-    cables: 3000,        // Abhängig von Verschmutzung
-    other: 500,
+// Emojis for component types managed in the Component Tracker
+const typeEmojis: Record<string, string> = {
+    fork: '🔱',
+    shock: '🔩',
+    chain: '⛓️',
+    cassette: '⚙️',
+    derailleur: '🔗',
+    wheel_front: '🛞',
+    wheel_rear: '🛞',
+    brake_front: '🛑',
+    brake_rear: '🛑',
+    battery: '🔋',
+    motor: '⚡',
 };
 
 function getTypeEmoji(type: string): string {
-    return componentTypes.find((t) => t.value === type)?.label.split(' ')[0] ?? '🔧';
-}
-
-function getTypeName(type: string): string {
-    return componentTypes.find((t) => t.value === type)?.label.split(' ').slice(1).join(' ') ?? type;
+    return typeEmojis[type] ?? '🔧';
 }
 
 function getTodayISO(): string {
@@ -125,92 +72,108 @@ export default function ShredCheckScreen() {
     );
 
     const updateComponentInBikes = async (compId: string, updateFn: (comp: SyncComponent) => SyncComponent) => {
-        const updatedBikes = bikes.map(b => ({
-            ...b,
-            components: b.components.map(c => c.id === compId ? updateFn(c) : c)
-        }));
-        await syncSaveBikes(updatedBikes);
-        setBikes(updatedBikes);
+        const bike = bikes.find(b => b.components.some(c => c.id === compId));
+        const comp = bike?.components.find(c => c.id === compId);
+        if (!bike || !comp) return;
+        const updatedComp = updateFn(comp);
+        // Targeted write: patch local cache + upsert only this component's row
+        await syncUpdateComponent(bike.id, updatedComp);
+        setBikes(bikes.map(b => b.id === bike.id
+            ? { ...b, components: b.components.map(c => c.id === compId ? updatedComp : c) }
+            : b
+        ));
     };
 
-    const handleService = (comp: SyncComponent, item: WearItem) => {
-        Alert.alert(
+    const handleService = async (comp: SyncComponent, item: WearItem) => {
+        const confirmed = await confirmDialog(
             'Service durchgeführt?',
-            `${item.label} (${comp.brand || ''} ${comp.model || comp.type}) — km-Zähler zurücksetzen?`,
-            [
-                { text: 'Abbrechen', style: 'cancel' },
-                {
-                    text: '✅ Erledigt',
-                    onPress: () => {
-                        updateComponentInBikes(comp.id, c => ({
-                            ...c,
-                            wearItems: (c.wearItems || []).map(w =>
-                                w.id === item.id
-                                    ? { ...w, currentKm: 0, lastServiceDate: getTodayISO() }
-                                    : w
-                            )
-                        }));
-                    },
-                },
-            ]
+            `${item.label} (${comp.brand || ''} ${comp.model || comp.type}) — km-Zähler zurücksetzen?`
         );
+        if (!confirmed) return;
+        updateComponentInBikes(comp.id, c => ({
+            ...c,
+            wearItems: (c.wearItems || []).map(w =>
+                w.id === item.id
+                    ? { ...w, currentKm: 0, lastServiceDate: getTodayISO() }
+                    : w
+            )
+        }));
+    };
+
+    // km input modal (Alert.prompt is iOS-only, Alert is a no-op on web)
+    const [kmModalVisible, setKmModalVisible] = useState(false);
+    const [kmInput, setKmInput] = useState('');
+    const [kmError, setKmError] = useState('');
+    const [kmBikeId, setKmBikeId] = useState(''); // bike selected for "Tour erfassen"
+    const [kmTarget, setKmTarget] = useState<
+        { kind: 'item'; comp: SyncComponent; item: WearItem } | { kind: 'global' } | null
+    >(null);
+
+    const openKmModal = (target: NonNullable<typeof kmTarget>) => {
+        setKmTarget(target);
+        setKmInput('');
+        setKmError('');
+        setKmModalVisible(true);
     };
 
     const handleAddKmItem = (comp: SyncComponent, item: WearItem) => {
-        Alert.prompt
-            ? Alert.prompt('km hinzufügen', `Für ${item.label} (${comp.brand || ''} ${comp.model || comp.type})`, (val) => {
-                const km = parseFloat(val);
-                if (!isNaN(km) && km > 0) {
-                    updateComponentInBikes(comp.id, c => ({
-                        ...c,
-                        wearItems: (c.wearItems || []).map(w =>
-                            w.id === item.id
-                                ? { ...w, currentKm: w.currentKm + km }
-                                : w
-                        )
-                    }));
-                }
-            })
-            : (() => {
-                const km = 10;
-                updateComponentInBikes(comp.id, c => ({
-                    ...c,
-                    wearItems: (c.wearItems || []).map(w =>
-                        w.id === item.id
-                            ? { ...w, currentKm: w.currentKm + km }
-                            : w
-                    )
-                }));
-            })();
+        openKmModal({ kind: 'item', comp, item });
     };
 
     const handleAddGlobalKm = () => {
-        Alert.prompt
-            ? Alert.prompt('Tour erfassen', 'Wie viele Kilometer bist du gefahren?', async (val) => {
-                const km = parseFloat(val);
-                if (!isNaN(km) && km > 0) {
-                    const updatedBikes = bikes.map(b => ({
-                        ...b,
-                        components: b.components.map(c => {
-                            if (!c.isWearTracked || !c.wearItems) return c;
-                            return {
-                                ...c,
-                                wearItems: c.wearItems.map(w => ({
-                                    ...w,
-                                    currentKm: w.currentKm + km
-                                }))
-                            };
-                        })
-                    }));
-                    await syncSaveBikes(updatedBikes);
-                    setBikes(updatedBikes);
-                }
-            })
-            : Alert.alert('Fehler', 'Nicht unterstützt auf dieser Plattform.');
+        setKmBikeId(bikes[0]?.id ?? ''); // default: first bike (no "all bikes" option)
+        openKmModal({ kind: 'global' });
+    };
+
+    const handleKmSubmit = async () => {
+        // Accept comma decimals ("12,5")
+        const km = parseFloat(kmInput.replace(',', '.'));
+        if (isNaN(km) || km <= 0) {
+            setKmError(t('shred.km_invalid'));
+            return;
+        }
+
+        if (kmTarget?.kind === 'item') {
+            const { comp, item } = kmTarget;
+            updateComponentInBikes(comp.id, c => ({
+                ...c,
+                wearItems: (c.wearItems || []).map(w =>
+                    w.id === item.id
+                        ? { ...w, currentKm: w.currentKm + km }
+                        : w
+                )
+            }));
+        } else if (kmTarget?.kind === 'global') {
+            const bike = bikes.find(b => b.id === kmBikeId);
+            if (!bike) return; // no bike selected/available
+            const changed: SyncComponent[] = [];
+            const updatedComps = bike.components.map(c => {
+                if (c.isWearTracked !== true || !c.wearItems || c.wearItems.length === 0) return c;
+                const updatedComp = {
+                    ...c,
+                    wearItems: c.wearItems.map(w => ({
+                        ...w,
+                        currentKm: w.currentKm + km
+                    }))
+                };
+                changed.push(updatedComp);
+                return updatedComp;
+            });
+            // Targeted writes: upsert only the affected component rows
+            await Promise.all(changed.map(c => syncUpdateComponent(bike.id, c)));
+            setBikes(bikes.map(b => b.id === bike.id ? { ...b, components: updatedComps } : b));
+        }
+
+        setKmModalVisible(false);
+        setKmTarget(null);
     };
 
     // Extract all components that have wear tracking enabled
     const allTrackedComps = bikes.flatMap(b => b.components.filter(c => c.isWearTracked === true));
+
+    // Component id → bike name (identical components on different bikes must stay distinguishable)
+    const bikeNameByCompId = new Map<string, string>();
+    bikes.forEach(b => b.components.forEach(c => bikeNameByCompId.set(c.id, b.name)));
 
     // Sort by worst wear item percentage
     const sorted = [...allTrackedComps].sort((a, b) => {
@@ -250,11 +213,12 @@ export default function ShredCheckScreen() {
 
                 <View style={{ marginBottom: theme.spacing.md, gap: theme.spacing.sm }}>
                     <BPButton
-                        title="+ Alle (Tour erfassen)"
+                        title={`+ ${t('shred.log_ride')}`}
                         onPress={handleAddGlobalKm}
                         color={ACCENT}
                         size="md"
                         fullWidth
+                        disabled={bikes.length === 0}
                     />
                     <Text style={{ color: theme.colors.textMuted, fontSize: 13, textAlign: 'center' }}>
                         {t('shred.manage_hint', { defaultValue: 'Komponenten und deren Verschleiß-Status werden im Component Tracker verwaltet.' })}
@@ -279,7 +243,8 @@ export default function ShredCheckScreen() {
                                         <Text style={styles.compEmoji}>{getTypeEmoji(comp.type)}</Text>
                                         <View style={{ flex: 1 }}>
                                             <Text style={styles.compTitle}>{comp.brand || ''} {comp.model || ''}</Text>
-                                            <Text style={styles.compType}>{getTypeName(comp.type)}</Text>
+                                            <Text style={styles.compType}>{t(`tracker.type_${comp.type}`, { defaultValue: comp.type })}</Text>
+                                            <Text style={styles.compBike}>{bikeNameByCompId.get(comp.id) ?? ''}</Text>
                                         </View>
                                     </View>
 
@@ -304,7 +269,7 @@ export default function ShredCheckScreen() {
                                                     style={styles.actionBtn}
                                                     onPress={() => handleAddKmItem(comp, item)}
                                                 >
-                                                    <Text style={styles.actionBtnText}>{t('shred.add_10km', { defaultValue: '+10 km' })}</Text>
+                                                    <Text style={styles.actionBtnText}>{t('shred.add_km')}</Text>
                                                 </TouchableOpacity>
                                                 <TouchableOpacity
                                                     style={[styles.actionBtn, styles.serviceBtn]}
@@ -327,6 +292,48 @@ export default function ShredCheckScreen() {
                     })
                 )}
             </ScrollView>
+
+            {/* km input modal (replaces iOS-only Alert.prompt) */}
+            <BPModal
+                visible={kmModalVisible}
+                onClose={() => setKmModalVisible(false)}
+                title={kmTarget?.kind === 'global' ? t('shred.log_ride_title') : t('shred.add_km_title')}
+            >
+                {kmTarget?.kind === 'item' ? (
+                    <Text style={styles.kmModalSub}>
+                        {kmTarget.item.label} ({kmTarget.comp.brand || ''} {kmTarget.comp.model || kmTarget.comp.type})
+                    </Text>
+                ) : (
+                    <>
+                        <Text style={styles.kmModalSub}>{t('shred.log_ride_msg')}</Text>
+                        <BPPicker
+                            label={t('shred.select_bike')}
+                            options={bikes.map(b => ({ label: b.name, value: b.id }))}
+                            value={kmBikeId}
+                            onValueChange={setKmBikeId}
+                            accentColor={ACCENT}
+                        />
+                    </>
+                )}
+
+                <BPInput
+                    label={t('shred.km_label')}
+                    placeholder="0"
+                    value={kmInput}
+                    onChangeText={(v) => { setKmInput(v); setKmError(''); }}
+                    keyboardType="numeric"
+                    suffix="km"
+                    accentColor={ACCENT}
+                    error={kmError}
+                />
+
+                <BPButton
+                    title={t('common.save')}
+                    onPress={handleKmSubmit}
+                    color={ACCENT}
+                    fullWidth
+                />
+            </BPModal>
 
         </View>
     );
@@ -393,6 +400,11 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 1,
     },
+    compBike: {
+        color: theme.colors.textMuted,
+        fontSize: 11,
+        marginTop: 1,
+    },
     compNotes: {
         color: theme.colors.textMuted,
         fontSize: 11,
@@ -445,5 +457,10 @@ const styles = StyleSheet.create({
     },
     serviceBtnText: {
         color: theme.colors.accentLime,
+    },
+    kmModalSub: {
+        color: theme.colors.textSecondary,
+        fontSize: 14,
+        marginBottom: theme.spacing.md,
     },
 });

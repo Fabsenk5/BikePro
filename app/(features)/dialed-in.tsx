@@ -10,12 +10,13 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable } from '@/lib/sync';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { confirmDialog } from '@/lib/dialog';
+import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Alert,
+    ActivityIndicator,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -27,6 +28,8 @@ import {
 
 const ACCENT = '#FF6B2C';
 const SETUPS_KEY = '@bikepro_setups';
+const UNITS_KEY = '@bikepro_units';
+const BAR_TO_PSI = 14.5038;
 
 // --- Types ---
 type ReboundMode = 'clicks' | 'hsls' | 'none';
@@ -42,6 +45,8 @@ interface SuspensionValues {
     sagPercent: number;
     travel: number;
     stroke?: number;  // shock-only: actual piston stroke in mm
+    mode?: 'air' | 'coil';  // shock-only: air spring or coil spring (default 'air')
+    springRate?: number;    // coil-only: spring rate in lb/in
     // Rebound
     reboundClicks: number;    // clicks-only mode
     reboundLSR: number;       // HS/LS mode
@@ -114,6 +119,7 @@ const defaultFork: SuspensionValues = {
 
 const defaultShock: SuspensionValues = {
     psi: 200, sagPercent: 30, travel: 140, stroke: 57,
+    mode: 'air', springRate: 400,
     reboundClicks: 8, reboundLSR: 8, reboundHSR: 3,
     compressionClicks: 8, compressionLever: 'open',
     compressionLSC: 8, compressionHSC: 2,
@@ -138,9 +144,11 @@ const tireWidthOptions = [
 export default function DialedInScreen() {
     const { t, i18n } = useTranslation();
     const [setups, setSetups] = useState<Setup[]>([]);
+    const [loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
+    const [pressureUnit, setPressureUnit] = useState<'bar' | 'psi'>('bar');
 
     const [wizardVisible, setWizardVisible] = useState(false);
     const [wizardStep, setWizardStep] = useState<'category' | 'issue' | 'solution'>('category');
@@ -243,7 +251,11 @@ export default function DialedInScreen() {
     const router = useRouter();
     const [lastHandledTs, setLastHandledTs] = useState('');
 
-    useEffect(() => { loadSetups(); loadBikes(); }, []);
+    useFocusEffect(
+        useCallback(() => {
+            Promise.all([loadSetups(), loadBikes(), loadUnits()]).finally(() => setLoading(false));
+        }, [])
+    );
 
     useEffect(() => {
         if (params.ts && typeof params.ts === 'string' && params.ts !== lastHandledTs && trackerBikes.length > 0) {
@@ -271,16 +283,16 @@ export default function DialedInScreen() {
             if (bike) {
                 const forkComp = bike.components.find((c: any) => c.type === 'fork');
                 if (forkComp && forkComp.setupValues) {
-                    const travel = forkComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
-                    const stroke = forkComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                    const travel = forkComp.setupValues.find((s: any) => s.key === 'travel')?.value;
+                    const stroke = forkComp.setupValues.find((s: any) => s.key === 'stroke')?.value;
                     if (travel) parsedFork.travel = parseInt(travel, 10) || parsedFork.travel;
                     if (stroke) parsedFork.stroke = parseInt(stroke, 10) || parsedFork.stroke;
                 }
 
                 const shockComp = bike.components.find((c: any) => c.type === 'shock');
                 if (shockComp && shockComp.setupValues) {
-                    const travel = shockComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
-                    const stroke = shockComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                    const travel = shockComp.setupValues.find((s: any) => s.key === 'travel')?.value;
+                    const stroke = shockComp.setupValues.find((s: any) => s.key === 'stroke')?.value;
                     if (travel) parsedShock.travel = parseInt(travel, 10) || parsedShock.travel;
                     if (stroke) parsedShock.stroke = parseInt(stroke, 10) || parsedShock.stroke;
                 }
@@ -306,6 +318,12 @@ export default function DialedInScreen() {
 
             if (params.shockPsi) {
                 parsedShock.psi = parseInt(params.shockPsi as string, 10) || parsedShock.psi;
+            }
+            if (params.shockMode === 'coil' || params.shockMode === 'air') {
+                parsedShock.mode = params.shockMode as 'air' | 'coil';
+            }
+            if (params.springRate) {
+                parsedShock.springRate = parseInt(params.springRate as string, 10) || parsedShock.springRate;
             }
             if (params.shockClicks) {
                 const c = parseInt(params.shockClicks as string, 10) || parsedShock.reboundClicks;
@@ -343,6 +361,12 @@ export default function DialedInScreen() {
         setTrackerBikes(bikes);
     };
 
+    const loadUnits = async () => {
+        const isGerman = i18n.language?.startsWith('de');
+        const pref = await syncLoadPreference<{ pressure: 'bar' | 'psi'; weight: 'kg' | 'lb' }>('units', UNITS_KEY);
+        setPressureUnit(pref?.pressure ?? (isGerman ? 'bar' : 'psi'));
+    };
+
     const saveSetups = async (updated: Setup[]) => {
         await syncSaveTable('suspension_setups', SETUPS_KEY, updated);
         setSetups(updated);
@@ -361,6 +385,19 @@ export default function DialedInScreen() {
         return trackerBikes.find(b => b.id === bikeId)?.name ?? '';
     };
 
+    // Resolve bike name at runtime (handles renamed bikes from Component Tracker)
+    const getBikeDisplayName = (setup: Setup): string =>
+        (setup.bikeId && trackerBikes.find(b => b.id === setup.bikeId)?.name) || setup.bikeName || '';
+
+    // Tire pressure is stored in bar; convert only at display/input boundaries
+    const toDisplayPressure = (bar: number) => pressureUnit === 'psi' ? Math.round(bar * BAR_TO_PSI) : bar;
+    const fromDisplayPressure = (v: number) => pressureUnit === 'psi' ? Math.round((v / BAR_TO_PSI) * 100) / 100 : v;
+    const formatTirePressure = (bar?: number) => {
+        if (bar == null) return '?';
+        if (pressureUnit === 'psi') return `${Math.round(bar * BAR_TO_PSI)} psi`;
+        return `${bar.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} bar`;
+    };
+
     const handleBikeChange = (newBikeId: string) => {
         setBikeId(newBikeId);
         if (!newBikeId) return;
@@ -372,8 +409,8 @@ export default function DialedInScreen() {
             let next = { ...prev };
             const forkComp = bike.components.find((c: any) => c.type === 'fork');
             if (forkComp && forkComp.setupValues) {
-                const travel = forkComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
-                const stroke = forkComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                const travel = forkComp.setupValues.find((s: any) => s.key === 'travel')?.value;
+                const stroke = forkComp.setupValues.find((s: any) => s.key === 'stroke')?.value;
                 if (travel) next.travel = parseInt(travel, 10) || next.travel;
                 if (stroke) next.stroke = parseInt(stroke, 10) || next.stroke;
             }
@@ -384,8 +421,8 @@ export default function DialedInScreen() {
             let next = { ...prev };
             const shockComp = bike.components.find((c: any) => c.type === 'shock');
             if (shockComp && shockComp.setupValues) {
-                const travel = shockComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
-                const stroke = shockComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                const travel = shockComp.setupValues.find((s: any) => s.key === 'travel')?.value;
+                const stroke = shockComp.setupValues.find((s: any) => s.key === 'stroke')?.value;
                 if (travel) next.travel = parseInt(travel, 10) || next.travel;
                 if (stroke) next.stroke = parseInt(stroke, 10) || next.stroke;
             }
@@ -408,16 +445,16 @@ export default function DialedInScreen() {
 
             const forkComp = bike.components.find((c: any) => c.type === 'fork');
             if (forkComp && forkComp.setupValues) {
-                const travel = forkComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
-                const stroke = forkComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                const travel = forkComp.setupValues.find((s: any) => s.key === 'travel')?.value;
+                const stroke = forkComp.setupValues.find((s: any) => s.key === 'stroke')?.value;
                 if (travel) resetFork.travel = parseInt(travel, 10) || resetFork.travel;
                 if (stroke) resetFork.stroke = parseInt(stroke, 10) || resetFork.stroke;
             }
 
             const shockComp = bike.components.find((c: any) => c.type === 'shock');
             if (shockComp && shockComp.setupValues) {
-                const travel = shockComp.setupValues.find((s: any) => s.key === 'Federweg')?.value;
-                const stroke = shockComp.setupValues.find((s: any) => s.key === 'Hub')?.value;
+                const travel = shockComp.setupValues.find((s: any) => s.key === 'travel')?.value;
+                const stroke = shockComp.setupValues.find((s: any) => s.key === 'stroke')?.value;
                 if (travel) resetShock.travel = parseInt(travel, 10) || resetShock.travel;
                 if (stroke) resetShock.stroke = parseInt(stroke, 10) || resetShock.stroke;
             }
@@ -445,7 +482,7 @@ export default function DialedInScreen() {
     const handleSave = () => {
         if (!name.trim()) return;
         const setupData: Setup = {
-            id: editingSetup?.id ?? Date.now().toString(),
+            id: editingSetup?.id ?? newId(),
             name: name.trim(), location: location.trim(),
             bikeId, bikeName: getSelectedBikeName(),
             fork, shock, tires, tags, notes: notes.trim(),
@@ -461,11 +498,14 @@ export default function DialedInScreen() {
         setModalVisible(false);
     };
 
-    const handleDelete = (id: string) => {
-        Alert.alert('Setup löschen?', '', [
-            { text: 'Abbrechen', style: 'cancel' },
-            { text: 'Löschen', style: 'destructive', onPress: async () => { await syncDeleteFromTable('suspension_setups', '@bikepro_setups', id); saveSetups(setups.filter(s => s.id !== id)); } },
-        ]);
+    const handleDelete = async (id: string) => {
+        const confirmed = await confirmDialog(
+            t('dialed.delete_setup_title'),
+            t('dialed.delete_setup_message')
+        );
+        if (!confirmed) return;
+        await syncDeleteFromTable('suspension_setups', '@bikepro_setups', id);
+        saveSetups(setups.filter(s => s.id !== id));
     };
 
     const activeSuspension = activeTab === 'fork' ? fork : activeTab === 'shock' ? shock : null;
@@ -531,7 +571,11 @@ export default function DialedInScreen() {
                     <BPButton title="🧙 Wizard" onPress={() => { setWizardStep('category'); setSelectedCategory(null); setWizardSolution(''); setWizardVisible(true); }} color={theme.colors.accentCyan} size="md" style={{ flex: 1 }} />
                 </View>
 
-                {setups.length === 0 ? (
+                {loading ? (
+                    <View style={styles.emptyState}>
+                        <ActivityIndicator color={ACCENT} />
+                    </View>
+                ) : setups.length === 0 ? (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>⚙️</Text>
                         <Text style={styles.emptyTitle}>{t('dialed.no_setups')}</Text>
@@ -544,8 +588,8 @@ export default function DialedInScreen() {
                                 <View style={styles.cardHeader}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.cardTitle}>{setup.name}</Text>
-                                        {setup.bikeName ? (
-                                            <Text style={styles.cardBike}>🚵 {setup.bikeName}</Text>
+                                        {getBikeDisplayName(setup) ? (
+                                            <Text style={styles.cardBike}>🚵 {getBikeDisplayName(setup)}</Text>
                                         ) : null}
                                         {setup.location ? <Text style={styles.cardLocation}>📍 {setup.location}</Text> : null}
                                     </View>
@@ -587,8 +631,17 @@ export default function DialedInScreen() {
                                     <View style={styles.valueCol}>
                                         <Text style={styles.valueColTitle}>{t('dialed.shock')}</Text>
                                         <Text style={styles.valueRow}>
-                                            <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.shock.psi}</Text>
-                                            <Text style={styles.valueLabel}> PSI  </Text>
+                                            {setup.shock.mode === 'coil' ? (
+                                                <Text>
+                                                    <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.shock.springRate ?? '?'}</Text>
+                                                    <Text style={styles.valueLabel}> lb/in  </Text>
+                                                </Text>
+                                            ) : (
+                                                <Text>
+                                                    <Text style={[styles.valueNum, { color: ACCENT }]}>{setup.shock.psi}</Text>
+                                                    <Text style={styles.valueLabel}> PSI  </Text>
+                                                </Text>
+                                            )}
                                             {setup.shock.stroke && setup.shock.sagPercent ? (
                                                 <Text>
                                                     <Text style={[styles.valueNum, { color: theme.colors.text }]}>
@@ -617,8 +670,8 @@ export default function DialedInScreen() {
 
                                 {setup.tires && (
                                     <View style={styles.tiresRow}>
-                                        <Text style={styles.tireText}>🛞 VR: {setup.tires.frontBar?.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? '?'} bar</Text>
-                                        <Text style={styles.tireText}>🛞 HR: {setup.tires.rearBar?.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) ?? '?'} bar</Text>
+                                        <Text style={styles.tireText}>🛞 VR: {formatTirePressure(setup.tires.frontBar)}</Text>
+                                        <Text style={styles.tireText}>🛞 HR: {formatTirePressure(setup.tires.rearBar)}</Text>
                                     </View>
                                 )}
 
@@ -666,9 +719,24 @@ export default function DialedInScreen() {
                 {/* Suspension Inputs */}
                 {activeSuspension && (
                     <>
+                        {activeTab === 'shock' && (
+                            <View style={styles.configToggle}>
+                                <Text style={styles.configLabel}>{t('dialed.coil_shock')}</Text>
+                                <Switch
+                                    value={(activeSuspension.mode ?? 'air') === 'coil'}
+                                    onValueChange={v => updateSusValue('mode', v ? 'coil' : 'air')}
+                                    trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
+                                    thumbColor={(activeSuspension.mode ?? 'air') === 'coil' ? ACCENT : theme.colors.textMuted}
+                                />
+                            </View>
+                        )}
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label={t('dialed.pressure')} value={activeSuspension.psi} min={activeTab === 'fork' ? 40 : 80} max={activeTab === 'fork' ? 160 : 400} step={1} unit=" PSI" accentColor={ACCENT} onValueChange={v => updateSusValue('psi', v)} />
+                                {activeTab === 'shock' && (activeSuspension.mode ?? 'air') === 'coil' ? (
+                                    <BPSlider label={t('dialed.spring_rate')} value={activeSuspension.springRate ?? 400} min={200} max={800} step={25} unit=" lb/in" accentColor={ACCENT} onValueChange={v => updateSusValue('springRate', v)} />
+                                ) : (
+                                    <BPSlider label={t('dialed.pressure')} value={activeSuspension.psi} min={activeTab === 'fork' ? 40 : 80} max={activeTab === 'fork' ? 160 : 400} step={1} unit=" PSI" accentColor={ACCENT} onValueChange={v => updateSusValue('psi', v)} />
+                                )}
                             </View>
                         </View>
                         <View style={styles.inputRow}>
@@ -764,7 +832,7 @@ export default function DialedInScreen() {
                         <Text style={styles.subSectionTitle}>{t('dialed.front_tire')}</Text>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label={t('dialed.pressure_front')} value={tires.frontBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, frontBar: v }))} />
+                                <BPSlider label={t('dialed.pressure_front')} value={toDisplayPressure(tires.frontBar)} min={pressureUnit === 'psi' ? 12 : 0.8} max={pressureUnit === 'psi' ? 44 : 3.0} step={pressureUnit === 'psi' ? 1 : 0.05} unit={pressureUnit === 'psi' ? ' psi' : ' bar'} accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, frontBar: fromDisplayPressure(v) }))} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <BPPicker label={t('dialed.width')} options={tireWidthOptions} value={tires.frontWidth} onValueChange={v => setTires(p => ({ ...p, frontWidth: v }))} accentColor={ACCENT} />
@@ -775,7 +843,7 @@ export default function DialedInScreen() {
                         <Text style={styles.subSectionTitle}>{t('dialed.rear_tire')}</Text>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label={t('dialed.pressure_rear')} value={tires.rearBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, rearBar: v }))} />
+                                <BPSlider label={t('dialed.pressure_rear')} value={toDisplayPressure(tires.rearBar)} min={pressureUnit === 'psi' ? 12 : 0.8} max={pressureUnit === 'psi' ? 44 : 3.0} step={pressureUnit === 'psi' ? 1 : 0.05} unit={pressureUnit === 'psi' ? ' psi' : ' bar'} accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, rearBar: fromDisplayPressure(v) }))} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <BPPicker label={t('dialed.width')} options={tireWidthOptions} value={tires.rearWidth} onValueChange={v => setTires(p => ({ ...p, rearWidth: v }))} accentColor={ACCENT} />

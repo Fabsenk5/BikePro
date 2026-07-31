@@ -12,7 +12,6 @@ import { Stack } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Dimensions,
     Image,
     Linking,
     ScrollView,
@@ -24,9 +23,6 @@ import {
 } from 'react-native';
 
 const ACCENT = '#00E5FF'; // Trail-Video accent
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const VIDEO_WIDTH = Math.min(SCREEN_WIDTH - theme.spacing.lg * 2, 800);
-const VIDEO_HEIGHT = VIDEO_WIDTH * 0.5625; // 16:9
 
 // --- Curated video data ---
 interface CuratedVideo {
@@ -149,7 +145,9 @@ export default function TrailVideoScreen() {
             : curatedVideos.filter((v) => v.category === category);
 
     const openVideo = useCallback((youtubeId: string) => {
-        Linking.openURL(`https://www.youtube.com/watch?v=${youtubeId}`);
+        Linking.openURL(`https://www.youtube.com/watch?v=${youtubeId}`).catch((err) =>
+            console.warn('Could not open video URL:', err)
+        );
     }, []);
 
     return (

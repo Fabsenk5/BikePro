@@ -7,13 +7,14 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, WearItem } from '@/lib/sync';
+import { confirmDialog } from '@/lib/dialog';
+import { newId, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
 import Slider from '@react-native-community/slider';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Alert,
+    ActivityIndicator,
     ScrollView,
     Share,
     StatusBar,
@@ -34,6 +35,23 @@ export interface SetupValue {
     value: string;
     unit: string;
 }
+
+interface UnitsPref {
+    pressure: 'bar' | 'psi';
+    weight: 'kg' | 'lb';
+}
+
+const BAR_TO_PSI = 14.5038;
+
+function convertPressure(value: number, from: string, to: string): number {
+    if (from === to) return value;
+    if (from === 'bar' && to === 'psi') return value * BAR_TO_PSI;
+    if (from === 'psi' && to === 'bar') return value / BAR_TO_PSI;
+    return value;
+}
+
+// Semantic setup keys get their labels via i18n (tracker.key_<key>)
+const SEMANTIC_SETUP_KEYS = ['size', 'width', 'tire_type', 'casing', 'mount', 'pressure', 'travel', 'stroke'];
 
 const bikeTypeOptions = [
     { label: '🚵 Enduro', value: 'enduro' },
@@ -56,10 +74,12 @@ const bikeSizeOptions = [
 export default function ComponentTrackerScreen() {
     const { t, i18n } = useTranslation();
     const isGerman = i18n.language.startsWith('de');
-    const tirePressureUnit = isGerman ? 'bar' : 'psi';
+    const [unitsPref, setUnitsPref] = useState<UnitsPref>({ pressure: isGerman ? 'bar' : 'psi', weight: 'kg' });
+    const tirePressureUnit = unitsPref.pressure;
     const [bikes, setBikes] = useState<Bike[]>([]);
     const [setups, setSetups] = useState<any[]>([]);
     const [selectedBikeId, setSelectedBikeId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
     const [bikeModalVisible, setBikeModalVisible] = useState(false);
     const [compModalVisible, setCompModalVisible] = useState(false);
     const [editingBike, setEditingBike] = useState<Bike | null>(null);
@@ -124,10 +144,10 @@ export default function ComponentTrackerScreen() {
         grips: [{ key: 'Drehmoment', value: '', unit: 'Nm' }],
         pedals: [{ key: 'Drehmoment', value: '', unit: 'Nm' }, { key: 'Plattformgröße', value: '', unit: 'mm' }],
         stem: [{ key: 'Länge', value: '', unit: 'mm' }, { key: 'Winkel', value: '', unit: '°' }, { key: 'Drehmoment Lenker', value: '', unit: 'Nm' }, { key: 'Drehmoment Steuerrohr', value: '', unit: 'Nm' }],
-        fork: [{ key: 'Federweg', value: '', unit: 'mm' }, { key: 'Offset', value: '', unit: 'mm' }, { key: 'Hub', value: '', unit: 'mm' }],
-        shock: [{ key: 'Federweg', value: '', unit: 'mm' }, { key: 'Einbaulänge', value: '', unit: 'mm' }, { key: 'Hub', value: '', unit: 'mm' }],
-        wheel_front: [{ key: 'Größe', value: '', unit: '"' }, { key: 'Breite', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'Reifentyp', value: '', unit: '' }, { key: 'Karkasse', value: '', unit: '' }, { key: 'Montage', value: '', unit: '' }, { key: 'Druck', value: '', unit: tirePressureUnit }],
-        wheel_rear: [{ key: 'Größe', value: '', unit: '"' }, { key: 'Breite', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'Reifentyp', value: '', unit: '' }, { key: 'Karkasse', value: '', unit: '' }, { key: 'Montage', value: '', unit: '' }, { key: 'Druck', value: '', unit: tirePressureUnit }],
+        fork: [{ key: 'travel', value: '', unit: 'mm' }, { key: 'Offset', value: '', unit: 'mm' }, { key: 'stroke', value: '', unit: 'mm' }],
+        shock: [{ key: 'travel', value: '', unit: 'mm' }, { key: 'Einbaulänge', value: '', unit: 'mm' }, { key: 'stroke', value: '', unit: 'mm' }],
+        wheel_front: [{ key: 'size', value: '', unit: '"' }, { key: 'width', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'tire_type', value: '', unit: '' }, { key: 'casing', value: '', unit: '' }, { key: 'mount', value: '', unit: '' }, { key: 'pressure', value: '', unit: tirePressureUnit }],
+        wheel_rear: [{ key: 'size', value: '', unit: '"' }, { key: 'width', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'tire_type', value: '', unit: '' }, { key: 'casing', value: '', unit: '' }, { key: 'mount', value: '', unit: '' }, { key: 'pressure', value: '', unit: tirePressureUnit }],
         chain: [{ key: 'Glieder', value: '', unit: '' }, { key: 'Typ', value: '', unit: '' }],
         cassette: [{ key: 'Abstufung', value: '', unit: '' }, { key: 'Zähne', value: '', unit: '' }],
         derailleur: [{ key: 'Max. Zähne', value: '', unit: '' }, { key: 'Kettenblatt', value: '', unit: 'T' }],
@@ -138,6 +158,10 @@ export default function ComponentTrackerScreen() {
 
     function getTypeLabel(type: string): string {
         return componentTypes.find(t => t.value === type)?.label ?? t('tracker.type_other');
+    }
+
+    function setupLabel(key: string): string {
+        return SEMANTIC_SETUP_KEYS.includes(key) ? t(`tracker.key_${key}`) : key;
     }
 
     function getDefaultWearItems(type: string, installedDate: string): WearItem[] {
@@ -226,12 +250,19 @@ export default function ComponentTrackerScreen() {
         }
         const setupsData = await syncLoadTable('suspension_setups', '@bikepro_setups');
         setSetups(setupsData ?? []);
+        const units = await syncLoadPreference<UnitsPref>('units', '@bikepro_units');
+        if (units) {
+            setUnitsPref({
+                pressure: units.pressure ?? (isGerman ? 'bar' : 'psi'),
+                weight: units.weight ?? 'kg',
+            });
+        }
     };
 
     useFocusEffect(
         useCallback(() => {
-            loadData();
-        }, [selectedBikeId])
+            loadData().finally(() => setLoading(false));
+        }, [])
     );
 
     const persist = async (updated: Bike[]) => {
@@ -264,11 +295,11 @@ export default function ComponentTrackerScreen() {
         setBikeModalVisible(true);
     };
 
-    const saveBike = () => {
+    const saveBike = async () => {
         if (!bikeName.trim()) return;
         const parsedWeight = parseFloat(bikeWeight);
         const bikeData: Bike = {
-            id: editingBike?.id ?? Date.now().toString(),
+            id: editingBike?.id ?? newId(),
             name: bikeName.trim(),
             type: bikeType,
             model: bikeModel.trim(),
@@ -285,23 +316,39 @@ export default function ComponentTrackerScreen() {
             setSelectedBikeId(bikeData.id);
         }
         persist(updated);
+
+        // Propagate renames to linked suspension setups
+        if (editingBike && editingBike.name !== bikeData.name && setups.some(s => s.bikeId === editingBike.id)) {
+            const updatedSetups = setups.map(s =>
+                s.bikeId === editingBike.id ? { ...s, bikeName: bikeData.name } : s
+            );
+            setSetups(updatedSetups);
+            await syncSaveTable('suspension_setups', '@bikepro_setups', updatedSetups);
+        }
+
         setBikeModalVisible(false);
     };
 
-    const deleteBike = (id: string) => {
-        Alert.alert('Bike löschen?', 'Alle Komponenten gehen verloren.', [
-            { text: 'Abbrechen', style: 'cancel' },
-            {
-                text: 'Löschen',
-                style: 'destructive',
-                onPress: async () => {
-                    await syncDeleteBike(id);
-                    const updated = bikes.filter((b) => b.id !== id);
-                    persist(updated);
-                    setSelectedBikeId(updated[0]?.id ?? null);
-                },
-            },
-        ]);
+    const deleteBike = async (id: string) => {
+        const confirmed = await confirmDialog(
+            t('tracker.delete_bike_title'),
+            t('tracker.delete_bike_message')
+        );
+        if (!confirmed) return;
+
+        await syncDeleteBike(id);
+        const updated = bikes.filter((b) => b.id !== id);
+        persist(updated);
+        setSelectedBikeId(updated[0]?.id ?? null);
+
+        // Unlink suspension setups referencing this bike (rides keep their stored snapshot)
+        if (setups.some(s => s.bikeId === id)) {
+            const updatedSetups = setups.map(s =>
+                s.bikeId === id ? { ...s, bikeId: '' } : s
+            );
+            setSetups(updatedSetups);
+            await syncSaveTable('suspension_setups', '@bikepro_setups', updatedSetups);
+        }
     };
 
     // --- Component CRUD ---
@@ -376,24 +423,33 @@ export default function ComponentTrackerScreen() {
         }
     };
 
-    const updateSetupValue = (index: number, value: string) => {
-        setCompSetup(prev => prev.map((s, i) => i === index ? { ...s, value } : s));
+    const updateSetupValue = (index: number, value: string, unit?: string) => {
+        setCompSetup(prev => prev.map((s, i) =>
+            i === index ? { ...s, value, ...(unit !== undefined ? { unit } : {}) } : s
+        ));
     };
 
     const updateWearItem = (index: number, field: keyof WearItem, value: string) => {
         setCompWearItems(prev => prev.map((w, i) => {
             if (i !== index) return w;
-            if (field === 'currentKm' || field === 'serviceIntervalKm') {
-                return { ...w, [field]: parseInt(value || '0', 10) };
+            if (field === 'currentKm') {
+                const parsed = parseInt(value, 10);
+                if (isNaN(parsed) || parsed < 0) return w;
+                return { ...w, currentKm: parsed };
+            }
+            if (field === 'serviceIntervalKm') {
+                const parsed = parseInt(value, 10);
+                if (isNaN(parsed) || parsed < 1) return w;
+                return { ...w, serviceIntervalKm: parsed };
             }
             return { ...w, [field]: value };
         }));
     };
 
-    const saveComp = () => {
+    const saveComp = async () => {
         if (!selectedBike) return;
         const compData: SyncComponent = {
-            id: editingComp?.id ?? Date.now().toString(),
+            id: editingComp?.id ?? newId(),
             type: compType,
             brand: compBrand.trim(),
             model: compModel.trim(),
@@ -415,10 +471,9 @@ export default function ComponentTrackerScreen() {
             installedDate: compIsWearTracked && compWearItems.length > 0 ? compWearItems[0].installedDate : getTodayISO(),
         };
 
-        let updatedBikes = [...bikes];
-
-        // Move to different bike?
+        // Move to different bike? (structural change → full resave)
         if (editingComp && compMoveToBikeId && compMoveToBikeId !== selectedBike.id) {
+            let updatedBikes = [...bikes];
             // Remove from current bike
             updatedBikes = updatedBikes.map(b =>
                 b.id === selectedBike.id
@@ -431,40 +486,38 @@ export default function ComponentTrackerScreen() {
                     ? { ...b, components: [...b.components, compData] }
                     : b
             );
+            persist(updatedBikes);
         } else {
-            // Normal save (edit or create on current bike)
-            const updatedBike = { ...selectedBike };
-            if (editingComp) {
-                updatedBike.components = updatedBike.components.map(c =>
-                    c.id === editingComp.id ? compData : c
-                );
-            } else {
-                updatedBike.components = [...updatedBike.components, compData];
-            }
-            updatedBikes = updatedBikes.map(b => b.id === selectedBike.id ? updatedBike : b);
+            // Normal save (edit or create on current bike) → targeted single-row write
+            await syncUpdateComponent(selectedBike.id, compData);
+            setBikes(bikes.map(b => b.id === selectedBike.id
+                ? {
+                    ...b,
+                    components: editingComp
+                        ? b.components.map(c => (c.id === editingComp.id ? compData : c))
+                        : [...b.components, compData],
+                }
+                : b
+            ));
         }
 
-        persist(updatedBikes);
         setCompModalVisible(false);
     };
 
-    const deleteComp = (compId: string) => {
+    const deleteComp = async (compId: string) => {
         if (!selectedBike) return;
-        Alert.alert('Komponente löschen?', '', [
-            { text: 'Abbrechen', style: 'cancel' },
-            {
-                text: 'Löschen',
-                style: 'destructive',
-                onPress: async () => {
-                    await syncDeleteComponent(compId);
-                    const updatedBike = {
-                        ...selectedBike,
-                        components: selectedBike.components.filter(c => c.id !== compId),
-                    };
-                    persist(bikes.map(b => b.id === selectedBike.id ? updatedBike : b));
-                },
-            },
-        ]);
+        const confirmed = await confirmDialog(
+            t('tracker.delete_component_title'),
+            t('tracker.delete_component_message')
+        );
+        if (!confirmed) return;
+
+        await syncDeleteComponent(compId);
+        const updatedBike = {
+            ...selectedBike,
+            components: selectedBike.components.filter(c => c.id !== compId),
+        };
+        persist(bikes.map(b => b.id === selectedBike.id ? updatedBike : b));
     };
     const handleShareBike = async () => {
         if (!selectedBike) return;
@@ -473,14 +526,14 @@ export default function ComponentTrackerScreen() {
         let totalPrice = 0;
 
         const lines = comps.map(c => {
-            const w = parseInt(c.weight) || 0;
+            const w = parseFloat(c.weight);
             const p = parseFloat(c.price ?? '0') || 0;
-            totalWeight += w;
+            if (!isNaN(w)) totalWeight += w;
             totalPrice += p;
-            return `- ${getTypeLabel(c.type)}: ${c.brand} ${c.model} (${w > 0 ? w + 'g' : '-'} | ${p > 0 ? p.toFixed(2) + '€' : '-'})`;
+            return `- ${getTypeLabel(c.type)}: ${c.brand} ${c.model} (${!isNaN(w) ? w + 'g' : '-'} | ${p > 0 ? p.toFixed(2) + '€' : '-'})`;
         });
 
-        const msg = `🚴 ${selectedBike.name} Build\n\n${lines.join('\n')}\n\n⚖️ Gesamtgewicht Teile: ${totalWeight}g\n💶 Gesamtwert Teile: ${totalPrice.toFixed(2)}€`;
+        const msg = `🚴 ${selectedBike.name} Build\n\n${lines.join('\n')}\n\n⚖️ Gesamtgewicht Teile: ${Math.round(totalWeight * 10) / 10}g\n💶 Gesamtwert Teile: ${totalPrice.toFixed(2)}€`;
         try {
             await Share.share({ message: msg });
         } catch (error) {
@@ -572,6 +625,13 @@ export default function ComponentTrackerScreen() {
                     </BPCard>
                 )}
 
+                {/* Loading (initial load) */}
+                {loading && (
+                    <View style={styles.emptyState}>
+                        <ActivityIndicator color={ACCENT} />
+                    </View>
+                )}
+
                 {/* Components list */}
                 {selectedBike?.components.length === 0 && (
                     <View style={styles.emptyState}>
@@ -581,7 +641,7 @@ export default function ComponentTrackerScreen() {
                     </View>
                 )}
 
-                {!selectedBike && bikes.length === 0 && (
+                {!loading && !selectedBike && bikes.length === 0 && (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyIcon}>🚵</Text>
                         <Text style={styles.emptyTitle}>{t('tracker.no_bikes')}</Text>
@@ -611,7 +671,7 @@ export default function ComponentTrackerScreen() {
                                 <View style={styles.compRowChips}>
                                     {comp.setupValues.slice(0, 3).map((sv, i) => (
                                         <Text key={i} style={styles.compRowChip}>
-                                            <Text style={styles.compRowChipKey}>{sv.key} </Text>
+                                            <Text style={styles.compRowChipKey}>{setupLabel(sv.key)} </Text>
                                             <Text style={[styles.compRowChipVal, { color: ACCENT }]}>{sv.value}{sv.unit}</Text>
                                         </Text>
                                     ))}
@@ -696,14 +756,14 @@ export default function ComponentTrackerScreen() {
                     <View style={styles.setupSection}>
                         <Text style={styles.setupSectionTitle}>⚙️ {t('tracker.setup_values')}</Text>
                         {compSetup.map((sv, i) => {
-                            if (sv.key === 'Größe') {
-                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...wheelSizeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            if (sv.key === 'size') {
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...wheelSizeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
                             if (sv.key === 'Breite' && compType === 'handlebar') {
                                 return (
                                     <View key={i} style={{ marginBottom: theme.spacing.lg }}>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{sv.key}</Text>
+                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{setupLabel(sv.key)}</Text>
                                             <Text style={{ color: ACCENT, fontWeight: '600' }}>{parseFloat(sv.value || '780').toFixed(0)} {sv.unit}</Text>
                                         </View>
                                         <Slider
@@ -720,32 +780,41 @@ export default function ComponentTrackerScreen() {
                                     </View>
                                 )
                             }
-                            if (sv.key === 'Breite') {
-                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...tireWidthOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            if (sv.key === 'width') {
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...tireWidthOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
-                            if (sv.key === 'Reifentyp') {
-                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...tireTypeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            if (sv.key === 'tire_type') {
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...tireTypeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
-                            if (sv.key === 'Karkasse') {
-                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...casingOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            if (sv.key === 'casing') {
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...casingOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
-                            if (sv.key === 'Montage') {
-                                return <BPPicker key={i} label={sv.key} options={[{ label: 'Wählen...', value: '' }, ...setupMountOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                            if (sv.key === 'mount') {
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...setupMountOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
-                            if (sv.key === 'Druck') {
+                            if (sv.key === 'pressure') {
+                                const isBar = tirePressureUnit === 'bar';
+                                const min = isBar ? 1.0 : 14;
+                                const max = isBar ? 3.5 : 50;
+                                const fallback = isBar ? 1.8 : 26;
+                                const parsed = parseFloat(sv.value);
+                                // Convert stored values saved in the other unit for display
+                                const displayVal = isNaN(parsed)
+                                    ? fallback
+                                    : Math.min(max, Math.max(min, convertPressure(parsed, sv.unit || tirePressureUnit, tirePressureUnit)));
                                 return (
                                     <View key={i} style={{ marginBottom: theme.spacing.lg }}>
                                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{sv.key}</Text>
-                                            <Text style={{ color: ACCENT, fontWeight: '600' }}>{parseFloat(sv.value || '0').toFixed(1)} {sv.unit}</Text>
+                                            <Text style={{ color: theme.colors.textMuted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 }}>{setupLabel(sv.key)}</Text>
+                                            <Text style={{ color: ACCENT, fontWeight: '600' }}>{displayVal.toFixed(isBar ? 1 : 0)} {tirePressureUnit}</Text>
                                         </View>
                                         <Slider
                                             style={{ height: 40 }}
-                                            minimumValue={1.0}
-                                            maximumValue={3.5}
-                                            step={0.1}
-                                            value={parseFloat(sv.value || '1.8')}
-                                            onValueChange={(val) => updateSetupValue(i, val.toFixed(1))}
+                                            minimumValue={min}
+                                            maximumValue={max}
+                                            step={isBar ? 0.1 : 1}
+                                            value={displayVal}
+                                            onValueChange={(val) => updateSetupValue(i, isBar ? val.toFixed(1) : val.toFixed(0), tirePressureUnit)}
                                             minimumTrackTintColor={ACCENT}
                                             maximumTrackTintColor={theme.colors.border}
                                             thumbTintColor={ACCENT}
@@ -756,7 +825,7 @@ export default function ComponentTrackerScreen() {
                             return (
                                 <BPInput
                                     key={`${sv.key}-${i}`}
-                                    label={sv.key}
+                                    label={setupLabel(sv.key)}
                                     placeholder="—"
                                     value={sv.value}
                                     onChangeText={(v) => updateSetupValue(i, v)}

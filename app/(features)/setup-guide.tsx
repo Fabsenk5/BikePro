@@ -8,13 +8,13 @@
  */
 import { BPCard, BPButton, BPInput } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
+import { syncLoadPreference, syncLoadWikiOverrides, syncSavePreference, syncSaveWikiOverride } from '@/lib/sync';
+import { showAlert } from '@/lib/dialog';
 import { Stack } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
-    Alert,
     Modal,
     ScrollView,
     StatusBar,
@@ -25,7 +25,6 @@ import {
     View,
 } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
-import { getSupabase } from '@/lib/supabase';
 
 const ACCENT = '#7C4DFF';
 
@@ -75,48 +74,24 @@ export default function SetupGuideScreen() {
     }, [i18n.language]);
 
     const fetchOverrides = async () => {
-        const supabase = getSupabase();
-        if (!supabase) return;
-        const { data, error } = await supabase
-            .from('wiki_overrides')
-            .select('*')
-            .eq('locale', i18n.language);
-        if (!error && data) {
-            const overrideMap: Record<string, Partial<WikiArticle>> = {};
-            for (const row of data) {
-                overrideMap[row.article_id] = {
-                    title: row.title || undefined,
-                    summary: row.summary || undefined,
-                    content: row.content || undefined,
-                    values: row.values_text || undefined,
-                    tip: row.tip || undefined,
-                };
-            }
-            setOverrides(overrideMap);
-        }
+        const overrideMap = await syncLoadWikiOverrides(i18n.language);
+        setOverrides(overrideMap);
     };
 
     const handleSaveOverride = async () => {
         if (!isEditing) return;
-        const supabase = getSupabase();
-        if (!supabase) return;
         setIsSaving(true);
-        const { error } = await supabase
-            .from('wiki_overrides')
-            .upsert({
-                article_id: isEditing.id,
-                locale: i18n.language,
-                title: editForm.title || null,
-                summary: editForm.summary || null,
-                content: editForm.content || null,
-                values_text: editForm.values || null,
-                tip: editForm.tip || null,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'article_id,locale' });
-        
+        const ok = await syncSaveWikiOverride(isEditing.id, i18n.language, {
+            title: editForm.title,
+            summary: editForm.summary,
+            content: editForm.content,
+            values: editForm.values,
+            tip: editForm.tip,
+        });
+
         setIsSaving(false);
-        if (error) {
-            Alert.alert('Fehler', 'Konnte die Änderungen nicht speichern: ' + error.message);
+        if (!ok) {
+            showAlert('Fehler', 'Konnte die Änderungen nicht speichern.');
         } else {
             setIsEditing(null);
             fetchOverrides();
@@ -528,7 +503,7 @@ export default function SetupGuideScreen() {
             );
         }
         return result;
-    }, [selectedCategory, searchQuery, sortedArticles]);
+    }, [selectedCategory, searchQuery, sortedArticles, favorites]);
 
     const toggleArticle = (id: string) => {
         setExpandedArticle(expandedArticle === id ? null : id);

@@ -8,7 +8,8 @@
  */
 import { BPButton, BPCard, BPInput, BPPicker, BPSlider } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, syncLoadBikes, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
+import { showAlert } from '@/lib/dialog';
+import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,10 +24,33 @@ import {
 
 const ACCENT = '#FFD600';
 
+// Semantic setup-value keys with legacy German-label fallback (lib/sync.ts migrates old labels on load).
+const getSetupValue = (values: any[] | undefined, key: string, legacyKey: string): string | undefined => {
+    if (!Array.isArray(values)) return undefined;
+    return values.find((s: any) => s.key === key)?.value ?? values.find((s: any) => s.key === legacyKey)?.value;
+};
+
+// Default rear travel / shock stroke (mm) per bike type when the tracker has no values.
+const travelStrokeDefaults = (bikeType?: string): { travel: number; stroke: number } => {
+    switch (bikeType) {
+        case 'downhill': return { travel: 200, stroke: 75 };
+        case 'enduro':
+        case 'emtb':
+        case 'e-mtb': return { travel: 170, stroke: 65 };
+        case 'trail': return { travel: 140, stroke: 57.5 };
+        case 'xc': return { travel: 115, stroke: 45 };
+        default: return { travel: 160, stroke: 60 };
+    }
+};
+
 export default function PressureBotScreen() {
     const { t, i18n } = useTranslation();
     const isGerman = i18n.language.startsWith('de');
-    const tirePressureUnit = isGerman ? 'bar' : 'psi';
+    const [units, setUnits] = useState<{ pressure: 'bar' | 'psi'; weight: 'kg' | 'lb' }>({
+        pressure: isGerman ? 'bar' : 'psi',
+        weight: 'kg',
+    });
+    const tirePressureUnit = units.pressure;
 
     const [riderWeight, setRiderWeight] = useState(80);
     const [bikeWeight, setBikeWeight] = useState(15);
@@ -54,8 +78,12 @@ export default function PressureBotScreen() {
         syncLoadProfile().then(p => {
             if (p.weight) {
                 const w = parseFloat(p.weight);
-                if (!isNaN(w) && w > 30) setRiderWeight(w);
+                // Profile weight is stored in kg (internal unit)
+                if (!isNaN(w) && w > 20) setRiderWeight(w);
             }
+        });
+        syncLoadPreference<{ pressure?: 'bar' | 'psi'; weight?: 'kg' | 'lb' }>('units', '@bikepro_units').then(u => {
+            if (u) setUnits(prev => ({ pressure: u.pressure ?? prev.pressure, weight: u.weight ?? prev.weight }));
         });
     }, []);
 
@@ -69,13 +97,13 @@ export default function PressureBotScreen() {
         // Try to find front wheel to auto-fill tire size/width
         const frontWheel = bike.components.find((c: any) => c.type === 'wheel_front');
         if (frontWheel && frontWheel.setupValues) {
-            const sizeVal = frontWheel.setupValues.find((s: any) => s.key === 'Größe')?.value;
+            const sizeVal = getSetupValue(frontWheel.setupValues, 'size', 'Größe');
             const sizeStr = sizeVal?.replace('"', ''); // "29"
             if (sizeStr === '29' || sizeStr === '27.5' || sizeStr === '26') {
                 setWheelSize(sizeStr);
             }
 
-            const widthVal = frontWheel.setupValues.find((s: any) => s.key === 'Breite')?.value;
+            const widthVal = getSetupValue(frontWheel.setupValues, 'width', 'Breite');
             if (widthVal) {
                 const widthStr = widthVal.replace('"', '').trim();
                 // Valid widths like "2.4" or "2.5"
@@ -84,21 +112,21 @@ export default function PressureBotScreen() {
                 }
             }
 
-            const typeStr = frontWheel.setupValues.find((s: any) => s.key === 'Reifentyp')?.value?.toLowerCase() || '';
+            const typeStr = getSetupValue(frontWheel.setupValues, 'tire_type', 'Reifentyp')?.toLowerCase() || '';
             if (typeStr.includes('xc') || typeStr.includes('cross')) setTireType('xc');
             else if (typeStr.includes('trail')) setTireType('trail');
             else if (typeStr.includes('enduro')) setTireType('enduro');
             else if (typeStr.includes('dh') || typeStr.includes('downhill')) setTireType('dh');
             else if (typeStr.includes('mud') || typeStr.includes('matsch')) setTireType('mud');
 
-            const casingStr = frontWheel.setupValues.find((s: any) => s.key === 'Karkasse')?.value?.toLowerCase() || '';
+            const casingStr = getSetupValue(frontWheel.setupValues, 'casing', 'Karkasse')?.toLowerCase() || '';
             if (casingStr.includes('light') || casingStr.includes('super race') || casingStr.includes('super ground') || casingStr.includes('leicht')) setCasing('light');
             else if (casingStr.includes('standard') || casingStr.includes('exo') || casingStr.includes('super trail')) setCasing('standard');
             else if (casingStr.includes('reinforced') || casingStr.includes('exo+') || casingStr.includes('super gravity')) setCasing('reinforced');
             else if (casingStr.includes('doubledown') || casingStr.includes('dd')) setCasing('doubledown');
             else if (casingStr.includes('dh') || casingStr.includes('downhill') || casingStr.includes('super downhill')) setCasing('dh');
 
-            const setupStr = frontWheel.setupValues.find((s: any) => s.key === 'Montage')?.value?.toLowerCase() || '';
+            const setupStr = getSetupValue(frontWheel.setupValues, 'mount', 'Montage')?.toLowerCase() || '';
             if (setupStr.includes('tubeless') || setupStr.includes('tlr')) setSetup('tubeless');
             else if (setupStr.includes('butyl') || setupStr.includes('schlauch') || setupStr === 'tube') setSetup('tube_butyl');
             else if (setupStr.includes('latex')) setSetup('tube_latex');
@@ -106,18 +134,28 @@ export default function PressureBotScreen() {
         }
 
         const shock = bike.components.find((c: any) => c.type === 'shock');
+        let hasTravelStroke = false;
         if (shock) {
             if (shock.model?.toLowerCase().includes('coil') || shock.name?.toLowerCase().includes('coil')) {
                 setShockType('coil');
             } else {
                 setShockType('air');
             }
-            if (shock.setupValues) {
-                const travelVal = shock.setupValues.find((s: any) => s.key === 'Federweg')?.value;
-                if (travelVal) setRearTravel(travelVal.replace(/[^0-9]/g, ''));
-                const strokeVal = shock.setupValues.find((s: any) => s.key === 'Hub')?.value;
-                if (strokeVal) setShockStroke(strokeVal.replace(/[^0-9]/g, ''));
+            const travelVal = getSetupValue(shock.setupValues, 'travel', 'Federweg');
+            if (travelVal) {
+                setRearTravel(travelVal.replace(/[^0-9.]/g, ''));
+                hasTravelStroke = true;
             }
+            const strokeVal = getSetupValue(shock.setupValues, 'stroke', 'Hub');
+            if (strokeVal) {
+                setShockStroke(strokeVal.replace(/[^0-9.]/g, ''));
+                hasTravelStroke = true;
+            }
+        }
+        if (!hasTravelStroke) {
+            const d = travelStrokeDefaults(bike.type);
+            setRearTravel(String(d.travel));
+            setShockStroke(String(d.stroke));
         }
     };
 
@@ -315,15 +353,22 @@ export default function PressureBotScreen() {
     );
 
     const suspResult = useMemo(() => {
+        const selectedBike = trackerBikes.find(b => b.id === selectedBikeId);
+        const isEbike = bikeWeight > 18 || selectedBike?.type === 'emtb' || selectedBike?.type === 'e-mtb';
+
         let fPsi = Math.round(riderWeight * 1.05 + (terrain === 'bikepark' ? 5 : 0) + (tireType === 'dh' ? 5 : 0));
         let sPsi = Math.round(riderWeight * 2.3 + (terrain === 'bikepark' ? 10 : 0) + (tireType === 'dh' ? 10 : 0));
-        if (bikeWeight > 18) { fPsi += 3; sPsi += 8; } // E-Bike compensation
+        if (isEbike) { fPsi += 3; sPsi += 8; } // E-Bike compensation
 
         if (shockType === 'coil') {
-            const rt = parseFloat(rearTravel) || 160;
-            const st = parseFloat(shockStroke) || 60;
-            let springRate = (riderWeight * 2.2046 * (rt / st)) / 1.15;
-            if (bikeWeight > 18) springRate += 25; 
+            const defs = travelStrokeDefaults(selectedBike?.type);
+            const travelMm = parseFloat(rearTravel) || defs.travel;
+            const strokeMm = parseFloat(shockStroke) || defs.stroke;
+            // Spring rate from rear-axle load (57% weight bias), leverage ratio and 30% sag target
+            const rearWeightLb = (riderWeight + bikeWeight) * 2.20462 * 0.57;
+            const leverage = travelMm / strokeMm;
+            const sagIn = (strokeMm / 25.4) * 0.30;
+            const springRate = (rearWeightLb * leverage) / sagIn;
             sPsi = Math.max(150, Math.round(springRate / 25) * 25);
         }
 
@@ -399,44 +444,50 @@ export default function PressureBotScreen() {
             if (b.id !== selectedBikeId) return b;
             const updatedComps = b.components.map(c => {
                 if (activeTab === 'tires') {
-                    const fbStr = `${result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
-                    const rbStr = `${result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${tirePressureUnit}`;
+                    // Persist dot-decimal values in the user's preferred unit;
+                    // result.front/rear are always bar internally, locale formatting is for rendering only.
+                    const fbStr = units.pressure === 'psi'
+                        ? `${(result.front * 14.5038).toFixed(2)} psi`
+                        : `${result.front.toFixed(2)} bar`;
+                    const rbStr = units.pressure === 'psi'
+                        ? `${(result.rear * 14.5038).toFixed(2)} psi`
+                        : `${result.rear.toFixed(2)} bar`;
                     if (c.type === 'wheel_front') {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
-                        const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
-                        if (dIdx >= 0) newSetup[dIdx].value = fbStr;
-                        else newSetup.push({ key: 'Druck', value: fbStr });
+                        const dIdx = newSetup.findIndex((s: any) => s.key === 'pressure' || s.key === 'Druck');
+                        if (dIdx >= 0) newSetup[dIdx] = { ...newSetup[dIdx], key: 'pressure', value: fbStr };
+                        else newSetup.push({ key: 'pressure', value: fbStr });
                         return { ...c, setupValues: newSetup };
                     }
                     if (c.type === 'wheel_rear') {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
-                        const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
-                        if (dIdx >= 0) newSetup[dIdx].value = rbStr;
-                        else newSetup.push({ key: 'Druck', value: rbStr });
+                        const dIdx = newSetup.findIndex((s: any) => s.key === 'pressure' || s.key === 'Druck');
+                        if (dIdx >= 0) newSetup[dIdx] = { ...newSetup[dIdx], key: 'pressure', value: rbStr };
+                        else newSetup.push({ key: 'pressure', value: rbStr });
                         return { ...c, setupValues: newSetup };
                     }
                 } else if (activeTab === 'suspension') {
                     if (c.type === 'fork') {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
-                        const dIdx = newSetup.findIndex((s: any) => s.key === 'Druck');
+                        const dIdx = newSetup.findIndex((s: any) => s.key === 'pressure' || s.key === 'Druck');
                         const vStr = `${suspResult.forkPsi} PSI`;
-                        if (dIdx >= 0) newSetup[dIdx].value = vStr;
-                        else newSetup.push({ key: 'Druck', value: vStr });
+                        if (dIdx >= 0) newSetup[dIdx] = { ...newSetup[dIdx], key: 'pressure', value: vStr };
+                        else newSetup.push({ key: 'pressure', value: vStr });
                         return { ...c, setupValues: newSetup };
                     }
                     if (c.type === 'shock') {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
-                        const keyName = shockType === 'coil' ? 'Federhärte' : 'Druck';
-                        const dIdx = newSetup.findIndex((s: any) => s.key === keyName);
+                        const keyName = shockType === 'coil' ? 'spring_rate' : 'pressure';
+                        const dIdx = newSetup.findIndex((s: any) => s.key === keyName || s.key === 'Druck' || s.key === 'Federhärte');
                         const vStr = shockType === 'coil' ? `${suspResult.shockPsi} lbs` : `${suspResult.shockPsi} PSI`;
-                        if (dIdx >= 0) newSetup[dIdx].value = vStr;
+                        if (dIdx >= 0) newSetup[dIdx] = { ...newSetup[dIdx], key: keyName, value: vStr };
                         else newSetup.push({ key: keyName, value: vStr });
-                        
+
                         if (shockType === 'coil') {
-                            const tIdx = newSetup.findIndex((s: any) => s.key === 'Federweg');
-                            if (tIdx < 0 && rearTravel) newSetup.push({ key: 'Federweg', value: `${rearTravel} mm` });
-                            const stIdx = newSetup.findIndex((s: any) => s.key === 'Hub');
-                            if (stIdx < 0 && shockStroke) newSetup.push({ key: 'Hub', value: `${shockStroke} mm` });
+                            const tIdx = newSetup.findIndex((s: any) => s.key === 'travel' || s.key === 'Federweg');
+                            if (tIdx < 0 && rearTravel) newSetup.push({ key: 'travel', value: `${rearTravel} mm` });
+                            const stIdx = newSetup.findIndex((s: any) => s.key === 'stroke' || s.key === 'Hub');
+                            if (stIdx < 0 && shockStroke) newSetup.push({ key: 'stroke', value: `${shockStroke} mm` });
                         }
 
                         return { ...c, setupValues: newSetup };
@@ -447,10 +498,13 @@ export default function PressureBotScreen() {
             return { ...b, components: updatedComps };
         });
 
-        await syncSaveBikes(updatedBikes);
-        setTrackerBikes(updatedBikes);
-
-        setTimeout(() => setSavingToBike(false), 800);
+        const ok = await syncSaveBikes(updatedBikes);
+        if (ok) {
+            setTrackerBikes(updatedBikes);
+        } else {
+            showAlert(t('pressure_bot.save_error_title'), t('pressure_bot.save_error'));
+        }
+        setSavingToBike(false);
     };
 
     return (
@@ -486,19 +540,27 @@ export default function PressureBotScreen() {
                             <View style={styles.resultItem}>
                                 <Text style={styles.resultLabel}>{t('pressure_bot.front')}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                    {result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {tirePressureUnit === 'bar'
+                                        ? result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                        : frontPSI}
                                 </Text>
                                 <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
-                                <Text style={styles.resultPSI}>{frontPSI} PSI</Text>
+                                <Text style={styles.resultPSI}>
+                                    {tirePressureUnit === 'bar' ? `${frontPSI} PSI` : `${result.front.toFixed(2)} bar`}
+                                </Text>
                             </View>
                             <View style={styles.resultDivider} />
                             <View style={styles.resultItem}>
                                 <Text style={styles.resultLabel}>{t('pressure_bot.rear')}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                    {result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    {tirePressureUnit === 'bar'
+                                        ? result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                        : rearPSI}
                                 </Text>
                                 <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
-                                <Text style={styles.resultPSI}>{rearPSI} PSI</Text>
+                                <Text style={styles.resultPSI}>
+                                    {tirePressureUnit === 'bar' ? `${rearPSI} PSI` : `${result.rear.toFixed(2)} bar`}
+                                </Text>
                             </View>
                         </View>
                         {result.notes.length > 0 && (
@@ -515,7 +577,7 @@ export default function PressureBotScreen() {
                                 onPress={() => {
                                     const fb = result.front.toFixed(2);
                                     const rb = result.rear.toFixed(2);
-                                    const ts = Date.now().toString();
+                                    const ts = newId();
                                     router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&frontBar=${fb}&rearBar=${rb}&ts=${ts}`);
                                 }}
                                 color={ACCENT}
@@ -600,8 +662,12 @@ export default function PressureBotScreen() {
                             <BPButton
                                 title="✅ Setup in Dialed In speichern"
                                 onPress={() => {
-                                    const ts = Date.now().toString();
-                                    router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&ts=${ts}&forkPsi=${suspResult.forkPsi}&forkClicks=${suspResult.rawForkClicks}&forkCompClicks=${suspResult.rawForkCompClicks}&shockPsi=${suspResult.shockPsi}&shockClicks=${suspResult.rawShockClicks}&shockCompClicks=${suspResult.rawShockCompClicks}`);
+                                    const ts = newId();
+                                    // Coil shocks hand over spring rate (lb/in) instead of air pressure
+                                    const shockParams = shockType === 'coil'
+                                        ? `shockMode=coil&springRate=${suspResult.shockPsi}`
+                                        : `shockPsi=${suspResult.shockPsi}`;
+                                    router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&ts=${ts}&forkPsi=${suspResult.forkPsi}&forkClicks=${suspResult.rawForkClicks}&forkCompClicks=${suspResult.rawForkCompClicks}&${shockParams}&shockClicks=${suspResult.rawShockClicks}&shockCompClicks=${suspResult.rawShockCompClicks}`);
                                 }}
                                 color={ACCENT}
                                 style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '60', borderWidth: 1 }}
@@ -627,8 +693,17 @@ export default function PressureBotScreen() {
                             accentColor={ACCENT}
                         />
                     )}
-                    <BPSlider label={t('pressure_bot.rider_weight_label')} value={riderWeight} min={40} max={140} step={1} unit=" kg" accentColor={ACCENT} onValueChange={setRiderWeight} />
-                    <BPSlider label={t('pressure_bot.bike_weight_label') + (selectedBikeId ? ' (Auto)' : '')} value={bikeWeight} min={8} max={30} step={0.5} unit=" kg" accentColor={ACCENT} onValueChange={setBikeWeight} disabled={!!selectedBikeId && bikeWeight > 8} />
+                    <BPSlider
+                        label={t('pressure_bot.rider_weight_label')}
+                        value={units.weight === 'lb' ? Math.round(riderWeight * 2.20462) : riderWeight}
+                        min={units.weight === 'lb' ? 88 : 40}
+                        max={units.weight === 'lb' ? 309 : 140}
+                        step={1}
+                        unit={units.weight === 'lb' ? ' lb' : ' kg'}
+                        accentColor={ACCENT}
+                        onValueChange={v => setRiderWeight(units.weight === 'lb' ? Math.round(v / 2.20462) : v)}
+                    />
+                    <BPSlider label={t('pressure_bot.bike_weight_label') + (selectedBikeId ? ' (Auto)' : '')} value={bikeWeight} min={8} max={30} step={0.5} unit=" kg" accentColor={ACCENT} onValueChange={setBikeWeight} disabled={!!selectedBikeId} />
                 </BPCard>
 
                 {/* Reifen */}

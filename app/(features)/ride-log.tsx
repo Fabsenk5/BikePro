@@ -8,12 +8,12 @@
  */
 import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { SyncBike, syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveBikes, syncSaveTable } from '@/lib/sync';
+import { confirmDialog, showAlert } from '@/lib/dialog';
+import { SyncBike, SyncComponent, newId, syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable, syncUpdateComponent } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Alert,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -43,6 +43,7 @@ interface Ride {
     bikeId?: string;
     setupId?: string;
     setupFeel?: string;
+    wearTrackedKm?: number;
     condition: string;
     mood: string;
     notes: string;
@@ -51,6 +52,19 @@ interface Ride {
 
 function getTodayISO(): string {
     return new Date().toISOString().split('T')[0];
+}
+
+/** Strict YYYY-MM-DD check that also rejects impossible dates (e.g. 2024-02-30). */
+function isValidISODate(value: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const [y, m, d] = value.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+/** Parse a user-entered number, accepting comma as decimal separator. */
+function parseDecimal(value: string): number {
+    return parseFloat(value.replace(',', '.')) || 0;
 }
 
 export default function RideLogScreen() {
@@ -132,6 +146,7 @@ export default function RideLogScreen() {
     const [condition, setCondition] = useState('dry');
     const [mood, setMood] = useState('fire');
     const [notes, setNotes] = useState('');
+    const [dateError, setDateError] = useState('');
 
     useEffect(() => {
         syncLoadTable<Ride>('rides', STORAGE_KEY).then(setRides);
@@ -139,9 +154,10 @@ export default function RideLogScreen() {
         syncLoadTable('suspension_setups', '@bikepro_setups').then(setSetups);
     }, []);
 
-    const persist = async (updated: Ride[]) => {
-        await syncSaveTable('rides', STORAGE_KEY, updated);
+    const persist = async (updated: Ride[]): Promise<boolean> => {
+        const ok = await syncSaveTable('rides', STORAGE_KEY, updated);
         setRides(updated);
+        return ok;
     };
 
     const resetForm = () => {
@@ -154,6 +170,7 @@ export default function RideLogScreen() {
         setRideBikeType('enduro');
         setRideBikeId(''); setRideSetupId(''); setRideSetupFeel(''); setTrackWear(true);
         setCondition('dry'); setMood('fire'); setNotes('');
+        setDateError('');
         setEditingRide(null);
     };
 
@@ -178,7 +195,7 @@ export default function RideLogScreen() {
         setRideBikeId(ride.bikeId ?? '');
         setRideSetupId(ride.setupId ?? '');
         setRideSetupFeel(ride.setupFeel ?? '');
-        setTrackWear(false); // Edit mode: auto-wear tracking off to prevent double-counting
+        setTrackWear((ride.wearTrackedKm ?? 0) > 0); // keep prior choice; save reconciles the km delta
         setCondition(ride.condition); setMood(ride.mood);
         setNotes(ride.notes);
         setModalVisible(true);
@@ -187,10 +204,17 @@ export default function RideLogScreen() {
     const handleSave = async () => {
         if (!location.trim()) return;
 
-        const parsedDistance = parseFloat(distanceKm) || 0;
+        if (!isValidISODate(date)) {
+            setDateError(t('ridelog.error_date'));
+            return;
+        }
+        setDateError('');
+
+        const parsedDistance = parseDecimal(distanceKm);
+        const newTrackedKm = trackWear && rideBikeId && parsedDistance > 0 ? parsedDistance : 0;
 
         const rideData: Ride = {
-            id: editingRide?.id ?? Date.now().toString(),
+            id: editingRide?.id ?? newId(),
             date,
             location: location.trim(),
             trail: trail.trim(),
@@ -198,9 +222,10 @@ export default function RideLogScreen() {
             durationMin: parseInt(durationMin, 10) || 0,
             elevationM: parseInt(elevationM, 10) || 0,
             descentM: parseInt(descentM, 10) || 0,
-            maxSpeedKmh: parseFloat(maxSpeedKmh) || 0,
+            maxSpeedKmh: parseDecimal(maxSpeedKmh),
             terrain, difficulty, bikeType: rideBikeType,
             bikeId: rideBikeId, setupId: rideSetupId, setupFeel: rideSetupFeel.trim(),
+            wearTrackedKm: newTrackedKm,
             condition, mood,
             notes: notes.trim(),
             createdAt: editingRide?.createdAt ?? new Date().toISOString(),
@@ -211,48 +236,64 @@ export default function RideLogScreen() {
             updated = rides.map((r) => (r.id === editingRide.id ? rideData : r));
         } else {
             updated = [rideData, ...rides];
-
-            // Apply Wear Tracking (Shred Check Integration)
-            if (trackWear && rideBikeId && parsedDistance > 0) {
-                const updatedBikes = bikes.map(b => {
-                    if (b.id !== rideBikeId) return b;
-                    const updatedComps = b.components.map(c => {
-                        if (!c.wearItems || c.wearItems.length === 0) return c;
-                        const updatedWearItems = c.wearItems.map(w => ({
-                            ...w,
-                            currentKm: w.currentKm + parsedDistance
-                        }));
-                        return { ...c, wearItems: updatedWearItems, currentKm: updatedWearItems[0]?.currentKm ?? c.currentKm };
-                    });
-                    return { ...b, components: updatedComps };
-                });
-                await syncSaveBikes(updatedBikes);
-                setBikes(updatedBikes);
-            }
         }
 
-        await persist(updated);
+        // Wear tracking (Shred-Check integration): on edit, reverse the previous
+        // charge first, then apply the new one — prevents double-counting.
+        let workingBikes = bikes;
+        const applyWear = async (bikeId: string, deltaKm: number) => {
+            const bike = workingBikes.find((b) => b.id === bikeId);
+            if (!bike || deltaKm === 0) return;
+            const changed: SyncComponent[] = [];
+            const updatedComps = bike.components.map((c) => {
+                if (c.isWearTracked !== true || !c.wearItems || c.wearItems.length === 0) return c;
+                const updatedComp = {
+                    ...c,
+                    wearItems: c.wearItems.map((w) => ({
+                        ...w,
+                        currentKm: Math.max(0, w.currentKm + deltaKm),
+                    })),
+                };
+                changed.push(updatedComp);
+                return updatedComp;
+            });
+            if (changed.length === 0) return;
+            workingBikes = workingBikes.map((b) => (b.id === bikeId ? { ...b, components: updatedComps } : b));
+            await Promise.all(changed.map((c) => syncUpdateComponent(bikeId, c)));
+        };
+
+        if (editingRide) {
+            const oldKm = editingRide.wearTrackedKm ?? 0;
+            if (oldKm > 0 && editingRide.bikeId) await applyWear(editingRide.bikeId, -oldKm);
+        }
+        if (newTrackedKm > 0) await applyWear(rideBikeId, newTrackedKm);
+        if (workingBikes !== bikes) setBikes(workingBikes);
+
+        const ok = await persist(updated);
         setModalVisible(false);
         resetForm();
+        if (ok) {
+            showAlert(t('ridelog.save_success_title'), t('ridelog.save_success_msg'));
+        } else {
+            showAlert(t('ridelog.save_error_title'), t('ridelog.save_error_msg'));
+        }
     };
 
     const formatDate = (dateString: string) => {
         const d = new Date(dateString);
+        if (isNaN(d.getTime())) return dateString; // fallback for legacy bad data
         return d.toLocaleDateString(i18n.language);
     };
 
-    const confirmDelete = (rideId: string) => {
-        Alert.alert(t('ridelog.delete_prompt_title'), t('ridelog.delete_prompt_msg'), [
-            { text: t('common.cancel'), style: 'cancel' },
-            {
-                text: 'Löschen',
-                style: 'destructive',
-                onPress: async () => {
-                    await syncDeleteFromTable('rides', '@bikepro_rides', rideId);
-                    persist(rides.filter((r) => r.id !== rideId));
-                },
-            },
-        ]);
+    const confirmDelete = async (rideId: string) => {
+        const confirmed = await confirmDialog(t('ridelog.delete_prompt_title'), t('ridelog.delete_prompt_msg'));
+        if (!confirmed) return;
+        // syncDeleteFromTable already removes the row locally (AsyncStorage) + in the cloud
+        const ok = await syncDeleteFromTable('rides', '@bikepro_rides', rideId);
+        setRides(rides.filter((r) => r.id !== rideId));
+        if (!ok) {
+            showAlert(t('ridelog.save_error_title'), t('ridelog.delete_error_msg'));
+        }
     };
 
     // Stats summary
@@ -408,6 +449,7 @@ export default function RideLogScreen() {
                     value={date}
                     onChangeText={setDate}
                     accentColor={ACCENT}
+                    error={dateError}
                 />
                 <BPInput
                     label={t('ridelog.location')}
@@ -447,7 +489,7 @@ export default function RideLogScreen() {
                     accentColor={ACCENT}
                 />
 
-                {!editingRide && rideBikeId ? (
+                {rideBikeId ? (
                     <View style={styles.wearToggleRow}>
                         <Text style={styles.wearToggleText}>♻️ Verschleiß auf Bike anrechnen?</Text>
                         <Switch

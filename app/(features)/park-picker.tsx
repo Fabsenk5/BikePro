@@ -548,9 +548,9 @@ const bikeparks: Bikepark[] = [
 ];
 
 function getGoLabel(score: number, t: any): { label: string; color: string } {
-    if (score >= 80) return { label: t('park_picker.go_lets_go'), color: '#4CAF50' };
-    if (score >= 60) return { label: t('park_picker.go_doable'), color: '#FFC107' };
-    if (score >= 40) return { label: t('park_picker.go_risky'), color: '#FF9800' };
+    if (score >= 8) return { label: t('park_picker.go_lets_go'), color: '#4CAF50' };
+    if (score >= 6) return { label: t('park_picker.go_doable'), color: '#FFC107' };
+    if (score >= 4) return { label: t('park_picker.go_risky'), color: '#FF9800' };
     return { label: t('park_picker.go_no_go'), color: '#F44336' };
 }
 
@@ -611,9 +611,9 @@ export default function ParkPickerScreen() {
         let score = 0;
         if (park.liftStatus === 'open') score += 5;
         if (park.liftStatus === 'partial') score += 2;
-        if (park.weather.condition === '☀️') score += 3;
-        if (park.weather.condition === '⛅') score += 2;
-        if (park.weather.condition === '🌧️') score -= 2;
+        if (park.weather.icon === '☀️') score += 3;
+        if (park.weather.icon === '⛅') score += 2;
+        if (park.weather.icon === '🌧️') score -= 2;
         if (park.weather.temp > 15 && park.weather.temp < 25) score += 2; // Optimal temp
         return score;
     };
@@ -625,9 +625,15 @@ export default function ParkPickerScreen() {
         return getGoScore(b) - getGoScore(a);
     });
 
-    const onRefresh = useCallback(() => {
+    const onRefresh = useCallback(async () => {
+        // No live data yet — refresh only reloads persisted favorites
         setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 1000);
+        try {
+            const data = await syncLoadPreference<string[]>('park_favorites', FAVORITES_KEY);
+            if (data) setFavorites(data);
+        } finally {
+            setRefreshing(false);
+        }
     }, []);
 
     return (
@@ -673,7 +679,7 @@ export default function ParkPickerScreen() {
                     return (
                         <TouchableOpacity
                             key={park.id}
-                            onPress={() => Linking.openURL(park.website)}
+                            onPress={() => Linking.openURL(park.website).catch(() => {})}
                             activeOpacity={0.85}
                         >
                             <BPCard style={styles.parkCard}>
