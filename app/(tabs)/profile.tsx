@@ -2,7 +2,7 @@
  * Profile Screen — Shows user info, admin badge, stats, and logout.
  * If not logged in, shows login prompt.
  */
-import { BPButton, BPCard, BPInput, BPPicker } from '@/components/ui';
+import { BPButton, BPCard, BPInput, BPPicker, screenContentStyle } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { showAlert } from '@/lib/dialog';
@@ -318,8 +318,7 @@ export default function ProfileScreen() {
                     <BPButton
                         title={`🚪 ${t('common.logout')}`}
                         onPress={handleLogout}
-                        color="#F44336"
-                        variant="secondary"
+                        variant="danger"
                         fullWidth
                     />
                 </View>
@@ -331,7 +330,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing.lg },
-    scrollContent: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
+    scrollContent: { ...screenContentStyle, padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
     headerWrap: { alignItems: 'center', marginBottom: theme.spacing.xl },
     avatar: { fontSize: 64, marginBottom: theme.spacing.sm },
     title: { color: theme.colors.text, fontSize: 28, fontWeight: '800', letterSpacing: 1 },

@@ -6,8 +6,8 @@
  * Phase 1: Curated list mit YouTube Embeds (kein API Key nötig)
  * Phase 2: YouTube Data API v3 für automatische Suche
  */
-import { BPCard, BPPicker } from '@/components/ui';
-import { theme } from '@/constants/Colors';
+import { BPCard, BPEmptyState, BPPicker, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
 import { Stack } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,11 +18,10 @@ import {
     StatusBar,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
 } from 'react-native';
 
-const ACCENT = '#00E5FF'; // Trail-Video accent
+const ACCENT = featureColors['trail-video'];
 
 // --- Curated video data ---
 interface CuratedVideo {
@@ -155,8 +154,6 @@ export default function TrailVideoScreen() {
             <Stack.Screen
                 options={{
                     title: t('trail_video.title'),
-                    headerStyle: { backgroundColor: theme.colors.surface },
-                    headerTintColor: theme.colors.text,
                 }}
             />
             <StatusBar barStyle="light-content" />
@@ -183,63 +180,56 @@ export default function TrailVideoScreen() {
 
                 {/* Video cards */}
                 {filtered.map((video) => (
-                    <TouchableOpacity
+                    <BPCard
                         key={video.id}
                         onPress={() => openVideo(video.youtubeId)}
-                        activeOpacity={0.85}
+                        style={[
+                            styles.videoCard,
+                            video.featured && category === 'all' && styles.featuredCard,
+                        ]}
                     >
-                        <BPCard
-                            style={[
-                                styles.videoCard,
-                                video.featured && category === 'all' && styles.featuredCard,
-                            ]}
-                        >
-                            {/* Thumbnail */}
-                            <View style={styles.thumbnailWrap}>
-                                <Image
-                                    source={{ uri: getThumbnail(video.youtubeId) }}
-                                    style={styles.thumbnail}
-                                    resizeMode="cover"
-                                />
-                                {/* Play overlay */}
-                                <View style={styles.playOverlay}>
-                                    <View style={styles.playButton}>
-                                        <Text style={styles.playIcon}>▶</Text>
-                                    </View>
+                        {/* Thumbnail */}
+                        <View style={styles.thumbnailWrap}>
+                            <Image
+                                source={{ uri: getThumbnail(video.youtubeId) }}
+                                style={styles.thumbnail}
+                                resizeMode="cover"
+                            />
+                            {/* Play overlay */}
+                            <View style={styles.playOverlay}>
+                                <View style={styles.playButton}>
+                                    <Text style={styles.playIcon}>▶</Text>
                                 </View>
-                                {/* Duration badge */}
-                                <View style={styles.durationBadge}>
-                                    <Text style={styles.durationText}>{video.duration}</Text>
-                                </View>
-                                {/* Featured badge */}
-                                {video.featured && (
-                                    <View style={[styles.featuredBadge, { backgroundColor: ACCENT }]}>
-                                        <Text style={styles.featuredBadgeText}>{t('trail_video.badge_featured')}</Text>
-                                    </View>
-                                )}
                             </View>
+                            {/* Duration badge */}
+                            <View style={styles.durationBadge}>
+                                <Text style={styles.durationText}>{video.duration}</Text>
+                            </View>
+                            {/* Featured badge */}
+                            {video.featured && (
+                                <View style={[styles.featuredBadge, { backgroundColor: ACCENT }]}>
+                                    <Text style={styles.featuredBadgeText}>{t('trail_video.badge_featured')}</Text>
+                                </View>
+                            )}
+                        </View>
 
-                            {/* Info */}
-                            <View style={styles.videoInfo}>
-                                <Text style={styles.videoTitle} numberOfLines={2}>
-                                    {video.title}
+                        {/* Info */}
+                        <View style={styles.videoInfo}>
+                            <Text style={styles.videoTitle} numberOfLines={2}>
+                                {video.title}
+                            </Text>
+                            <View style={styles.videoMeta}>
+                                <Text style={styles.videoChannel}>{video.channel}</Text>
+                                <Text style={styles.videoCat}>
+                                    {categoryOptions.find((c) => c.value === video.category)?.label}
                                 </Text>
-                                <View style={styles.videoMeta}>
-                                    <Text style={styles.videoChannel}>{video.channel}</Text>
-                                    <Text style={styles.videoCat}>
-                                        {categoryOptions.find((c) => c.value === video.category)?.label}
-                                    </Text>
-                                </View>
                             </View>
-                        </BPCard>
-                    </TouchableOpacity>
+                        </View>
+                    </BPCard>
                 ))}
 
                 {filtered.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>🎬</Text>
-                        <Text style={styles.emptyTitle}>{t('trail_video.no_videos')}</Text>
-                    </View>
+                    <BPEmptyState icon="🎬" title={t('trail_video.no_videos')} />
                 )}
             </ScrollView>
         </View>
@@ -252,6 +242,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     scrollContent: {
+        ...screenContentStyle,
         padding: theme.spacing.lg,
         paddingBottom: theme.spacing.xxl,
     },
@@ -299,7 +290,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(255,255,255,0.3)',
     },
     playIcon: {
-        color: '#fff',
+        color: theme.colors.text,
         fontSize: 22,
         marginLeft: 3,
     },
@@ -313,7 +304,7 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     durationText: {
-        color: '#fff',
+        color: theme.colors.text,
         fontSize: 11,
         fontWeight: '700',
     },
@@ -326,7 +317,7 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
     featuredBadgeText: {
-        color: '#000',
+        color: theme.colors.onAccent,
         fontSize: 10,
         fontWeight: '800',
     },
@@ -352,18 +343,5 @@ const styles = StyleSheet.create({
     videoCat: {
         color: theme.colors.textMuted,
         fontSize: 12,
-    },
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: theme.spacing.xxl * 2,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: theme.spacing.md,
-    },
-    emptyTitle: {
-        color: theme.colors.text,
-        fontSize: 18,
-        fontWeight: '700',
     },
 });

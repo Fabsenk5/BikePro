@@ -6,8 +6,8 @@
  *         Tubeless/Schlauch, Reifentyp, Casing, Fahrstil, Untergrund, Wetterlage
  * Logik: Erweiterte Matrix basierend auf Hersteller-Empfehlungen + Praxis-Werte
  */
-import { BPButton, BPCard, BPInput, BPPicker, BPSlider } from '@/components/ui';
-import { theme } from '@/constants/Colors';
+import { BPButton, BPCard, BPInput, BPPicker, BPSegmentedControl, BPSlider, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
 import { showAlert } from '@/lib/dialog';
 import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useRouter } from 'expo-router';
@@ -18,11 +18,10 @@ import {
     StatusBar,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
 } from 'react-native';
 
-const ACCENT = '#FFD600';
+const ACCENT = featureColors['pressure-bot'];
 
 // Semantic setup-value keys with legacy German-label fallback (lib/sync.ts migrates old labels on load).
 const getSetupValue = (values: any[] | undefined, key: string, legacyKey: string): string | undefined => {
@@ -467,10 +466,15 @@ export default function PressureBotScreen() {
                         return { ...c, setupValues: newSetup };
                     }
                 } else if (activeTab === 'suspension') {
+                    // Format pressures/spring rate in the user's preferred units
+                    // (suspResult values are PSI / lbs-in internally)
+                    const fmtPsi = (psi: number) => units.pressure === 'bar'
+                        ? `${(psi / 14.5038).toFixed(2)} bar`
+                        : `${psi} PSI`;
                     if (c.type === 'fork') {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
                         const dIdx = newSetup.findIndex((s: any) => s.key === 'pressure' || s.key === 'Druck');
-                        const vStr = `${suspResult.forkPsi} PSI`;
+                        const vStr = fmtPsi(suspResult.forkPsi);
                         if (dIdx >= 0) newSetup[dIdx] = { ...newSetup[dIdx], key: 'pressure', value: vStr };
                         else newSetup.push({ key: 'pressure', value: vStr });
                         return { ...c, setupValues: newSetup };
@@ -479,7 +483,9 @@ export default function PressureBotScreen() {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
                         const keyName = shockType === 'coil' ? 'spring_rate' : 'pressure';
                         const dIdx = newSetup.findIndex((s: any) => s.key === keyName || s.key === 'Druck' || s.key === 'Federhärte');
-                        const vStr = shockType === 'coil' ? `${suspResult.shockPsi} lbs` : `${suspResult.shockPsi} PSI`;
+                        const vStr = shockType === 'coil'
+                            ? (units.weight === 'kg' ? `${Math.round(suspResult.shockPsi / 2.20462)} kg` : `${suspResult.shockPsi} lbs`)
+                            : fmtPsi(suspResult.shockPsi);
                         if (dIdx >= 0) newSetup[dIdx] = { ...newSetup[dIdx], key: keyName, value: vStr };
                         else newSetup.push({ key: keyName, value: vStr });
 
@@ -512,8 +518,6 @@ export default function PressureBotScreen() {
             <Stack.Screen
                 options={{
                     title: t('pressure_bot.title'),
-                    headerStyle: { backgroundColor: theme.colors.surface },
-                    headerTintColor: theme.colors.text,
                 }}
             />
             <StatusBar barStyle="light-content" />
@@ -523,14 +527,15 @@ export default function PressureBotScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Mode Switch */}
-                <View style={{ flexDirection: 'row', backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: 4, marginBottom: theme.spacing.md }}>
-                    <TouchableOpacity style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: activeTab === 'tires' ? ACCENT : 'transparent', borderRadius: theme.radius.sm }} onPress={() => setActiveTab('tires')}>
-                        <Text style={{ fontWeight: '700', color: activeTab === 'tires' ? '#000' : theme.colors.text }}>🛞 {t('pressure_bot.tab_tires', { defaultValue: 'Reifen' })}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: activeTab === 'suspension' ? ACCENT : 'transparent', borderRadius: theme.radius.sm }} onPress={() => setActiveTab('suspension')}>
-                        <Text style={{ fontWeight: '700', color: activeTab === 'suspension' ? '#000' : theme.colors.text }}>🔱 {t('pressure_bot.tab_suspension', { defaultValue: 'Fahrwerk' })}</Text>
-                    </TouchableOpacity>
-                </View>
+                <BPSegmentedControl
+                    options={[
+                        { label: `🛞 ${t('pressure_bot.tab_tires', { defaultValue: 'Reifen' })}`, value: 'tires' },
+                        { label: `🔱 ${t('pressure_bot.tab_suspension', { defaultValue: 'Fahrwerk' })}`, value: 'suspension' },
+                    ]}
+                    value={activeTab}
+                    onChange={(v) => setActiveTab(v as 'tires' | 'suspension')}
+                    accentColor={ACCENT}
+                />
 
                 {/* Result card Tires */}
                 {activeTab === 'tires' && (
@@ -580,18 +585,16 @@ export default function PressureBotScreen() {
                                     const ts = newId();
                                     router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&frontBar=${fb}&rearBar=${rb}&ts=${ts}`);
                                 }}
+                                variant="outline"
                                 color={ACCENT}
-                                style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '60', borderWidth: 1 }}
-                                textStyle={{ color: ACCENT }}
                                 fullWidth
                             />
                             {selectedBikeId ? (
                                 <BPButton
                                     title={savingToBike ? "⏳ Wird gespeichert..." : "💾 Im Component Tracker (Räder) speichern"}
                                     onPress={handleSaveToBike}
+                                    variant="outline"
                                     color={theme.colors.accentCyan}
-                                    style={{ backgroundColor: theme.colors.accentCyan + '20', borderColor: theme.colors.accentCyan + '60', borderWidth: 1 }}
-                                    textStyle={{ color: theme.colors.accentCyan }}
                                     fullWidth
                                     disabled={savingToBike}
                                 />
@@ -669,9 +672,8 @@ export default function PressureBotScreen() {
                                         : `shockPsi=${suspResult.shockPsi}`;
                                     router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&ts=${ts}&forkPsi=${suspResult.forkPsi}&forkClicks=${suspResult.rawForkClicks}&forkCompClicks=${suspResult.rawForkCompClicks}&${shockParams}&shockClicks=${suspResult.rawShockClicks}&shockCompClicks=${suspResult.rawShockCompClicks}`);
                                 }}
+                                variant="outline"
                                 color={ACCENT}
-                                style={{ backgroundColor: ACCENT + '20', borderColor: ACCENT + '60', borderWidth: 1 }}
-                                textStyle={{ color: ACCENT }}
                                 fullWidth
                             />
                         </View>
@@ -746,7 +748,7 @@ export default function PressureBotScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
-    scrollContent: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
+    scrollContent: { ...screenContentStyle, padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
     resultCard: { marginBottom: theme.spacing.lg, padding: theme.spacing.lg },
     resultTitle: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5, textAlign: 'center', marginBottom: theme.spacing.md },
     resultRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },

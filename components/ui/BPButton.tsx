@@ -21,7 +21,9 @@ import Animated, {
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'outline';
+const onAccent = theme.colors.onAccent;
+
+type Variant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 interface BPButtonProps {
@@ -110,16 +112,16 @@ function getVariantStyles(variant: Variant, color: string) {
         case 'primary':
             return {
                 button: { backgroundColor: color, borderWidth: 0 } as ViewStyle,
-                textColor: '#000',
+                textColor: onAccent,
             };
         case 'secondary':
             return {
                 button: {
-                    backgroundColor: 'transparent',
-                    borderWidth: 1.5,
-                    borderColor: color,
+                    backgroundColor: theme.colors.elevated,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
                 } as ViewStyle,
-                textColor: color,
+                textColor: theme.colors.text,
             };
         case 'ghost':
             return {
@@ -134,6 +136,11 @@ function getVariantStyles(variant: Variant, color: string) {
                     borderColor: color,
                 } as ViewStyle,
                 textColor: color,
+            };
+        case 'danger':
+            return {
+                button: { backgroundColor: theme.colors.accentRed, borderWidth: 0 } as ViewStyle,
+                textColor: onAccent,
             };
     }
 }

@@ -1,4 +1,5 @@
 import { theme } from '@/constants/Colors';
+import Slider from '@react-native-community/slider';
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 
@@ -11,6 +12,7 @@ interface BPSliderProps {
     unit?: string;
     accentColor?: string;
     onValueChange: (value: number) => void;
+    formatValue?: (value: number) => string;
     containerStyle?: ViewStyle;
     disabled?: boolean;
 }
@@ -24,10 +26,11 @@ export default function BPSlider({
     unit = '',
     accentColor = theme.colors.accent,
     onValueChange,
+    formatValue,
     containerStyle,
     disabled,
 }: BPSliderProps) {
-    const progress = Math.max(0, Math.min(1, (value - min) / (max - min)));
+    const display = (v: number) => (formatValue ? formatValue(v) : `${v}${unit}`);
 
     const handleIncrement = useCallback(() => {
         if (disabled) return;
@@ -45,13 +48,17 @@ export default function BPSlider({
         onValueChange(Math.round((next + Number.EPSILON) * 1000) / 1000);
     }, [value, min, step, onValueChange, disabled]);
 
+    const handleSlide = useCallback((v: number) => {
+        onValueChange(Math.round((v + Number.EPSILON) * 1000) / 1000);
+    }, [onValueChange]);
+
     return (
         <View style={[styles.container, containerStyle]}>
             {label && (
                 <View style={styles.headerRow}>
                     <Text style={styles.label}>{label}</Text>
                     <Text style={[styles.valueText, { color: accentColor }]}>
-                        {value}{unit}
+                        {display(value)}
                     </Text>
                 </View>
             )}
@@ -68,27 +75,19 @@ export default function BPSlider({
                     <Text style={styles.stepButtonText}>−</Text>
                 </TouchableOpacity>
 
-                {/* Track */}
-                <View style={styles.track}>
-                    <View
-                        style={[
-                            styles.fill,
-                            {
-                                width: `${progress * 100}%`,
-                                backgroundColor: accentColor,
-                            },
-                        ]}
-                    />
-                    <View
-                        style={[
-                            styles.glow,
-                            {
-                                width: `${progress * 100}%`,
-                                backgroundColor: accentColor,
-                            },
-                        ]}
-                    />
-                </View>
+                {/* Draggable track */}
+                <Slider
+                    style={styles.slider}
+                    value={Number(value) || 0}
+                    minimumValue={min}
+                    maximumValue={max}
+                    step={step}
+                    onValueChange={handleSlide}
+                    minimumTrackTintColor={accentColor}
+                    maximumTrackTintColor={theme.colors.elevated}
+                    thumbTintColor={accentColor}
+                    disabled={disabled}
+                />
 
                 {/* Plus button */}
                 <TouchableOpacity
@@ -103,8 +102,8 @@ export default function BPSlider({
             </View>
 
             <View style={styles.rangeRow}>
-                <Text style={styles.rangeText}>{min}{unit}</Text>
-                <Text style={styles.rangeText}>{max}{unit}</Text>
+                <Text style={styles.rangeText}>{display(min)}</Text>
+                <Text style={styles.rangeText}>{display(max)}</Text>
             </View>
         </View>
     );
@@ -152,25 +151,9 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         lineHeight: 22,
     },
-    track: {
+    slider: {
         flex: 1,
-        height: 8,
-        backgroundColor: theme.colors.elevated,
-        borderRadius: 4,
-        overflow: 'hidden',
-        position: 'relative',
-    },
-    fill: {
-        height: '100%',
-        borderRadius: 4,
-    },
-    glow: {
-        position: 'absolute',
-        top: -2,
-        left: 0,
-        height: 12,
-        borderRadius: 6,
-        opacity: 0.2,
+        height: 36,
     },
     rangeRow: {
         flexDirection: 'row',

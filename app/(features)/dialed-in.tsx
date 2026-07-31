@@ -8,8 +8,8 @@
  * - Tire setup (Front/Rear)
  * - Bike integration with Component Tracker
  */
-import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPSlider } from '@/components/ui';
-import { theme } from '@/constants/Colors';
+import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPSegmentedControl, BPSlider, BPToggle, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -20,13 +20,12 @@ import {
     ScrollView,
     StatusBar,
     StyleSheet,
-    Switch,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
 
-const ACCENT = '#FF6B2C';
+const ACCENT = featureColors['dialed-in'];
 const SETUPS_KEY = '@bikepro_setups';
 const UNITS_KEY = '@bikepro_units';
 const BAR_TO_PSI = 14.5038;
@@ -501,7 +500,8 @@ export default function DialedInScreen() {
     const handleDelete = async (id: string) => {
         const confirmed = await confirmDialog(
             t('dialed.delete_setup_title'),
-            t('dialed.delete_setup_message')
+            t('dialed.delete_setup_message'),
+            t('common.cancel')
         );
         if (!confirmed) return;
         await syncDeleteFromTable('suspension_setups', '@bikepro_setups', id);
@@ -562,7 +562,7 @@ export default function DialedInScreen() {
 
     return (
         <View style={styles.container}>
-            <Stack.Screen options={{ title: t('dialed.title'), headerStyle: { backgroundColor: theme.colors.surface }, headerTintColor: theme.colors.text }} />
+            <Stack.Screen options={{ title: t('dialed.title') }} />
             <StatusBar barStyle="light-content" />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -576,15 +576,14 @@ export default function DialedInScreen() {
                         <ActivityIndicator color={ACCENT} />
                     </View>
                 ) : setups.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>⚙️</Text>
-                        <Text style={styles.emptyTitle}>{t('dialed.no_setups')}</Text>
-                        <Text style={styles.emptySubtitle}>{t('dialed.create_first_setup')}</Text>
-                    </View>
+                    <BPEmptyState
+                        icon="⚙️"
+                        title={t('dialed.no_setups')}
+                        subtitle={t('dialed.create_first_setup')}
+                    />
                 ) : (
                     setups.map(setup => (
-                        <TouchableOpacity key={setup.id} onPress={() => openEditSetup(setup)} activeOpacity={0.8}>
-                            <BPCard accentColor={ACCENT} style={styles.setupCard}>
+                        <BPCard key={setup.id} accentColor={ACCENT} style={styles.setupCard} onPress={() => openEditSetup(setup)}>
                                 <View style={styles.cardHeader}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.cardTitle}>{setup.name}</Text>
@@ -680,17 +679,14 @@ export default function DialedInScreen() {
                                         {setup.tags.map(tVal => {
                                             const lbl = TAG_OPTIONS.find(o => o.value === tVal)?.label || tVal;
                                             return (
-                                                <View key={tVal} style={{ backgroundColor: ACCENT + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                                                    <Text style={{ color: ACCENT, fontSize: 10, fontWeight: '700' }}>{lbl}</Text>
-                                                </View>
+                                                <BPChip key={tVal} label={lbl} color={ACCENT} small />
                                             );
                                         })}
                                     </View>
                                 )}
 
                                 {setup.notes ? <Text style={styles.cardNotes}>{setup.notes}</Text> : null}
-                            </BPCard>
-                        </TouchableOpacity>
+                        </BPCard>
                     ))
                 )}
             </ScrollView>
@@ -704,15 +700,15 @@ export default function DialedInScreen() {
                 <BPPicker label={t('dialed.bike')} options={bikeOptions} value={bikeId} onValueChange={handleBikeChange} accentColor={ACCENT} />
 
                 {/* Component Tab */}
-                <BPPicker
-                    label={t('dialed.component')}
+                <Text style={styles.configLabel}>{t('dialed.component')}</Text>
+                <BPSegmentedControl
                     options={[
                         { label: t('dialed.fork'), value: 'fork' },
                         { label: t('dialed.shock'), value: 'shock' },
                         { label: t('dialed.tires'), value: 'tires' },
                     ]}
                     value={activeTab}
-                    onValueChange={v => setActiveTab(v as 'fork' | 'shock' | 'tires')}
+                    onChange={v => setActiveTab(v as 'fork' | 'shock' | 'tires')}
                     accentColor={ACCENT}
                 />
 
@@ -720,15 +716,12 @@ export default function DialedInScreen() {
                 {activeSuspension && (
                     <>
                         {activeTab === 'shock' && (
-                            <View style={styles.configToggle}>
-                                <Text style={styles.configLabel}>{t('dialed.coil_shock')}</Text>
-                                <Switch
-                                    value={(activeSuspension.mode ?? 'air') === 'coil'}
-                                    onValueChange={v => updateSusValue('mode', v ? 'coil' : 'air')}
-                                    trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
-                                    thumbColor={(activeSuspension.mode ?? 'air') === 'coil' ? ACCENT : theme.colors.textMuted}
-                                />
-                            </View>
+                            <BPToggle
+                                label={t('dialed.coil_shock')}
+                                value={(activeSuspension.mode ?? 'air') === 'coil'}
+                                onValueChange={v => updateSusValue('mode', v ? 'coil' : 'air')}
+                                accentColor={ACCENT}
+                            />
                         )}
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
@@ -756,15 +749,12 @@ export default function DialedInScreen() {
                             <View style={styles.configSection}>
                                 <Text style={styles.subSectionTitle}>{t('dialed.rebound')}</Text>
                                 {!compConfig.isReboundOverridden && (
-                                    <View style={styles.configToggle}>
-                                        <Text style={styles.configLabel}>{t('dialed.rebound_hsls')}</Text>
-                                        <Switch
-                                            value={compConfig.rMode === 'hsls'}
-                                            onValueChange={v => updateConfig('reboundMode', v ? 'hsls' : 'clicks')}
-                                            trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
-                                            thumbColor={compConfig.rMode === 'hsls' ? ACCENT : theme.colors.textMuted}
-                                        />
-                                    </View>
+                                    <BPToggle
+                                        label={t('dialed.rebound_hsls')}
+                                        value={compConfig.rMode === 'hsls'}
+                                        onValueChange={v => updateConfig('reboundMode', v ? 'hsls' : 'clicks')}
+                                        accentColor={ACCENT}
+                                    />
                                 )}
 
                                 {compConfig.rMode === 'clicks' && (
@@ -858,19 +848,13 @@ export default function DialedInScreen() {
                     {TAG_OPTIONS.map(tagOpt => {
                         const isActive = tags.includes(tagOpt.value);
                         return (
-                            <TouchableOpacity
+                            <BPChip
                                 key={tagOpt.value}
+                                label={tagOpt.label}
+                                selected={isActive}
+                                color={ACCENT}
                                 onPress={() => setTags(prev => isActive ? prev.filter(t => t !== tagOpt.value) : [...prev, tagOpt.value])}
-                                style={{
-                                    backgroundColor: isActive ? ACCENT : theme.colors.elevated,
-                                    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-                                    borderWidth: 1, borderColor: isActive ? ACCENT : theme.colors.border
-                                }}
-                            >
-                                <Text style={{ color: isActive ? '#fff' : theme.colors.text, fontSize: 13, fontWeight: '600' }}>
-                                    {tagOpt.label}
-                                </Text>
-                            </TouchableOpacity>
+                            />
                         );
                     })}
                 </View>
@@ -921,7 +905,7 @@ export default function DialedInScreen() {
                                 <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>{issue.label}</Text>
                             </TouchableOpacity>
                         ))}
-                        <BPButton title="Zurück zu Kategorien" onPress={() => setWizardStep('category')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
+                        <BPButton title={t('dialed.wizard_back_categories')} onPress={() => setWizardStep('category')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
                     </>
                 )}
 
@@ -935,7 +919,7 @@ export default function DialedInScreen() {
                             setWizardVisible(false);
                             openNewSetup();
                         }} color={ACCENT} fullWidth />
-                        <BPButton title="Zurück" onPress={() => setWizardStep('issue')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
+                        <BPButton title={t('common.back')} onPress={() => setWizardStep('issue')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
                     </>
                 )}
             </BPModal>
@@ -945,12 +929,9 @@ export default function DialedInScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
-    scrollContent: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
+    scrollContent: { ...screenContentStyle, padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
     btnRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
     emptyState: { alignItems: 'center', paddingVertical: theme.spacing.xxl * 2 },
-    emptyIcon: { fontSize: 48, marginBottom: theme.spacing.md },
-    emptyTitle: { color: theme.colors.text, fontSize: 20, fontWeight: '700' },
-    emptySubtitle: { color: theme.colors.textMuted, fontSize: 14, marginTop: 8 },
     setupCard: { marginTop: theme.spacing.md, padding: theme.spacing.md },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     cardTitle: { color: theme.colors.text, fontSize: 17, fontWeight: '700', flex: 1 },
@@ -971,6 +952,5 @@ const styles = StyleSheet.create({
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     subSectionTitle: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginTop: theme.spacing.md, marginBottom: 4 },
     configSection: { backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: theme.spacing.sm, marginTop: theme.spacing.sm },
-    configToggle: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.sm },
     configLabel: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
 });

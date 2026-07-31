@@ -6,27 +6,24 @@
  * Kategorien: Cockpit, Fahrwerk, Bremsen, Antrieb, Laufräder, Geometrie, Ergonomie
  * Daten: Statische JSON-Struktur, lokal gebündelt
  */
-import { BPCard, BPButton, BPInput } from '@/components/ui';
-import { theme } from '@/constants/Colors';
+import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPSearchInput, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
 import { syncLoadPreference, syncLoadWikiOverrides, syncSavePreference, syncSaveWikiOverride } from '@/lib/sync';
 import { showAlert } from '@/lib/dialog';
 import { Stack } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ActivityIndicator,
-    Modal,
     ScrollView,
     StatusBar,
     StyleSheet,
     Text,
-    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
 import { useAuth } from '@/context/AuthContext';
 
-const ACCENT = '#7C4DFF';
+const ACCENT = featureColors['setup-guide'];
 
 // --- Wiki Data Structure ---
 interface WikiArticle {
@@ -91,7 +88,7 @@ export default function SetupGuideScreen() {
 
         setIsSaving(false);
         if (!ok) {
-            showAlert('Fehler', 'Konnte die Änderungen nicht speichern.');
+            showAlert(t('setup_guide.save_error_title'), t('setup_guide.save_error_msg'));
         } else {
             setIsEditing(null);
             fetchOverrides();
@@ -560,16 +557,11 @@ export default function SetupGuideScreen() {
         }
     };
 
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => setMounted(true), []);
-
     return (
         <View style={styles.container}>
             <Stack.Screen
                 options={{
                     title: t('setup_guide.title'),
-                    headerStyle: { backgroundColor: theme.colors.surface },
-                    headerTintColor: theme.colors.text,
                 }}
             />
             <StatusBar barStyle="light-content" />
@@ -578,36 +570,25 @@ export default function SetupGuideScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={styles.searchWrap}>
-                    <Text style={styles.searchIcon}>🔍</Text>
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder={t('setup_guide.search_placeholder')}
-                        placeholderTextColor={theme.colors.textMuted}
-                        value={searchQuery}
-                        onChangeText={(text) => {
-                            setSearchQuery(text);
-                            if (text.trim()) setSelectedCategory(null);
-                        }}
-                        selectionColor={ACCENT}
-                    />
-                    {searchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Text style={styles.clearBtn}>✕</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
+                <BPSearchInput
+                    value={searchQuery}
+                    onChangeText={(text) => {
+                        setSearchQuery(text);
+                        if (text.trim()) setSelectedCategory(null);
+                    }}
+                    placeholder={t('setup_guide.search_placeholder')}
+                    onClear={() => setSearchQuery('')}
+                />
 
                 {!selectedCategory && !searchQuery && (
                     <View style={styles.categoryGrid}>
                         {augmentedCategories.map((cat) => {
                             const count = cat.id === 'favorites' ? favorites.length : articles.filter(a => a.category === cat.id).length;
                             return (
-                                <TouchableOpacity
+                                <BPCard
                                     key={cat.id}
                                     style={styles.categoryCard}
                                     onPress={() => setSelectedCategory(cat.id)}
-                                    activeOpacity={0.8}
                                 >
                                     <Text style={styles.catEmoji}>{cat.emoji}</Text>
                                     <Text style={styles.catTitle}>{cat.title}</Text>
@@ -619,7 +600,7 @@ export default function SetupGuideScreen() {
                                             <TouchableOpacity onPress={() => moveCategory(cat.id, 1)} style={{ padding: 4 }}><Text>⬇️</Text></TouchableOpacity>
                                         </View>
                                     )}
-                                </TouchableOpacity>
+                                </BPCard>
                             );
                         })}
                     </View>
@@ -640,12 +621,11 @@ export default function SetupGuideScreen() {
                 {filteredArticles.map((article) => {
                     const expanded = expandedArticle === article.id;
                     return (
-                        <TouchableOpacity
+                        <BPCard
                             key={article.id}
                             onPress={() => toggleArticle(article.id)}
-                            activeOpacity={0.85}
+                            style={[styles.articleCard, expanded ? styles.articleExpanded : undefined]}
                         >
-                            <BPCard style={[styles.articleCard, expanded ? styles.articleExpanded : undefined]}>
                                 <View style={styles.articleHeader}>
                                     <View style={{ flex: 1 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -723,73 +703,46 @@ export default function SetupGuideScreen() {
 
                                         <View style={styles.tagRow}>
                                             {article.tags.map((tag) => (
-                                                <View key={tag} style={styles.tagChip}>
-                                                    <Text style={styles.tagText}>#{tag}</Text>
-                                                </View>
+                                                <BPChip key={tag} label={`#${tag}`} small />
                                             ))}
                                         </View>
                                     </View>
                                 )}
-                            </BPCard>
-                        </TouchableOpacity>
+                        </BPCard>
                     );
                 })}
 
                 {filteredArticles.length === 0 && (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>📚</Text>
-                        <Text style={styles.emptyTitle}>{t('setup_guide.no_articles')}</Text>
-                    </View>
+                    <BPEmptyState icon="📚" title={t('setup_guide.no_articles')} />
                 )}
             </ScrollView>
 
             {/* Admin Edit Modal */}
-            {mounted && (
-                <Modal visible={!!isEditing} animationType="slide" transparent>
-                    <View style={styles.modalBg}>
-                        <BPCard style={styles.modalCard}>
-                            <Text style={styles.modalTitle}>Artikel bearbeiten</Text>
-                            <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
-                                <BPInput label="Titel" value={editForm.title} onChangeText={t => setEditForm(p => ({ ...p, title: t }))} />
-                                <BPInput label="Zusammenfassung" value={editForm.summary} onChangeText={t => setEditForm(p => ({ ...p, summary: t }))} multiline />
-                                <BPInput label="Inhalt" value={editForm.content} onChangeText={t => setEditForm(p => ({ ...p, content: t }))} multiline style={{ height: 100 }} />
-                                <BPInput label="Empfohlene Werte" value={editForm.values} onChangeText={t => setEditForm(p => ({ ...p, values: t }))} multiline />
-                                <BPInput label="Tipp" value={editForm.tip} onChangeText={t => setEditForm(p => ({ ...p, tip: t }))} multiline />
-                            </ScrollView>
-                            <View style={styles.modalActions}>
-                                <BPButton title="Abbrechen" variant="secondary" onPress={() => setIsEditing(null)} style={{ flex: 1, marginRight: 8 }} />
-                                <BPButton title={isSaving ? "Speichern..." : "Speichern"} onPress={handleSaveOverride} style={{ flex: 1, marginLeft: 8 }} disabled={isSaving} />
-                            </View>
-                        </BPCard>
+            <BPModal
+                visible={!!isEditing}
+                onClose={() => setIsEditing(null)}
+                title="Artikel bearbeiten"
+                variant="center"
+                footer={
+                    <View style={styles.modalActions}>
+                        <BPButton title={t('common.cancel')} variant="secondary" onPress={() => setIsEditing(null)} style={{ flex: 1, marginRight: 8 }} />
+                        <BPButton title={isSaving ? t('setup_guide.saving') : t('common.save')} onPress={handleSaveOverride} style={{ flex: 1, marginLeft: 8 }} disabled={isSaving} />
                     </View>
-                </Modal>
-            )}
+                }
+            >
+                <BPInput label="Titel" value={editForm.title} onChangeText={t => setEditForm(p => ({ ...p, title: t }))} />
+                <BPInput label="Zusammenfassung" value={editForm.summary} onChangeText={t => setEditForm(p => ({ ...p, summary: t }))} multiline />
+                <BPInput label="Inhalt" value={editForm.content} onChangeText={t => setEditForm(p => ({ ...p, content: t }))} multiline style={{ height: 100 }} />
+                <BPInput label="Empfohlene Werte" value={editForm.values} onChangeText={t => setEditForm(p => ({ ...p, values: t }))} multiline />
+                <BPInput label="Tipp" value={editForm.tip} onChangeText={t => setEditForm(p => ({ ...p, tip: t }))} multiline />
+            </BPModal>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
-    scrollContent: { padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
-
-    searchWrap: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        paddingHorizontal: theme.spacing.md,
-        marginBottom: theme.spacing.lg,
-    },
-    searchIcon: { fontSize: 16, marginRight: 8 },
-    searchInput: {
-        flex: 1,
-        color: theme.colors.text,
-        fontSize: 15,
-        paddingVertical: 14,
-    },
-    clearBtn: { color: theme.colors.textMuted, fontSize: 16, padding: 4 },
+    scrollContent: { ...screenContentStyle, padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
 
     categoryGrid: {
         flexDirection: 'row',
@@ -800,11 +753,6 @@ const styles = StyleSheet.create({
     categoryCard: {
         width: '48%',
         flexGrow: 1,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.lg,
-        padding: theme.spacing.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
     },
     catEmoji: { fontSize: 28, marginBottom: 6 },
     catTitle: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
@@ -829,15 +777,6 @@ const styles = StyleSheet.create({
     infoValue: { fontSize: 13, fontWeight: '600', lineHeight: 20 },
 
     tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: theme.spacing.md },
-    tagChip: { backgroundColor: theme.colors.elevated, borderRadius: theme.radius.full, paddingHorizontal: 10, paddingVertical: 4 },
-    tagText: { color: theme.colors.textMuted, fontSize: 10, fontWeight: '600' },
 
-    emptyState: { alignItems: 'center', paddingVertical: theme.spacing.xxl * 2 },
-    emptyIcon: { fontSize: 48, marginBottom: theme.spacing.md },
-    emptyTitle: { color: theme.colors.text, fontSize: 18, fontWeight: '700' },
-
-    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: theme.spacing.lg },
-    modalCard: { width: '100%', padding: theme.spacing.xl, maxHeight: '90%' },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.text, marginBottom: theme.spacing.md },
     modalActions: { flexDirection: 'row', justifyContent: 'space-between', marginTop: theme.spacing.lg }
 });

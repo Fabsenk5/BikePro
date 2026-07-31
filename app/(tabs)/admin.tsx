@@ -1,4 +1,4 @@
-import { BPButton, BPCard, BPInput, BPModal } from '@/components/ui';
+import { BPButton, BPCard, BPInput, BPModal, screenContentStyle } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { confirmDialog, showAlert } from '@/lib/dialog';
@@ -94,7 +94,7 @@ export default function AdminScreen() {
     };
 
     const handlePasswordChange = async () => {
-        if (!newPassword || newPassword.length < 6) {
+        if (!newPassword || newPassword.length < 8) {
             showAlert(t('admin.error_title'), t('admin.pwd_too_short'));
             return;
         }
@@ -186,7 +186,7 @@ export default function AdminScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
-    scroll: { padding: theme.spacing.md, paddingBottom: 60 },
+    scroll: { ...screenContentStyle, padding: theme.spacing.md, paddingBottom: 60 },
     centerTarget: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.background },
     sectionTitle: { fontSize: 20, color: theme.colors.text, fontWeight: 'bold', marginBottom: theme.spacing.md, marginTop: theme.spacing.sm },
     emptyText: { color: theme.colors.textSecondary, fontStyle: 'italic', marginBottom: theme.spacing.lg },

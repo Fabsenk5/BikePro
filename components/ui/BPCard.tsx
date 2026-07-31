@@ -4,13 +4,14 @@
  */
 import { theme } from '@/constants/Colors';
 import React from 'react';
-import { StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
+import { Pressable, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 
 interface BPCardProps {
     children: React.ReactNode;
     accentColor?: string;
     style?: StyleProp<ViewStyle>;
     noPadding?: boolean;
+    onPress?: () => void;
 }
 
 export default function BPCard({
@@ -18,13 +19,36 @@ export default function BPCard({
     accentColor,
     style,
     noPadding = false,
+    onPress,
 }: BPCardProps) {
-    return (
-        <View style={[styles.card, !noPadding && styles.padded, style]}>
+    const content = (
+        <>
             {accentColor && (
                 <View style={[styles.accentBar, { backgroundColor: accentColor }]} />
             )}
             {children}
+        </>
+    );
+
+    if (onPress) {
+        return (
+            <Pressable
+                onPress={onPress}
+                style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
+                    styles.card,
+                    !noPadding && styles.padded,
+                    (hovered || pressed) && styles.hover,
+                    style,
+                ]}
+            >
+                {content}
+            </Pressable>
+        );
+    }
+
+    return (
+        <View style={[styles.card, !noPadding && styles.padded, style]}>
+            {content}
         </View>
     );
 }
@@ -47,5 +71,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: 3,
+    },
+    hover: {
+        backgroundColor: theme.colors.surfaceHover,
     },
 });

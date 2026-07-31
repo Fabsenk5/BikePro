@@ -12,6 +12,8 @@ import {
     ViewStyle
 } from 'react-native';
 
+const onAccent = theme.colors.onAccent;
+
 interface BPPickerOption {
     label: string;
     value: string;
@@ -97,7 +99,7 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     chipTextActive: {
-        color: '#000',
+        color: onAccent,
         fontWeight: '700',
     },
 });

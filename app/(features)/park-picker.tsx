@@ -6,8 +6,8 @@
  * Phase 1: Curated park data + OpenWeatherMap ready
  * Phase 2: Live Wetter-API + Web-Scraping für Liftstatus
  */
-import { BPCard, BPPicker } from '@/components/ui';
-import { theme } from '@/constants/Colors';
+import { BPCard, BPChip, BPPicker, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
 import { syncLoadPreference, syncSavePreference } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -23,7 +23,7 @@ import {
     View,
 } from 'react-native';
 
-const ACCENT = '#A8E10C'; // Park-Picker accent
+const ACCENT = featureColors['park-picker'];
 const FAVORITES_KEY = '@bikepro_park_favorites';
 
 // --- Bikepark data ---
@@ -548,10 +548,10 @@ const bikeparks: Bikepark[] = [
 ];
 
 function getGoLabel(score: number, t: any): { label: string; color: string } {
-    if (score >= 8) return { label: t('park_picker.go_lets_go'), color: '#4CAF50' };
-    if (score >= 6) return { label: t('park_picker.go_doable'), color: '#FFC107' };
-    if (score >= 4) return { label: t('park_picker.go_risky'), color: '#FF9800' };
-    return { label: t('park_picker.go_no_go'), color: '#F44336' };
+    if (score >= 8) return { label: t('park_picker.go_lets_go'), color: theme.colors.accentLime };
+    if (score >= 6) return { label: t('park_picker.go_doable'), color: theme.colors.accentYellow };
+    if (score >= 4) return { label: t('park_picker.go_risky'), color: theme.colors.accentOrange };
+    return { label: t('park_picker.go_no_go'), color: theme.colors.accentRed };
 }
 
 const countryMap: Record<string, string> = {
@@ -575,13 +575,13 @@ export default function ParkPickerScreen() {
     function getStatusInfo(status: Bikepark['liftStatus']) {
         switch (status) {
             case 'open':
-                return { color: '#4CAF50', label: t('park_picker.status_open'), emoji: '🟢' };
+                return { color: theme.colors.accentLime, label: t('park_picker.status_open'), emoji: '🟢' };
             case 'partial':
-                return { color: '#FFC107', label: t('park_picker.status_partial'), emoji: '🟡' };
+                return { color: theme.colors.accentYellow, label: t('park_picker.status_partial'), emoji: '🟡' };
             case 'closed':
-                return { color: '#F44336', label: t('park_picker.status_closed'), emoji: '🔴' };
+                return { color: theme.colors.accentRed, label: t('park_picker.status_closed'), emoji: '🔴' };
             case 'season_end':
-                return { color: '#9E9E9E', label: t('park_picker.status_season_end'), emoji: '⚫' };
+                return { color: theme.colors.textMuted, label: t('park_picker.status_season_end'), emoji: '⚫' };
         }
     }
     const [refreshing, setRefreshing] = useState(false);
@@ -641,8 +641,6 @@ export default function ParkPickerScreen() {
             <Stack.Screen
                 options={{
                     title: t('park_picker.title'),
-                    headerStyle: { backgroundColor: theme.colors.surface },
-                    headerTintColor: theme.colors.text,
                 }}
             />
             <StatusBar barStyle="light-content" />
@@ -677,69 +675,65 @@ export default function ParkPickerScreen() {
                     const go = getGoLabel(goScore, t);
 
                     return (
-                        <TouchableOpacity
+                        <BPCard
                             key={park.id}
+                            style={styles.parkCard}
                             onPress={() => Linking.openURL(park.website).catch(() => {})}
-                            activeOpacity={0.85}
                         >
-                            <BPCard style={styles.parkCard}>
-                                {/* Header */}
-                                <View style={styles.parkHeader}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.parkName}>
-                                            {park.country} {park.name}
-                                        </Text>
-                                        <Text style={styles.parkRegion}>{park.region}</Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        onPress={(e) => { e.stopPropagation?.(); toggleFavorite(park.id); }}
-                                        style={styles.favBtn}
-                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                                    >
-                                        <Text style={styles.favIcon}>
-                                            {favorites.includes(park.id) ? '❤️' : '🤍'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <View style={[styles.goBadge, { backgroundColor: go.color + '20', borderColor: go.color }]}>
-                                        <Text style={[styles.goText, { color: go.color }]}>{go.label}</Text>
+                            {/* Header */}
+                            <View style={styles.parkHeader}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.parkName}>
+                                        {park.country} {park.name}
+                                    </Text>
+                                    <Text style={styles.parkRegion}>{park.region}</Text>
+                                </View>
+                                <TouchableOpacity
+                                    onPress={(e) => { e.stopPropagation?.(); toggleFavorite(park.id); }}
+                                    style={styles.favBtn}
+                                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                >
+                                    <Text style={styles.favIcon}>
+                                        {favorites.includes(park.id) ? '❤️' : '🤍'}
+                                    </Text>
+                                </TouchableOpacity>
+                                <BPChip label={go.label} color={go.color} small />
+                            </View>
+
+                            {/* Weather & Status row */}
+                            <View style={styles.infoRow}>
+                                {/* Weather */}
+                                <View style={styles.weatherBlock}>
+                                    <Text style={styles.weatherIcon}>{park.weather.icon}</Text>
+                                    <View>
+                                        <Text style={styles.weatherTemp}>{park.weather.temp}°C</Text>
+                                        <Text style={styles.weatherDesc}>{park.weather.condition}</Text>
                                     </View>
                                 </View>
 
-                                {/* Weather & Status row */}
-                                <View style={styles.infoRow}>
-                                    {/* Weather */}
-                                    <View style={styles.weatherBlock}>
-                                        <Text style={styles.weatherIcon}>{park.weather.icon}</Text>
-                                        <View>
-                                            <Text style={styles.weatherTemp}>{park.weather.temp}°C</Text>
-                                            <Text style={styles.weatherDesc}>{park.weather.condition}</Text>
-                                        </View>
-                                    </View>
-
-                                    {/* Wind & Rain */}
-                                    <View style={styles.weatherDetails}>
-                                        <Text style={styles.detailText}>💨 {park.weather.wind} km/h</Text>
-                                        <Text style={styles.detailText}>💧 {park.weather.rain} mm</Text>
-                                    </View>
-
-                                    {/* Lift status */}
-                                    <View style={styles.liftBlock}>
-                                        <Text style={[styles.liftStatus, { color: status.color }]}>
-                                            {status.emoji} {status.label}
-                                        </Text>
-                                        <Text style={styles.liftCount}>
-                                            {t('park_picker.lifts_count', { open: park.openLifts, total: park.lifts })}
-                                        </Text>
-                                    </View>
+                                {/* Wind & Rain */}
+                                <View style={styles.weatherDetails}>
+                                    <Text style={styles.detailText}>💨 {park.weather.wind} km/h</Text>
+                                    <Text style={styles.detailText}>💧 {park.weather.rain} mm</Text>
                                 </View>
 
-                                {/* Trails info */}
-                                <View style={styles.trailsRow}>
-                                    <Text style={styles.trailsText}>{t('park_picker.trails_count', { count: park.trails })}</Text>
-                                    <Text style={styles.websiteLink}>{t('park_picker.website_link')}</Text>
+                                {/* Lift status */}
+                                <View style={styles.liftBlock}>
+                                    <Text style={[styles.liftStatus, { color: status.color }]}>
+                                        {status.emoji} {status.label}
+                                    </Text>
+                                    <Text style={styles.liftCount}>
+                                        {t('park_picker.lifts_count', { open: park.openLifts, total: park.lifts })}
+                                    </Text>
                                 </View>
-                            </BPCard>
-                        </TouchableOpacity>
+                            </View>
+
+                            {/* Trails info */}
+                            <View style={styles.trailsRow}>
+                                <Text style={styles.trailsText}>{t('park_picker.trails_count', { count: park.trails })}</Text>
+                                <Text style={styles.websiteLink}>{t('park_picker.website_link')}</Text>
+                            </View>
+                        </BPCard>
                     );
                 })}
             </ScrollView>
@@ -753,6 +747,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     scrollContent: {
+        ...screenContentStyle,
         padding: theme.spacing.lg,
         paddingBottom: theme.spacing.xxl,
     },
@@ -782,16 +777,6 @@ const styles = StyleSheet.create({
         color: theme.colors.textSecondary,
         fontSize: 12,
         marginTop: 2,
-    },
-    goBadge: {
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: theme.radius.full,
-        borderWidth: 1,
-    },
-    goText: {
-        fontSize: 11,
-        fontWeight: '800',
     },
     infoRow: {
         flexDirection: 'row',

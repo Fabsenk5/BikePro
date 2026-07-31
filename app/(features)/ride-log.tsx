@@ -6,10 +6,10 @@
  * Verknüpfungen: Dialed-In Setups, Shred-Check km-Zuweisung
  * Storage: AsyncStorage (Supabase later)
  */
-import { BPButton, BPCard, BPInput, BPModal, BPPicker } from '@/components/ui';
-import { theme } from '@/constants/Colors';
+import { BPButton, BPCard, BPEmptyState, BPInput, BPModal, BPPicker, BPToggle, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
-import { SyncBike, SyncComponent, newId, syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable, syncUpdateComponent } from '@/lib/sync';
+import { SyncBike, SyncComponent, newId, syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable, syncUpdateComponents } from '@/lib/sync';
 import { Stack } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,13 +17,12 @@ import {
     ScrollView,
     StatusBar,
     StyleSheet,
-    Switch,
     Text,
     TouchableOpacity,
     View,
 } from 'react-native';
 
-const ACCENT = '#B388FF'; // Ride-Log accent
+const ACCENT = featureColors['ride-log'];
 const STORAGE_KEY = '@bikepro_rides';
 
 // --- Types ---
@@ -241,9 +240,9 @@ export default function RideLogScreen() {
         // Wear tracking (Shred-Check integration): on edit, reverse the previous
         // charge first, then apply the new one — prevents double-counting.
         let workingBikes = bikes;
-        const applyWear = async (bikeId: string, deltaKm: number) => {
+        const applyWear = async (bikeId: string, deltaKm: number): Promise<boolean> => {
             const bike = workingBikes.find((b) => b.id === bikeId);
-            if (!bike || deltaKm === 0) return;
+            if (!bike || deltaKm === 0) return true;
             const changed: SyncComponent[] = [];
             const updatedComps = bike.components.map((c) => {
                 if (c.isWearTracked !== true || !c.wearItems || c.wearItems.length === 0) return c;
@@ -257,17 +256,22 @@ export default function RideLogScreen() {
                 changed.push(updatedComp);
                 return updatedComp;
             });
-            if (changed.length === 0) return;
+            if (changed.length === 0) return true;
             workingBikes = workingBikes.map((b) => (b.id === bikeId ? { ...b, components: updatedComps } : b));
-            await Promise.all(changed.map((c) => syncUpdateComponent(bikeId, c)));
+            // Batch write: one local cache patch + one cloud upsert for all affected rows
+            return syncUpdateComponents(bikeId, changed);
         };
 
+        let wearOk = true;
         if (editingRide) {
             const oldKm = editingRide.wearTrackedKm ?? 0;
-            if (oldKm > 0 && editingRide.bikeId) await applyWear(editingRide.bikeId, -oldKm);
+            if (oldKm > 0 && editingRide.bikeId) wearOk = (await applyWear(editingRide.bikeId, -oldKm)) && wearOk;
         }
-        if (newTrackedKm > 0) await applyWear(rideBikeId, newTrackedKm);
+        if (newTrackedKm > 0) wearOk = (await applyWear(rideBikeId, newTrackedKm)) && wearOk;
         if (workingBikes !== bikes) setBikes(workingBikes);
+        if (!wearOk) {
+            showAlert(t('common.sync_pending_title'), t('common.sync_pending_msg'));
+        }
 
         const ok = await persist(updated);
         setModalVisible(false);
@@ -286,7 +290,7 @@ export default function RideLogScreen() {
     };
 
     const confirmDelete = async (rideId: string) => {
-        const confirmed = await confirmDialog(t('ridelog.delete_prompt_title'), t('ridelog.delete_prompt_msg'));
+        const confirmed = await confirmDialog(t('ridelog.delete_prompt_title'), t('ridelog.delete_prompt_msg'), t('common.cancel'));
         if (!confirmed) return;
         // syncDeleteFromTable already removes the row locally (AsyncStorage) + in the cloud
         const ok = await syncDeleteFromTable('rides', '@bikepro_rides', rideId);
@@ -308,8 +312,6 @@ export default function RideLogScreen() {
             <Stack.Screen
                 options={{
                     title: t('ridelog.title'),
-                    headerStyle: { backgroundColor: theme.colors.surface },
-                    headerTintColor: theme.colors.text,
                 }}
             />
             <StatusBar barStyle="light-content" />
@@ -319,7 +321,7 @@ export default function RideLogScreen() {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Stats bar */}
-                <View style={styles.statsRow}>
+                <BPCard style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: ACCENT }]}>{totalRides}</Text>
                         <Text style={styles.statLabel}>{t('ridelog.stats_rides')}</Text>
@@ -340,7 +342,7 @@ export default function RideLogScreen() {
                         <Text style={[styles.statValue, { color: ACCENT }]}>{Math.round(totalTime / 60)}h</Text>
                         <Text style={styles.statLabel}>{t('ridelog.stats_time')}</Text>
                     </View>
-                </View>
+                </BPCard>
 
                 {/* Add button */}
                 <BPButton
@@ -353,19 +355,15 @@ export default function RideLogScreen() {
 
                 {/* Rides list */}
                 {rides.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>📖</Text>
-                        <Text style={styles.emptyTitle}>{t('ridelog.no_rides')}</Text>
-                        <Text style={styles.emptySubtitle}>{t('ridelog.log_first')}</Text>
-                    </View>
+                    <BPEmptyState icon="📖" title={t('ridelog.no_rides')} subtitle={t('ridelog.log_first')} />
                 ) : (
                     rides.map((ride) => (
-                        <TouchableOpacity
+                        <BPCard
                             key={ride.id}
                             onPress={() => openEdit(ride)}
-                            activeOpacity={0.8}
+                            accentColor={ACCENT}
+                            style={styles.rideCard}
                         >
-                            <BPCard accentColor={ACCENT} style={styles.rideCard}>
                                 <View style={styles.cardHeader}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.cardTitle}>{ride.location}</Text>
@@ -431,8 +429,7 @@ export default function RideLogScreen() {
                                 >
                                     <Text style={styles.deleteBtnText}>🗑</Text>
                                 </TouchableOpacity>
-                            </BPCard>
-                        </TouchableOpacity>
+                        </BPCard>
                     ))
                 )}
             </ScrollView>
@@ -490,15 +487,12 @@ export default function RideLogScreen() {
                 />
 
                 {rideBikeId ? (
-                    <View style={styles.wearToggleRow}>
-                        <Text style={styles.wearToggleText}>♻️ Verschleiß auf Bike anrechnen?</Text>
-                        <Switch
-                            value={trackWear}
-                            onValueChange={setTrackWear}
-                            trackColor={{ false: theme.colors.border, true: ACCENT + '80' }}
-                            thumbColor={trackWear ? ACCENT : theme.colors.textMuted}
-                        />
-                    </View>
+                    <BPToggle
+                        label="♻️ Verschleiß auf Bike anrechnen?"
+                        value={trackWear}
+                        onValueChange={setTrackWear}
+                        accentColor={ACCENT}
+                    />
                 ) : null}
 
                 <BPPicker
@@ -553,6 +547,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     scrollContent: {
+        ...screenContentStyle,
         padding: theme.spacing.lg,
         paddingBottom: theme.spacing.xxl,
     },
@@ -560,11 +555,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         marginBottom: theme.spacing.lg,
-        backgroundColor: theme.colors.surface,
-        borderRadius: theme.radius.lg,
-        padding: theme.spacing.md,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
     },
     statItem: {
         alignItems: 'center',
@@ -579,24 +569,6 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         letterSpacing: 1.5,
         marginTop: 2,
-    },
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: theme.spacing.xxl * 2,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: theme.spacing.md,
-    },
-    emptyTitle: {
-        color: theme.colors.text,
-        fontSize: 20,
-        fontWeight: '700',
-    },
-    emptySubtitle: {
-        color: theme.colors.textMuted,
-        fontSize: 14,
-        marginTop: 8,
     },
     rideCard: {
         marginTop: theme.spacing.md,
@@ -667,22 +639,6 @@ const styles = StyleSheet.create({
     inputRow: {
         flexDirection: 'row',
         gap: theme.spacing.sm,
-    },
-    wearToggleRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginVertical: theme.spacing.sm,
-        padding: theme.spacing.sm,
-        backgroundColor: theme.colors.elevated,
-        borderRadius: theme.radius.md,
-        borderWidth: 1,
-        borderColor: ACCENT + '40',
-    },
-    wearToggleText: {
-        color: theme.colors.text,
-        fontSize: 14,
-        fontWeight: '600',
     },
     modalActions: {
         marginTop: theme.spacing.lg,

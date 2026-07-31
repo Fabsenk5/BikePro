@@ -7,10 +7,10 @@
  * Integration: Liest Ride-Log km für automatische Aggregation (später)
  * UI Supervisor: Wear & Tear Fortschrittsbalken
  */
-import { BPButton, BPCard, BPInput, BPModal, BPPicker, BPProgressBar } from '@/components/ui';
-import { theme } from '@/constants/Colors';
-import { confirmDialog } from '@/lib/dialog';
-import { SyncBike, SyncComponent, syncLoadBikes, syncUpdateComponent, WearItem } from '@/lib/sync';
+import { BPButton, BPCard, BPEmptyState, BPInput, BPModal, BPPicker, BPProgressBar, screenContentStyle } from '@/components/ui';
+import { featureColors, theme } from '@/constants/Colors';
+import { confirmDialog, showAlert } from '@/lib/dialog';
+import { SyncBike, SyncComponent, syncLoadBikes, syncUpdateComponent, syncUpdateComponents, WearItem } from '@/lib/sync';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +19,10 @@ import {
     StatusBar,
     StyleSheet,
     Text,
-    TouchableOpacity,
     View,
 } from 'react-native';
 
-const ACCENT = '#FF5252'; // Shred-Check accent
+const ACCENT = featureColors['shred-check'];
 
 // Emojis for component types managed in the Component Tracker
 const typeEmojis: Record<string, string> = {
@@ -77,7 +76,10 @@ export default function ShredCheckScreen() {
         if (!bike || !comp) return;
         const updatedComp = updateFn(comp);
         // Targeted write: patch local cache + upsert only this component's row
-        await syncUpdateComponent(bike.id, updatedComp);
+        const ok = await syncUpdateComponent(bike.id, updatedComp);
+        if (!ok) {
+            showAlert(t('common.sync_pending_title'), t('common.sync_pending_msg'));
+        }
         setBikes(bikes.map(b => b.id === bike.id
             ? { ...b, components: b.components.map(c => c.id === compId ? updatedComp : c) }
             : b
@@ -86,11 +88,15 @@ export default function ShredCheckScreen() {
 
     const handleService = async (comp: SyncComponent, item: WearItem) => {
         const confirmed = await confirmDialog(
-            'Service durchgeführt?',
-            `${item.label} (${comp.brand || ''} ${comp.model || comp.type}) — km-Zähler zurücksetzen?`
+            t('shred.service_confirm_title'),
+            t('shred.service_confirm_msg', {
+                label: item.label,
+                component: `${comp.brand || ''} ${comp.model || comp.type}`.trim(),
+            }),
+            t('common.cancel')
         );
         if (!confirmed) return;
-        updateComponentInBikes(comp.id, c => ({
+        await updateComponentInBikes(comp.id, c => ({
             ...c,
             wearItems: (c.wearItems || []).map(w =>
                 w.id === item.id
@@ -135,7 +141,7 @@ export default function ShredCheckScreen() {
 
         if (kmTarget?.kind === 'item') {
             const { comp, item } = kmTarget;
-            updateComponentInBikes(comp.id, c => ({
+            await updateComponentInBikes(comp.id, c => ({
                 ...c,
                 wearItems: (c.wearItems || []).map(w =>
                     w.id === item.id
@@ -159,8 +165,11 @@ export default function ShredCheckScreen() {
                 changed.push(updatedComp);
                 return updatedComp;
             });
-            // Targeted writes: upsert only the affected component rows
-            await Promise.all(changed.map(c => syncUpdateComponent(bike.id, c)));
+            // Batch write: one local cache patch + one cloud upsert for all affected rows
+            const ok = await syncUpdateComponents(bike.id, changed);
+            if (!ok) {
+                showAlert(t('common.sync_pending_title'), t('common.sync_pending_msg'));
+            }
             setBikes(bikes.map(b => b.id === bike.id ? { ...b, components: updatedComps } : b));
         }
 
@@ -192,8 +201,6 @@ export default function ShredCheckScreen() {
             <Stack.Screen
                 options={{
                     title: t('shred.title'),
-                    headerStyle: { backgroundColor: theme.colors.surface },
-                    headerTintColor: theme.colors.text,
                 }}
             />
             <StatusBar barStyle="light-content" />
@@ -226,13 +233,11 @@ export default function ShredCheckScreen() {
                 </View>
 
                 {sorted.length === 0 ? (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>🔧</Text>
-                        <Text style={styles.emptyTitle}>{t('shred.no_components')}</Text>
-                        <Text style={styles.emptySubtitle}>
-                            {t('shred.add_first')}
-                        </Text>
-                    </View>
+                    <BPEmptyState
+                        icon="🔧"
+                        title={t('shred.no_components')}
+                        subtitle={t('shred.add_first')}
+                    />
                 ) : (
                     sorted.map((comp) => {
                         const items = comp.wearItems || [];
@@ -265,20 +270,20 @@ export default function ShredCheckScreen() {
                                                 containerStyle={{ marginTop: 4 }}
                                             />
                                             <View style={styles.compActions}>
-                                                <TouchableOpacity
-                                                    style={styles.actionBtn}
+                                                <BPButton
+                                                    title={t('shred.add_km')}
                                                     onPress={() => handleAddKmItem(comp, item)}
-                                                >
-                                                    <Text style={styles.actionBtnText}>{t('shred.add_km')}</Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={[styles.actionBtn, styles.serviceBtn]}
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    color={theme.colors.textSecondary}
+                                                />
+                                                <BPButton
+                                                    title={t('shred.service_done')}
                                                     onPress={() => handleService(comp, item)}
-                                                >
-                                                    <Text style={[styles.actionBtnText, styles.serviceBtnText]}>
-                                                        {t('shred.service_done')}
-                                                    </Text>
-                                                </TouchableOpacity>
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    color={theme.colors.accentLime}
+                                                />
                                             </View>
                                         </View>
                                     ))}
@@ -345,6 +350,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.background,
     },
     scrollContent: {
+        ...screenContentStyle,
         padding: theme.spacing.lg,
         paddingBottom: theme.spacing.xxl,
     },
@@ -359,24 +365,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '700',
         textAlign: 'center',
-    },
-    emptyState: {
-        alignItems: 'center',
-        paddingVertical: theme.spacing.xxl * 2,
-    },
-    emptyIcon: {
-        fontSize: 48,
-        marginBottom: theme.spacing.md,
-    },
-    emptyTitle: {
-        color: theme.colors.text,
-        fontSize: 20,
-        fontWeight: '700',
-    },
-    emptySubtitle: {
-        color: theme.colors.textMuted,
-        fontSize: 14,
-        marginTop: 8,
     },
     compCard: {
         marginTop: theme.spacing.md,
@@ -437,26 +425,6 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         gap: 8,
         marginTop: 10,
-    },
-    actionBtn: {
-        backgroundColor: theme.colors.elevated,
-        borderRadius: theme.radius.sm,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-    },
-    actionBtnText: {
-        color: theme.colors.textSecondary,
-        fontSize: 11,
-        fontWeight: '700',
-    },
-    serviceBtn: {
-        borderColor: theme.colors.accentLime + '60',
-        backgroundColor: theme.colors.accentLime + '10',
-    },
-    serviceBtnText: {
-        color: theme.colors.accentLime,
     },
     kmModalSub: {
         color: theme.colors.textSecondary,

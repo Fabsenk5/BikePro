@@ -1,17 +1,17 @@
 /**
- * BPModal — Bottom sheet modal component
- * UI Supervisor: Dark overlay, slide-up animation
+ * BPModal — Modal component (bottom sheet or centered dialog)
+ * UI Supervisor: Dark overlay, slide-up sheet / centered card, optional footer
  */
 import { theme } from '@/constants/Colors';
 import React from 'react';
 import {
-    Dimensions,
     Modal,
     ScrollView,
     StyleSheet,
     Text,
     TouchableOpacity,
     TouchableWithoutFeedback,
+    useWindowDimensions,
     View,
 } from 'react-native';
 
@@ -21,37 +21,51 @@ interface BPModalProps {
     title?: string;
     children: React.ReactNode;
     maxHeight?: number;
+    variant?: 'sheet' | 'center';
+    footer?: React.ReactNode;
 }
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function BPModal({
     visible,
     onClose,
     title,
     children,
-    maxHeight = SCREEN_HEIGHT * 0.7,
+    maxHeight,
+    variant = 'sheet',
+    footer,
 }: BPModalProps) {
+    const { height: screenHeight } = useWindowDimensions();
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
 
     if (!mounted) return null;
 
+    const isCenter = variant === 'center';
+    const resolvedMaxHeight =
+        maxHeight ?? screenHeight * (isCenter ? 0.8 : 0.7);
+
     return (
         <Modal
             visible={visible}
             transparent
-            animationType="slide"
+            animationType={isCenter ? 'fade' : 'slide'}
             onRequestClose={onClose}
         >
             <TouchableWithoutFeedback onPress={onClose}>
-                <View style={styles.overlay}>
+                <View style={[styles.overlay, isCenter && styles.overlayCenter]}>
                     <TouchableWithoutFeedback>
-                        <View style={[styles.sheet, { maxHeight }]}>
-                            {/* Handle bar */}
-                            <View style={styles.handleWrap}>
-                                <View style={styles.handle} />
-                            </View>
+                        <View
+                            style={[
+                                isCenter ? styles.centerCard : styles.sheet,
+                                { maxHeight: resolvedMaxHeight },
+                            ]}
+                        >
+                            {/* Handle bar (sheet only) */}
+                            {!isCenter && (
+                                <View style={styles.handleWrap}>
+                                    <View style={styles.handle} />
+                                </View>
+                            )}
 
                             {/* Header */}
                             {title && (
@@ -71,6 +85,9 @@ export default function BPModal({
                             >
                                 {children}
                             </ScrollView>
+
+                            {/* Footer (action row) */}
+                            {footer && <View style={styles.footer}>{footer}</View>}
                         </View>
                     </TouchableWithoutFeedback>
                 </View>
@@ -85,12 +102,25 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'flex-end',
     },
+    overlayCenter: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: theme.spacing.lg,
+    },
     sheet: {
         backgroundColor: theme.colors.surface,
         borderTopLeftRadius: theme.radius.xl,
         borderTopRightRadius: theme.radius.xl,
         borderTopWidth: 1,
         borderColor: theme.colors.border,
+    },
+    centerCard: {
+        backgroundColor: theme.colors.surface,
+        borderRadius: theme.radius.xl,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+        width: '100%',
+        maxWidth: 480,
     },
     handleWrap: {
         alignItems: 'center',
@@ -128,5 +158,12 @@ const styles = StyleSheet.create({
     contentInner: {
         padding: theme.spacing.lg,
         paddingBottom: theme.spacing.xxl,
+    },
+    footer: {
+        flexDirection: 'row',
+        gap: theme.spacing.sm,
+        padding: theme.spacing.lg,
+        borderTopWidth: 1,
+        borderTopColor: theme.colors.border,
     },
 });
