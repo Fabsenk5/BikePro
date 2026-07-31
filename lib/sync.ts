@@ -7,15 +7,31 @@
  *
  * Features:
  * - syncLoad: Load data from Supabase (fallback AsyncStorage)
- * - syncSave: Save data to Supabase + AsyncStorage
+ * - syncSave: Save data to Supabase + AsyncStorage (returns true when local AND cloud ok / offline mode)
+ * - syncUpdateComponent: Targeted single-component patch (local cache + single-row upsert)
  * - syncDelete: Delete from Supabase + AsyncStorage
  * - syncPreference: Save/load user preferences (favorites, tile order, etc.)
+ * - syncWikiOverrides: Load/save Setup Guide admin content (wiki_overrides table)
  * - migrateLocalToCloud: One-time migration of local data on first login
+ *
+ * Setup-value keys: SETUP_KEY_MIGRATION maps legacy German labels
+ * (Größe, Druck, Federweg, ...) to semantic keys on load.
+ *
+ * Dirty flags: When a cloud write fails, `@bikepro_dirty_<storageKey>` is set.
+ * syncLoad* skips the cloud overwrite while the flag is set (local data wins).
+ * The flag is cleared on the next successful save.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSupabase, isSupabaseConfigured } from './supabase';
 
 // ─── Generic Helpers ───
+
+/**
+ * Collision-safe ID generator (time base36 + random suffix)
+ */
+export function newId(): string {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
 
 /**
  * Check if cloud sync is available (Supabase configured + user authenticated)
@@ -34,6 +50,34 @@ async function isCloudAvailable(): Promise<{ available: boolean; userId: string 
         console.warn('[sync] Failed to get session:', e);
     }
     return { available: false, userId: null };
+}
+
+// ─── Dirty Flags (unsynced local changes) ───
+
+const dirtyKey = (storageKey: string) => `@bikepro_dirty_${storageKey}`;
+
+async function markDirty(storageKey: string): Promise<void> {
+    try {
+        await AsyncStorage.setItem(dirtyKey(storageKey), 'true');
+    } catch (e) {
+        console.warn('[sync] Failed to set dirty flag:', e);
+    }
+}
+
+async function clearDirty(storageKey: string): Promise<void> {
+    try {
+        await AsyncStorage.removeItem(dirtyKey(storageKey));
+    } catch (e) {
+        console.warn('[sync] Failed to clear dirty flag:', e);
+    }
+}
+
+async function isDirty(storageKey: string): Promise<boolean> {
+    try {
+        return (await AsyncStorage.getItem(dirtyKey(storageKey))) === 'true';
+    } catch {
+        return false;
+    }
 }
 
 // ─── BIKES ───
@@ -86,6 +130,7 @@ export interface SyncComponent {
     type: string;
     brand: string;
     model: string;
+    name?: string;
     weight: string;
     purchaseDate: string;
     setupValues: any[];
@@ -105,10 +150,38 @@ export interface SyncComponent {
 
 const BIKES_KEY = '@bikepro_bikes';
 
+/**
+ * Legacy German setup-value labels → semantic keys.
+ * Applied on load so stored data (local cache + cloud rows) keeps working.
+ * Unknown/custom keys are passed through unchanged.
+ */
+export const SETUP_KEY_MIGRATION: Record<string, string> = {
+    'Größe': 'size',
+    'Breite': 'width',
+    'Reifentyp': 'tire_type',
+    'Karkasse': 'casing',
+    'Montage': 'mount',
+    'Druck': 'pressure',
+    'Federweg': 'travel',
+    'Hub': 'stroke',
+    'Federhärte': 'spring_rate',
+};
+
+function migrateSetupValues(values: any[]): any[] {
+    if (!Array.isArray(values)) return [];
+    return values.map(v =>
+        v && typeof v.key === 'string' && SETUP_KEY_MIGRATION[v.key]
+            ? { ...v, key: SETUP_KEY_MIGRATION[v.key] }
+            : v
+    );
+}
+
 export async function syncLoadBikes(): Promise<SyncBike[]> {
     const { available } = await isCloudAvailable();
+    const dirty = await isDirty(BIKES_KEY);
 
-    if (available) {
+    // Skip cloud overwrite while local changes are unsynced
+    if (available && !dirty) {
         try {
             const supabase = getSupabase()!;
             const { data: bikes, error } = await supabase.from('bikes').select('*').order('created_at');
@@ -120,14 +193,14 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
 
             const result: SyncBike[] = (bikes ?? []).map(b => ({
                 id: b.id, name: b.name, type: b.type,
-                model: b.model, year: b.year, size: b.size ?? 'L',
+                model: b.model, year: b.year, size: b.size ?? '',
                 weight: b.weight ?? undefined,
                 components: (comps ?? [])
                     .filter(c => c.bike_id === b.id)
                     .map(c => ({
                         id: c.id, type: c.type, brand: c.brand, model: c.model,
                         weight: c.weight, purchaseDate: c.purchase_date,
-                        setupValues: c.setup_values ?? [], notes: c.notes,
+                        setupValues: migrateSetupValues(c.setup_values ?? []), notes: c.notes,
                         isWearTracked: c.is_wear_tracked ?? false,
                         currentKm: c.current_km ?? 0,
                         serviceIntervalKm: c.service_interval_km ?? 500,
@@ -152,17 +225,26 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
     // Fallback: local
     try {
         const data = await AsyncStorage.getItem(BIKES_KEY);
-        return data ? JSON.parse(data) : [];
+        const bikes: SyncBike[] = data ? JSON.parse(data) : [];
+        // Migrate legacy German setup keys → semantic keys (same as cloud path)
+        return bikes.map(b => ({
+            ...b,
+            components: (b.components ?? []).map(c => ({
+                ...c,
+                setupValues: migrateSetupValues(c.setupValues),
+            })),
+        }));
     } catch { return []; }
 }
 
-export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
+export async function syncSaveBikes(bikes: SyncBike[]): Promise<boolean> {
     // Always save locally
     await AsyncStorage.setItem(BIKES_KEY, JSON.stringify(bikes));
 
     const { available, userId } = await isCloudAvailable();
-    if (!available || !userId) return;
+    if (!available || !userId) return true; // offline mode = ok
 
+    let cloudOk = true;
     try {
         const supabase = getSupabase()!;
 
@@ -174,38 +256,115 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<void> {
 
         if (bikeRows.length > 0) {
             const { error } = await supabase.from('bikes').upsert(bikeRows, { onConflict: 'id' });
-            if (error) console.warn('[sync] Bike upsert error:', error.message);
+            if (error) {
+                console.warn('[sync] Bike upsert error:', error.message);
+                cloudOk = false;
+            }
         }
 
         // Upsert all components (no destructive deletes)
         const compRows: any[] = [];
         bikes.forEach(b => {
             b.components.forEach(c => {
-                compRows.push({
-                    id: c.id, user_id: userId, bike_id: b.id, type: c.type,
-                    brand: c.brand, model: c.model, weight: c.weight,
-                    purchase_date: c.purchaseDate, setup_values: c.setupValues,
-                    notes: c.notes,
-                    is_wear_tracked: c.isWearTracked ?? false,
-                    current_km: c.currentKm ?? 0,
-                    service_interval_km: c.serviceIntervalKm ?? 500,
-                    last_service_date: c.lastServiceDate,
-                    installed_date: c.installedDate,
-                    wear_items: c.wearItems ?? [],
-                    max_clicks: c.maxClicks,
-                    rebound_mode: c.reboundMode,
-                    compression_mode: c.compressionMode,
-                    price: c.price,
-                });
+                compRows.push(componentToRow(b.id, c, userId));
             });
         });
 
         if (compRows.length > 0) {
             const { error } = await supabase.from('components').upsert(compRows, { onConflict: 'id' });
-            if (error) console.warn('[sync] Component upsert error:', error.message);
+            if (error) {
+                console.warn('[sync] Component upsert error:', error.message);
+                cloudOk = false;
+            }
         }
     } catch (e) {
         console.warn('[sync] Cloud save bikes failed:', e);
+        cloudOk = false;
+    }
+
+    if (cloudOk) {
+        await clearDirty(BIKES_KEY);
+    } else {
+        await markDirty(BIKES_KEY);
+    }
+    return cloudOk;
+}
+
+/**
+ * Map a local component to a DB row.
+ * Flat wear columns are derived from wearItems[0] — wearItems stays the single source of truth.
+ */
+function componentToRow(bikeId: string, c: SyncComponent, userId: string): any {
+    const first = c.wearItems?.[0];
+    return {
+        id: c.id, user_id: userId, bike_id: bikeId, type: c.type,
+        brand: c.brand, model: c.model, weight: c.weight,
+        purchase_date: c.purchaseDate, setup_values: c.setupValues,
+        notes: c.notes,
+        is_wear_tracked: c.isWearTracked ?? false,
+        current_km: first?.currentKm ?? c.currentKm ?? 0,
+        service_interval_km: first?.serviceIntervalKm ?? c.serviceIntervalKm ?? 500,
+        last_service_date: first?.lastServiceDate ?? c.lastServiceDate,
+        installed_date: first?.installedDate ?? c.installedDate,
+        wear_items: c.wearItems ?? [],
+        max_clicks: c.maxClicks,
+        rebound_mode: c.reboundMode,
+        compression_mode: c.compressionMode,
+        price: c.price,
+    };
+}
+
+/**
+ * Targeted update of a single component: patches the local bikes cache and
+ * upserts ONLY this component's row in the cloud (no full-tree resave).
+ * Returns true when local write succeeded AND cloud write succeeded (or offline mode).
+ */
+export async function syncUpdateComponent(bikeId: string, component: SyncComponent): Promise<boolean> {
+    // Keep flat wear fields consistent with wearItems (single source of truth)
+    const first = component.wearItems?.[0];
+    const normalized: SyncComponent = {
+        ...component,
+        currentKm: first?.currentKm ?? component.currentKm,
+        serviceIntervalKm: first?.serviceIntervalKm ?? component.serviceIntervalKm,
+        lastServiceDate: first?.lastServiceDate ?? component.lastServiceDate,
+        installedDate: first?.installedDate ?? component.installedDate,
+    };
+
+    // Patch local cache (update in place, or append when new)
+    try {
+        const data = await AsyncStorage.getItem(BIKES_KEY);
+        const bikes: SyncBike[] = data ? JSON.parse(data) : [];
+        const updated = bikes.map(b => {
+            if (b.id !== bikeId) return b;
+            const exists = b.components.some(c => c.id === normalized.id);
+            return {
+                ...b,
+                components: exists
+                    ? b.components.map(c => (c.id === normalized.id ? normalized : c))
+                    : [...b.components, normalized],
+            };
+        });
+        await AsyncStorage.setItem(BIKES_KEY, JSON.stringify(updated));
+    } catch (e) {
+        console.warn('[sync] Local component update failed:', e);
+        return false;
+    }
+
+    const { available, userId } = await isCloudAvailable();
+    if (!available || !userId) return true; // offline mode = ok
+
+    try {
+        const supabase = getSupabase()!;
+        const { error } = await supabase
+            .from('components')
+            .upsert(componentToRow(bikeId, normalized, userId), { onConflict: 'id' });
+        if (error) throw error;
+        await clearDirty(BIKES_KEY);
+        return true;
+    } catch (e) {
+        console.warn('[sync] Cloud component update failed:', e);
+        await markDirty(BIKES_KEY);
+        return false;
     }
 }
 
@@ -245,8 +404,10 @@ export async function syncLoadTable<T extends { id: string }>(
     storageKey: string,
 ): Promise<T[]> {
     const { available } = await isCloudAvailable();
+    const dirty = await isDirty(storageKey);
 
-    if (available) {
+    // Skip cloud overwrite while local changes are unsynced
+    if (available && !dirty) {
         try {
             const supabase = getSupabase()!;
             const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: false });
@@ -273,11 +434,11 @@ export async function syncSaveTable<T extends { id: string }>(
     table: string,
     storageKey: string,
     items: T[],
-): Promise<void> {
+): Promise<boolean> {
     await AsyncStorage.setItem(storageKey, JSON.stringify(items));
 
     const { available, userId } = await isCloudAvailable();
-    if (!available || !userId) return;
+    if (!available || !userId) return true; // offline mode = ok
 
     try {
         const supabase = getSupabase()!;
@@ -286,14 +447,22 @@ export async function syncSaveTable<T extends { id: string }>(
         const rows = items.map(item => mapLocalToRow(table, item, userId));
         if (rows.length > 0) {
             const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
-            if (error) console.warn(`[sync] ${table} upsert error:`, error.message);
+            if (error) {
+                console.warn(`[sync] ${table} upsert error:`, error.message);
+                await markDirty(storageKey);
+                return false;
+            }
         }
+        await clearDirty(storageKey);
+        return true;
     } catch (e) {
         console.warn(`[sync] Cloud save ${table} failed:`, e);
+        await markDirty(storageKey);
+        return false;
     }
 }
 
-export async function syncDeleteFromTable(table: string, storageKey: string, itemId: string): Promise<void> {
+export async function syncDeleteFromTable(table: string, storageKey: string, itemId: string): Promise<boolean> {
     // Update local storage
     try {
         const data = await AsyncStorage.getItem(storageKey);
@@ -306,14 +475,16 @@ export async function syncDeleteFromTable(table: string, storageKey: string, ite
     }
 
     const { available } = await isCloudAvailable();
-    if (!available) return;
+    if (!available) return true;
 
     try {
         const supabase = getSupabase()!;
         const { error } = await supabase.from(table).delete().eq('id', itemId);
-        if (error) console.warn(`[sync] Delete ${table} error:`, error.message);
+        if (error) throw error;
+        return true;
     } catch (e) {
         console.warn(`[sync] Cloud delete ${table} failed:`, e);
+        return false;
     }
 }
 
@@ -321,8 +492,10 @@ export async function syncDeleteFromTable(table: string, storageKey: string, ite
 
 export async function syncLoadPreference<T>(key: string, storageKey: string): Promise<T | null> {
     const { available } = await isCloudAvailable();
+    const dirty = await isDirty(storageKey);
 
-    if (available) {
+    // Skip cloud overwrite while local changes are unsynced
+    if (available && !dirty) {
         try {
             const supabase = getSupabase()!;
             const { data, error } = await supabase
@@ -348,11 +521,11 @@ export async function syncLoadPreference<T>(key: string, storageKey: string): Pr
     } catch { return null; }
 }
 
-export async function syncSavePreference<T>(key: string, storageKey: string, value: T): Promise<void> {
+export async function syncSavePreference<T>(key: string, storageKey: string, value: T): Promise<boolean> {
     await AsyncStorage.setItem(storageKey, JSON.stringify(value));
 
     const { available, userId } = await isCloudAvailable();
-    if (!available || !userId) return;
+    if (!available || !userId) return true; // offline mode = ok
 
     try {
         const supabase = getSupabase()!;
@@ -360,9 +533,92 @@ export async function syncSavePreference<T>(key: string, storageKey: string, val
             { user_id: userId, key, value: value as any },
             { onConflict: 'user_id,key' }
         );
-        if (error) console.warn(`[sync] Pref save ${key} error:`, error.message);
+        if (error) {
+            console.warn(`[sync] Pref save ${key} error:`, error.message);
+            await markDirty(storageKey);
+            return false;
+        }
+        await clearDirty(storageKey);
+        return true;
     } catch (e) {
         console.warn(`[sync] Cloud save pref ${key} failed:`, e);
+        await markDirty(storageKey);
+        return false;
+    }
+}
+
+// ─── WIKI OVERRIDES (Setup Guide admin content) ───
+
+export interface WikiOverride {
+    title?: string;
+    summary?: string;
+    content?: string;
+    values?: string;
+    tip?: string;
+}
+
+/**
+ * Load admin content overrides for a locale (wiki_overrides table, RLS: public read).
+ * Cloud-only — returns an empty map when Supabase is not configured.
+ */
+export async function syncLoadWikiOverrides(locale: string): Promise<Record<string, WikiOverride>> {
+    const supabase = getSupabase();
+    if (!supabase) return {};
+
+    try {
+        const { data, error } = await supabase
+            .from('wiki_overrides')
+            .select('*')
+            .eq('locale', locale);
+        if (error) throw error;
+
+        const map: Record<string, WikiOverride> = {};
+        for (const row of data ?? []) {
+            map[row.article_id] = {
+                title: row.title || undefined,
+                summary: row.summary || undefined,
+                content: row.content || undefined,
+                values: row.values_text || undefined,
+                tip: row.tip || undefined,
+            };
+        }
+        return map;
+    } catch (e) {
+        console.warn('[sync] Load wiki overrides failed:', e);
+        return {};
+    }
+}
+
+/**
+ * Upsert a single wiki override (admin only, enforced by RLS).
+ * Returns true on success.
+ */
+export async function syncSaveWikiOverride(
+    articleId: string,
+    locale: string,
+    override: WikiOverride,
+): Promise<boolean> {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+
+    try {
+        const { error } = await supabase
+            .from('wiki_overrides')
+            .upsert({
+                article_id: articleId,
+                locale,
+                title: override.title || null,
+                summary: override.summary || null,
+                content: override.content || null,
+                values_text: override.values || null,
+                tip: override.tip || null,
+                updated_at: new Date().toISOString(),
+            }, { onConflict: 'article_id,locale' });
+        if (error) throw error;
+        return true;
+    } catch (e) {
+        console.warn('[sync] Save wiki override failed:', e);
+        return false;
     }
 }
 
@@ -381,8 +637,8 @@ export async function syncLoadProfile(): Promise<SyncProfile> {
     return data ?? {};
 }
 
-export async function syncSaveProfile(profile: SyncProfile): Promise<void> {
-    await syncSavePreference<SyncProfile>('rider_profile', PROFILE_KEY, profile);
+export async function syncSaveProfile(profile: SyncProfile): Promise<boolean> {
+    return syncSavePreference<SyncProfile>('rider_profile', PROFILE_KEY, profile);
 }
 
 // ─── ROW MAPPING ───
@@ -405,18 +661,19 @@ function mapRowToLocal(table: string, row: any): any {
     if (table === 'rides') {
         return {
             id: row.id,
-            title: row.title,
             date: row.date,
-            park: row.park ?? '',
-            duration: row.duration ?? '',
-            distance: row.distance ?? '',
-            descentM: row.descent_m ?? '',
-            maxSpeedKmh: row.max_speed ?? '',
+            location: row.title ?? '',
+            distanceKm: Number(row.distance) || 0,
+            durationMin: Number(row.duration) || 0,
+            descentM: Number(row.descent_m) || 0,
+            maxSpeedKmh: Number(row.max_speed) || 0,
             bikeType: row.bike_type ?? '',
-            conditions: row.conditions ?? '',
+            condition: row.conditions ?? '',
             terrain: row.terrain ?? '',
             mood: row.mood ?? '',
             notes: row.notes ?? '',
+            createdAt: row.created_at,
+            // Remaining fields (trail, difficulty, elevationM, bikeId, setupId, setupFeel, wearTrackedKm) live in data JSONB
             ...(row.data ?? {}),
         };
     }
@@ -436,16 +693,27 @@ function mapLocalToRow(table: string, item: any, userId: string): any {
     if (table === 'rides') {
         return {
             id: item.id, user_id: userId,
-            title: item.title, date: item.date,
-            park: item.park ?? '', duration: item.duration ?? '',
-            distance: item.distance ?? '',
-            descent_m: item.descentM ?? '',
-            max_speed: item.maxSpeedKmh ?? '',
+            title: item.location ?? '', date: item.date,
+            park: '',
+            duration: String(item.durationMin ?? ''),
+            distance: String(item.distanceKm ?? ''),
+            descent_m: String(item.descentM ?? ''),
+            max_speed: String(item.maxSpeedKmh ?? ''),
             bike_type: item.bikeType ?? '',
-            conditions: item.conditions ?? '',
+            conditions: item.condition ?? '',
             terrain: item.terrain ?? '',
             mood: item.mood ?? '',
             notes: item.notes ?? '',
+            // Fields without a dedicated column go into the data JSONB column
+            data: {
+                trail: item.trail ?? '',
+                difficulty: item.difficulty ?? '',
+                elevationM: item.elevationM ?? 0,
+                bikeId: item.bikeId ?? '',
+                setupId: item.setupId ?? '',
+                setupFeel: item.setupFeel ?? '',
+                wearTrackedKm: item.wearTrackedKm ?? 0,
+            },
         };
     }
     return { ...item, user_id: userId };
@@ -455,12 +723,26 @@ function mapLocalToRow(table: string, item: any, userId: string): any {
 
 const MIGRATION_KEY = '@bikepro_cloud_migrated';
 
-export async function migrateLocalToCloud(): Promise<void> {
+// Guard against parallel migration runs (e.g. double login events)
+let migrationInFlight: Promise<void> | null = null;
+
+export function migrateLocalToCloud(): Promise<void> {
+    if (migrationInFlight) return migrationInFlight;
+    migrationInFlight = runMigration()
+        .catch(e => console.warn('[sync] Migration failed:', e))
+        .finally(() => { migrationInFlight = null; });
+    return migrationInFlight;
+}
+
+async function runMigration(): Promise<void> {
     const { available, userId } = await isCloudAvailable();
     if (!available || !userId) return;
 
+    // Migration flag is tracked per user
+    const migrationKey = `${MIGRATION_KEY}_${userId}`;
+
     // Check if already migrated
-    const migrated = await AsyncStorage.getItem(MIGRATION_KEY);
+    const migrated = await AsyncStorage.getItem(migrationKey);
     if (migrated === 'true') return;
 
     console.log('[sync] Migrating local data to cloud...');
@@ -502,12 +784,7 @@ export async function migrateLocalToCloud(): Promise<void> {
             await syncSavePreference('tile_order', '@bikepro_tile_order', JSON.parse(tileData));
         }
 
-        const shredData = await AsyncStorage.getItem('@bikepro_components');
-        if (shredData) {
-            await syncSavePreference('shred_check', '@bikepro_components', JSON.parse(shredData));
-        }
-
-        await AsyncStorage.setItem(MIGRATION_KEY, 'true');
+        await AsyncStorage.setItem(migrationKey, 'true');
         console.log('[sync] Migration complete!');
     } catch (e) {
         console.warn('[sync] Migration failed:', e);
