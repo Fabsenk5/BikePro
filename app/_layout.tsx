@@ -40,16 +40,19 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (error) throw error;
+    // Font loading failure is non-fatal: log it and continue with system fonts.
+    if (error) console.warn('Font loading failed, falling back to system fonts:', error);
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded || error) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loaded, error]);
 
-  if (!loaded) {
+  // While fonts load, render nothing (SSR output stays empty; the splash screen
+  // covers this on native). On font error we continue with system fonts.
+  if (!loaded && !error) {
     return null;
   }
 
@@ -66,7 +69,6 @@ function RootLayoutNav() {
             <Stack.Screen name="(features)" options={{ headerShown: false }} />
             <Stack.Screen name="auth" options={{ headerShown: false }} />
             <Stack.Screen name="pending" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           </Stack>
         </AuthGuard>
       </ThemeProvider>
@@ -75,11 +77,14 @@ function RootLayoutNav() {
 }
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, isActive, isAdmin, isLoading, isConfigured } = useAuth();
+  const { user, isActive, isAdmin, isLoading, isConfigured, activationChecked } = useAuth();
   const segments = useSegments();
 
   useEffect(() => {
     if (isLoading || !isConfigured) return;
+    // Wait for the activation check before any /pending decision — while the
+    // check runs, keep the current screen (loading state) instead of flickering
+    if (user && !isAdmin && !activationChecked) return;
 
     const inAuthGroup = segments[0] === 'auth';
     const inPendingGroup = segments[0] === 'pending';
@@ -94,7 +99,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       // Redirect to app if authenticated and active
       router.replace('/(tabs)/profile');
     }
-  }, [user, isActive, isAdmin, isLoading, isConfigured, segments]);
+  }, [user, isActive, isAdmin, isLoading, isConfigured, activationChecked, segments]);
 
   return <>{children}</>;
 }
