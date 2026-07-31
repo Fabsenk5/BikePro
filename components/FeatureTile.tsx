@@ -3,7 +3,6 @@ import type { Feature } from '@/constants/Features';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    Dimensions,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -14,8 +13,6 @@ import Animated, {
     useSharedValue,
     withSpring,
 } from 'react-native-reanimated';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 

@@ -61,14 +61,8 @@ export const theme = {
     xl: 24,
     full: 9999,
   },
-  font: {
-    regular: 'Inter-Regular',
-    medium: 'Inter-Medium',
-    semibold: 'Inter-SemiBold',
-    bold: 'Inter-Bold',
-    black: 'Inter-Black',
-    mono: 'SpaceMono',
-  },
+  // No font tokens: only SpaceMono is bundled (see app/_layout.tsx) and no code
+  // references theme.font — RN system default is used everywhere.
 };
 
 // Feature tile accent mapping
@@ -81,22 +75,4 @@ export const featureColors: Record<string, string> = {
   'pressure-bot': accentYellow,
   'ride-log': accentPurple,
   'gps-tracker': accentBlue,
-};
-
-// Legacy compat export
-export default {
-  light: {
-    text: textPrimary,
-    background: surfaceDark,
-    tint: accentOrange,
-    tabIconDefault: textMuted,
-    tabIconSelected: accentOrange,
-  },
-  dark: {
-    text: textPrimary,
-    background: surfaceDark,
-    tint: accentOrange,
-    tabIconDefault: textMuted,
-    tabIconSelected: accentOrange,
-  },
 };

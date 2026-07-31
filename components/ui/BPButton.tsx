@@ -6,6 +6,7 @@ import { theme } from '@/constants/Colors';
 import React from 'react';
 import {
     ActivityIndicator,
+    StyleProp,
     StyleSheet,
     Text,
     TextStyle,
@@ -33,7 +34,7 @@ interface BPButtonProps {
     loading?: boolean;
     fullWidth?: boolean;
     icon?: React.ReactNode;
-    style?: ViewStyle;
+    style?: StyleProp<ViewStyle>;
     textStyle?: TextStyle;
 }
 

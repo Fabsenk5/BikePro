@@ -28,6 +28,8 @@ export default function BPInput({
     containerStyle,
     error,
     style,
+    onFocus,
+    onBlur,
     ...inputProps
 }: BPInputProps) {
     const [focused, setFocused] = useState(false);
@@ -50,9 +52,9 @@ export default function BPInput({
                     ]}
                     placeholderTextColor={theme.colors.textMuted}
                     selectionColor={accentColor}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
                     {...inputProps}
+                    onFocus={(e) => { setFocused(true); onFocus?.(e); }}
+                    onBlur={(e) => { setFocused(false); onBlur?.(e); }}
                 />
                 {suffix && <Text style={styles.suffix}>{suffix}</Text>}
             </View>
