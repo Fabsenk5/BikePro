@@ -1,10 +1,11 @@
 import FeatureTile from '@/components/FeatureTile';
-import { BPButton, BPPicker, screenContentStyle } from '@/components/ui';
+import { BPButton, BPCard, BPPicker, screenContentStyle } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { Feature, features as defaultFeatures } from '@/constants/Features';
 import { useAuth } from '@/context/AuthContext';
 import { loadFromStorage } from '@/lib/supabase';
 import { SyncBike, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
+import { computeBikePaceKmPerDay, dueWeeks, formatForecast } from '@/lib/wearForecast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -15,6 +16,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TouchableOpacity,
   useWindowDimensions,
   View
 } from 'react-native';
@@ -29,6 +31,7 @@ interface HomeData {
   bikes: SyncBike[];
   setups: { id: string; name: string; createdAt: string }[];
   primaryBikeId: string | null;
+  parkFavorites: string[] | null;
   offline: boolean;
   ts: number;
 }
@@ -50,13 +53,14 @@ async function loadHomeData(isAuthed: boolean): Promise<HomeData> {
     if (Date.now() - homeCache.ts < CACHE_TTL_MS || homeCache.offline) return homeCache;
   }
 
-  const [tileOrder, rides, bikes, setups, primaryBikeId] = isAuthed
+  const [tileOrder, rides, bikes, setups, primaryBikeId, parkFavorites] = isAuthed
     ? await Promise.all([
         syncLoadPreference<string[]>('tile_order', TILE_ORDER_KEY),
         syncLoadTable<any>('rides', '@bikepro_rides'),
         syncLoadBikes(),
         syncLoadTable<{ id: string; name: string; createdAt: string }>('suspension_setups', '@bikepro_setups'),
         syncLoadPreference<string>('primary_bike', PRIMARY_BIKE_KEY),
+        syncLoadPreference<string[]>('park_favorites', '@bikepro_park_favorites'),
       ])
     : await Promise.all([
         loadLocalPref<string[]>(TILE_ORDER_KEY),
@@ -66,9 +70,10 @@ async function loadHomeData(isAuthed: boolean): Promise<HomeData> {
         syncLoadBikes(),
         loadFromStorage<{ id: string; name: string; createdAt: string }>('@bikepro_setups'),
         loadLocalPref<string>(PRIMARY_BIKE_KEY),
+        loadLocalPref<string[]>('@bikepro_park_favorites'),
       ]);
 
-  homeCache = { tileOrder, rides, bikes, setups, primaryBikeId, offline: !isAuthed, ts: Date.now() };
+  homeCache = { tileOrder, rides, bikes, setups, primaryBikeId, parkFavorites, offline: !isAuthed, ts: Date.now() };
   return homeCache;
 }
 
@@ -87,7 +92,7 @@ function pressureSubtitle(bikes: SyncBike[], primaryId: string | null): string |
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const [editMode, setEditMode] = useState(false);
   const [orderedFeatures, setOrderedFeatures] = useState<Feature[]>(defaultFeatures);
@@ -95,11 +100,15 @@ export default function HomeScreen() {
 
   // Widget Data State
   const [shredBadge, setShredBadge] = useState<string | null>(null);
+  const [shredSub, setShredSub] = useState<string | null>(null);
   const [lastRideSub, setLastRideSub] = useState<string | null>(null);
+  const [parkFavSub, setParkFavSub] = useState<string | null>(null);
   const [pressureSub, setPressureSub] = useState<string | null>(null);
   const [dialedSub, setDialedSub] = useState<string | null>(null);
   const [bikes, setBikes] = useState<SyncBike[]>([]);
   const [primaryBikeId, setPrimaryBikeId] = useState<string | null>(null);
+  const [rideCount, setRideCount] = useState(0);
+  const [setupCount, setSetupCount] = useState(0);
 
   // Responsive grid: 2 columns on phones, 3 on tablets, 4 on wide desktop
   const { width: windowWidth } = useWindowDimensions();
@@ -142,6 +151,26 @@ export default function HomeScreen() {
     });
     setShredBadge(overdue > 0 ? t('home.overdue_badge', { count: overdue }) : null);
 
+    // Shred Check subtitle: next upcoming service (from Ride-Log pace)
+    const pace = computeBikePaceKmPerDay(d.rides ?? []);
+    let nextLabel: string | null = null;
+    let nextWeeks = Infinity;
+    for (const b of d.bikes) {
+      const p = pace[b.id] ?? 0;
+      for (const c of b.components) {
+        for (const w of c.wearItems ?? []) {
+          const weeks = dueWeeks(w.serviceIntervalKm - w.currentKm, p);
+          if (weeks !== null && weeks < nextWeeks) {
+            nextWeeks = weeks;
+            nextLabel = w.label;
+          }
+        }
+      }
+    }
+    setShredSub(nextLabel
+      ? `${t('home.next_service')}: ${nextLabel} · ${formatForecast(t, i18n.language, nextWeeks)}`
+      : null);
+
     // Pressure Bot preview (primary bike front pressure)
     setPressureSub(pressureSubtitle(d.bikes, d.primaryBikeId));
 
@@ -155,7 +184,12 @@ export default function HomeScreen() {
 
     setBikes(d.bikes);
     setPrimaryBikeId(d.primaryBikeId);
-  }, []);
+    setRideCount(d.rides.length);
+    setSetupCount(d.setups.length);
+    setParkFavSub(d.parkFavorites && d.parkFavorites.length > 0
+      ? t('home.park_favorites', { count: d.parkFavorites.length })
+      : null);
+  }, [t, i18n]);
 
   useFocusEffect(
     useCallback(() => {
@@ -220,6 +254,15 @@ export default function HomeScreen() {
     setSelectedTile(toIndex);
   };
 
+  // Onboarding checklist (hides once every step is done)
+  const onboardingSteps = [
+    { id: 'bike', icon: '🚵', label: t('home.onboarding_bike'), done: bikes.length > 0, route: '/(features)/component-tracker' as Href },
+    { id: 'components', icon: '🔩', label: t('home.onboarding_components'), done: bikes.some(b => b.components.length > 0), route: '/(features)/component-tracker' as Href },
+    { id: 'setup', icon: '⚙️', label: t('home.onboarding_setup'), done: setupCount > 0, route: '/(features)/dialed-in' as Href },
+    { id: 'ride', icon: '📖', label: t('home.onboarding_ride'), done: rideCount > 0, route: '/(features)/ride-log' as Href },
+  ];
+  const onboardingDone = onboardingSteps.every(s => s.done);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.background} />
@@ -234,6 +277,27 @@ export default function HomeScreen() {
           <Text style={styles.logoText}>BikePro</Text>
           <Text style={styles.tagline}>{t('home.tagline')}</Text>
         </View>
+
+        {/* Onboarding checklist */}
+        {!onboardingDone && (
+          <BPCard accentColor={theme.colors.accent} style={styles.onboardingCard}>
+            <Text style={styles.onboardingTitle}>🚀 {t('home.onboarding_title')}</Text>
+            <Text style={styles.onboardingSubtitle}>{t('home.onboarding_subtitle')}</Text>
+            {onboardingSteps.map(step => (
+              <TouchableOpacity
+                key={step.id}
+                style={styles.onboardingStep}
+                onPress={() => router.push(step.route)}
+              >
+                <Text style={styles.onboardingCheck}>{step.done ? '✅' : '⬜'}</Text>
+                <Text style={[styles.onboardingLabel, step.done && styles.onboardingLabelDone]}>
+                  {step.icon} {step.label}
+                </Text>
+                {!step.done && <Text style={styles.onboardingArrow}>→</Text>}
+              </TouchableOpacity>
+            ))}
+          </BPCard>
+        )}
 
         {/* Edit mode toggle */}
         <BPButton
@@ -294,10 +358,12 @@ export default function HomeScreen() {
                   index={index}
                   onPress={() => handleTilePress(feature.route, feature.ready, index)}
                   dynamicSubtitle={
-                    feature.id === 'ride-log' && lastRideSub ? lastRideSub :
-                      feature.id === 'pressure-bot' && pressureSub ? pressureSub :
-                        feature.id === 'dialed-in' && dialedSub ? dialedSub :
-                          undefined
+                    feature.id === 'park-picker' && parkFavSub ? parkFavSub :
+                      feature.id === 'shred-check' && shredSub ? shredSub :
+                        feature.id === 'ride-log' && lastRideSub ? lastRideSub :
+                          feature.id === 'pressure-bot' && pressureSub ? pressureSub :
+                            feature.id === 'dialed-in' && dialedSub ? dialedSub :
+                              undefined
                   }
                   badgeLabel={
                     feature.id === 'shred-check' && shredBadge ? shredBadge : undefined
@@ -351,6 +417,47 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: theme.spacing.xs,
     letterSpacing: 1,
+  },
+  onboardingCard: {
+    marginBottom: theme.spacing.md,
+    padding: theme.spacing.md,
+  },
+  onboardingTitle: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  onboardingSubtitle: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginBottom: theme.spacing.sm,
+  },
+  onboardingStep: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border + '40',
+  },
+  onboardingCheck: {
+    fontSize: 14,
+  },
+  onboardingLabel: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    flex: 1,
+  },
+  onboardingLabelDone: {
+    color: theme.colors.textMuted,
+    textDecorationLine: 'line-through',
+  },
+  onboardingArrow: {
+    color: theme.colors.accent,
+    fontSize: 16,
+    fontWeight: '700',
   },
   editBtn: {
     alignSelf: 'flex-end',

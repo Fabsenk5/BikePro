@@ -10,9 +10,11 @@
 import { BPButton, BPCard, BPEmptyState, BPInput, BPModal, BPPicker, BPProgressBar, screenContentStyle } from '@/components/ui';
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
-import { SyncBike, SyncComponent, syncLoadBikes, syncUpdateComponent, syncUpdateComponents, WearItem } from '@/lib/sync';
+import { wearLabelLocalized } from '@/lib/componentLabels';
+import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncUpdateComponent, syncUpdateComponents, WearItem } from '@/lib/sync';
+import { computeBikePaceKmPerDay, dueWeeks, formatForecast } from '@/lib/wearForecast';
 import { Stack, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ScrollView,
@@ -50,6 +52,7 @@ function getTodayISO(): string {
 export default function ShredCheckScreen() {
     const { t, i18n } = useTranslation();
     const [bikes, setBikes] = useState<SyncBike[]>([]);
+    const [rides, setRides] = useState<any[]>([]);
 
     const formatDate = (iso: string): string => {
         if (!iso) return '—';
@@ -64,9 +67,15 @@ export default function ShredCheckScreen() {
         setBikes(data ?? []);
     };
 
+    const loadRides = async () => {
+        const data = await syncLoadTable<any>('rides', '@bikepro_rides');
+        setRides(data ?? []);
+    };
+
     useFocusEffect(
         useCallback(() => {
             loadBikes();
+            loadRides();
         }, [])
     );
 
@@ -90,7 +99,7 @@ export default function ShredCheckScreen() {
         const confirmed = await confirmDialog(
             t('shred.service_confirm_title'),
             t('shred.service_confirm_msg', {
-                label: item.label,
+                label: wearLabelLocalized(t, item),
                 component: `${comp.brand || ''} ${comp.model || comp.type}`.trim(),
             }),
             t('common.cancel')
@@ -184,6 +193,17 @@ export default function ShredCheckScreen() {
     const bikeNameByCompId = new Map<string, string>();
     bikes.forEach(b => b.components.forEach(c => bikeNameByCompId.set(c.id, b.name)));
 
+    // Bike id → avg km/day from Ride-Log; forecast per component id
+    const paceByBikeId = useMemo(() => computeBikePaceKmPerDay(rides), [rides]);
+    const paceByCompId = useMemo(() => {
+        const map = new Map<string, number>();
+        bikes.forEach(b => {
+            const p = paceByBikeId[b.id] ?? 0;
+            b.components.forEach(c => map.set(c.id, p));
+        });
+        return map;
+    }, [bikes, paceByBikeId]);
+
     // Sort by worst wear item percentage
     const sorted = [...allTrackedComps].sort((a, b) => {
         const maxPctA = Math.max(...(a.wearItems?.map(w => w.currentKm / w.serviceIntervalKm) || [0]), 0);
@@ -256,9 +276,9 @@ export default function ShredCheckScreen() {
                                     {items.map((item) => (
                                         <View key={item.id} style={styles.wearItemContainer}>
                                             <View style={styles.wearItemHeader}>
-                                                <Text style={styles.wearItemLabel}>{item.label}</Text>
+                                                <Text style={styles.wearItemLabel}>{wearLabelLocalized(t, item)}</Text>
                                                 <Text style={styles.compDate}>
-                                                    Service: {formatDate(item.lastServiceDate)}
+                                                    {t('shred.service_label')}{formatDate(item.lastServiceDate)}
                                                 </Text>
                                             </View>
                                             <BPProgressBar
@@ -269,6 +289,15 @@ export default function ShredCheckScreen() {
                                                 colorThresholds
                                                 containerStyle={{ marginTop: 4 }}
                                             />
+                                            {(() => {
+                                                const remaining = item.serviceIntervalKm - item.currentKm;
+                                                const weeks = dueWeeks(remaining, paceByCompId.get(comp.id) ?? 0);
+                                                return weeks === null ? null : (
+                                                    <Text style={styles.forecastText}>
+                                                        {t('shred.next_service')}: {formatForecast(t, i18n.language, weeks)}
+                                                    </Text>
+                                                );
+                                            })()}
                                             <View style={styles.compActions}>
                                                 <BPButton
                                                     title={t('shred.add_km')}
@@ -306,7 +335,7 @@ export default function ShredCheckScreen() {
             >
                 {kmTarget?.kind === 'item' ? (
                     <Text style={styles.kmModalSub}>
-                        {kmTarget.item.label} ({kmTarget.comp.brand || ''} {kmTarget.comp.model || kmTarget.comp.type})
+                        {wearLabelLocalized(t, kmTarget.item)} ({kmTarget.comp.brand || ''} {kmTarget.comp.model || kmTarget.comp.type})
                     </Text>
                 ) : (
                     <>
@@ -414,6 +443,12 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 6,
+    },
+    forecastText: {
+        color: theme.colors.accent,
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 4,
     },
     wearItemLabel: {
         color: theme.colors.textSecondary,
