@@ -160,7 +160,7 @@ export interface WearItem {
     serviceIntervalKm: number;
     lastServiceDate: string;
     installedDate: string;
-    serviceHistory?: { date: string; note: string; type: string }[];
+    serviceHistory?: { date: string; note: string; cost?: number; type: string }[];
 }
 
 export interface SetupValue {
@@ -785,8 +785,10 @@ function mapLocalToRow(table: string, item: any, userId: string): any {
                 difficulty: item.difficulty ?? '',
                 elevationM: item.elevationM ?? 0,
                 bikeId: item.bikeId ?? '',
+                parkId: item.parkId ?? '',
                 setupId: item.setupId ?? '',
                 setupFeel: item.setupFeel ?? '',
+                setupRating: item.setupRating ?? 0,
                 wearTrackedKm: item.wearTrackedKm ?? 0,
             },
         };

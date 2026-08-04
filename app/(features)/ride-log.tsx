@@ -6,12 +6,13 @@
  * Verknüpfungen: Dialed-In Setups, Shred-Check km-Zuweisung
  * Storage: AsyncStorage (Supabase later)
  */
-import { BPButton, BPCard, BPEmptyState, BPInput, BPModal, BPPicker, BPToggle, screenContentStyle } from '@/components/ui';
+import { BPButton, BPCard, BPEmptyState, BPInput, BPModal, BPPicker, BPSearchInput, BPToggle, screenContentStyle } from '@/components/ui';
+import { bikeparks } from '@/constants/bikeparks';
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
 import { SyncBike, SyncComponent, newId, syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable, syncUpdateComponents } from '@/lib/sync';
 import { Stack } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ScrollView,
@@ -40,8 +41,10 @@ interface Ride {
     difficulty: string;
     bikeType: string;
     bikeId?: string;
+    parkId?: string;
     setupId?: string;
     setupFeel?: string;
+    setupRating?: number;
     wearTrackedKm?: number;
     condition: string;
     mood: string;
@@ -121,6 +124,15 @@ export default function RideLogScreen() {
         { label: t('ridelog.bike_dirt'), value: 'dirt' },
     ];
 
+    const setupRatingOptions = [
+        { label: t('ridelog.setup_rating_none'), value: '0' },
+        { label: '⭐', value: '1' },
+        { label: '⭐⭐', value: '2' },
+        { label: '⭐⭐⭐', value: '3' },
+        { label: '⭐⭐⭐⭐', value: '4' },
+        { label: '⭐⭐⭐⭐⭐', value: '5' },
+    ];
+
     const [modalVisible, setModalVisible] = useState(false);
     const [editingRide, setEditingRide] = useState<Ride | null>(null);
 
@@ -138,14 +150,71 @@ export default function RideLogScreen() {
     const [rideBikeType, setRideBikeType] = useState('enduro');
     // Integrations
     const [rideBikeId, setRideBikeId] = useState('');
+    const [rideParkId, setRideParkId] = useState('');
     const [rideSetupId, setRideSetupId] = useState('');
     const [rideSetupFeel, setRideSetupFeel] = useState('');
+    const [rideSetupRating, setRideSetupRating] = useState(0);
     const [trackWear, setTrackWear] = useState(true);
 
     const [condition, setCondition] = useState('dry');
     const [mood, setMood] = useState('fire');
     const [notes, setNotes] = useState('');
     const [dateError, setDateError] = useState('');
+
+    // ─── Search & Filters ───
+    const [search, setSearch] = useState('');
+    const [filterBikeId, setFilterBikeId] = useState('');
+    const [filterTerrain, setFilterTerrain] = useState('');
+    const [filterPeriod, setFilterPeriod] = useState('');
+
+    // Month options derived from rides (YYYY-MM, newest first)
+    const periodOptions = useMemo(() => {
+        const months = new Set<string>();
+        rides.forEach(r => {
+            const m = typeof r.date === 'string' ? r.date.slice(0, 7) : '';
+            if (m) months.add(m);
+        });
+        return [...months].sort().reverse().map(m => {
+            const [y, mo] = m.split('-').map(Number);
+            const label = new Date(y, mo - 1, 1).toLocaleDateString(i18n.language, { month: 'long', year: 'numeric' });
+            return { label, value: m };
+        });
+    }, [rides, i18n.language]);
+
+    const filteredRides = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return rides.filter(r => {
+            if (filterPeriod && !r.date?.startsWith(filterPeriod)) return false;
+            if (filterBikeId && r.bikeId !== filterBikeId) return false;
+            if (filterTerrain && r.terrain !== filterTerrain) return false;
+            if (q) {
+                const hay = `${r.location} ${r.trail ?? ''} ${r.notes ?? ''}`.toLowerCase();
+                if (!hay.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [rides, search, filterBikeId, filterTerrain, filterPeriod]);
+
+    // Monthly km chart (last 6 months with rides)
+    const chartData = useMemo(() => {
+        const byMonth: Record<string, number> = {};
+        rides.forEach(r => {
+            const m = typeof r.date === 'string' ? r.date.slice(0, 7) : '';
+            const km = Number(r.distanceKm) || 0;
+            if (m && km > 0) byMonth[m] = (byMonth[m] ?? 0) + km;
+        });
+        return Object.entries(byMonth)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .slice(-6)
+            .map(([month, km]) => {
+                const [y, mo] = month.split('-').map(Number);
+                const label = new Date(y, mo - 1, 1).toLocaleDateString(i18n.language, { month: 'short' });
+                return { month, label, km };
+            });
+    }, [rides, i18n.language]);
+
+    const maxChartKm = chartData.reduce((m, c) => Math.max(m, c.km), 0);
+    const hasFilters = search.trim() !== '' || filterBikeId !== '' || filterTerrain !== '' || filterPeriod !== '';
 
     useEffect(() => {
         syncLoadTable<Ride>('rides', STORAGE_KEY).then(setRides);
@@ -167,7 +236,7 @@ export default function RideLogScreen() {
         setDescentM(''); setMaxSpeedKmh('');
         setTerrain('bikepark'); setDifficulty('medium');
         setRideBikeType('enduro');
-        setRideBikeId(''); setRideSetupId(''); setRideSetupFeel(''); setTrackWear(true);
+        setRideBikeId(''); setRideParkId(''); setRideSetupId(''); setRideSetupFeel(''); setRideSetupRating(0); setTrackWear(true);
         setCondition('dry'); setMood('fire'); setNotes('');
         setDateError('');
         setEditingRide(null);
@@ -192,12 +261,82 @@ export default function RideLogScreen() {
         setDifficulty(ride.difficulty ?? 'medium');
         setRideBikeType(ride.bikeType ?? 'enduro');
         setRideBikeId(ride.bikeId ?? '');
+        setRideParkId(ride.parkId ?? '');
         setRideSetupId(ride.setupId ?? '');
         setRideSetupFeel(ride.setupFeel ?? '');
+        setRideSetupRating(ride.setupRating ?? 0);
         setTrackWear((ride.wearTrackedKm ?? 0) > 0); // keep prior choice; save reconciles the km delta
         setCondition(ride.condition); setMood(ride.mood);
         setNotes(ride.notes);
         setModalVisible(true);
+    };
+
+    /**
+     * Wear tracking (Shred-Check integration): applies a km delta to all
+     * wear-tracked components of a bike. Returns the updated bikes list.
+     */
+    const applyWear = async (currentBikes: SyncBike[], bikeId: string, deltaKm: number): Promise<{ bikes: SyncBike[]; ok: boolean }> => {
+        const bike = currentBikes.find((b) => b.id === bikeId);
+        if (!bike || deltaKm === 0) return { bikes: currentBikes, ok: true };
+        const changed: SyncComponent[] = [];
+        const updatedComps = bike.components.map((c) => {
+            if (c.isWearTracked !== true || !c.wearItems || c.wearItems.length === 0) return c;
+            const updatedComp = {
+                ...c,
+                wearItems: c.wearItems.map((w) => ({
+                    ...w,
+                    currentKm: Math.max(0, w.currentKm + deltaKm),
+                })),
+            };
+            changed.push(updatedComp);
+            return updatedComp;
+        });
+        if (changed.length === 0) return { bikes: currentBikes, ok: true };
+        // Batch write: one local cache patch + one cloud upsert for all affected rows
+        const ok = await syncUpdateComponents(bikeId, changed);
+        const updated = currentBikes.map((b) => (b.id === bikeId ? { ...b, components: updatedComps } : b));
+        return { bikes: updated, ok };
+    };
+
+    /**
+     * Persist a ride (create or edit) including wear reconciliation:
+     * on edit, reverse the previous charge first, then apply the new one.
+     */
+    const commitRide = async (rideData: Ride, editing: Ride | null) => {
+        let updated: Ride[];
+        if (editing) {
+            updated = rides.map((r) => (r.id === editing.id ? rideData : r));
+        } else {
+            updated = [rideData, ...rides];
+        }
+
+        let workingBikes = bikes;
+        let wearOk = true;
+        if (editing) {
+            const oldKm = editing.wearTrackedKm ?? 0;
+            if (oldKm > 0 && editing.bikeId) {
+                const res = await applyWear(workingBikes, editing.bikeId, -oldKm);
+                workingBikes = res.bikes;
+                wearOk = res.ok && wearOk;
+            }
+        }
+        const newTrackedKm = rideData.wearTrackedKm ?? 0;
+        if (newTrackedKm > 0 && rideData.bikeId) {
+            const res = await applyWear(workingBikes, rideData.bikeId, newTrackedKm);
+            workingBikes = res.bikes;
+            wearOk = res.ok && wearOk;
+        }
+        if (workingBikes !== bikes) setBikes(workingBikes);
+        if (!wearOk) {
+            showAlert(t('common.sync_pending_title'), t('common.sync_pending_msg'));
+        }
+
+        const ok = await persist(updated);
+        if (ok) {
+            showAlert(t('ridelog.save_success_title'), t('ridelog.save_success_msg'));
+        } else {
+            showAlert(t('ridelog.save_error_title'), t('ridelog.save_error_msg'));
+        }
     };
 
     const handleSave = async () => {
@@ -223,64 +362,95 @@ export default function RideLogScreen() {
             descentM: parseInt(descentM, 10) || 0,
             maxSpeedKmh: parseDecimal(maxSpeedKmh),
             terrain, difficulty, bikeType: rideBikeType,
-            bikeId: rideBikeId, setupId: rideSetupId, setupFeel: rideSetupFeel.trim(),
+            bikeId: rideBikeId, parkId: rideParkId, setupId: rideSetupId, setupFeel: rideSetupFeel.trim(),
+            setupRating: rideSetupRating,
             wearTrackedKm: newTrackedKm,
             condition, mood,
             notes: notes.trim(),
             createdAt: editingRide?.createdAt ?? new Date().toISOString(),
         };
 
-        let updated: Ride[];
-        if (editingRide) {
-            updated = rides.map((r) => (r.id === editingRide.id ? rideData : r));
-        } else {
-            updated = [rideData, ...rides];
-        }
-
-        // Wear tracking (Shred-Check integration): on edit, reverse the previous
-        // charge first, then apply the new one — prevents double-counting.
-        let workingBikes = bikes;
-        const applyWear = async (bikeId: string, deltaKm: number): Promise<boolean> => {
-            const bike = workingBikes.find((b) => b.id === bikeId);
-            if (!bike || deltaKm === 0) return true;
-            const changed: SyncComponent[] = [];
-            const updatedComps = bike.components.map((c) => {
-                if (c.isWearTracked !== true || !c.wearItems || c.wearItems.length === 0) return c;
-                const updatedComp = {
-                    ...c,
-                    wearItems: c.wearItems.map((w) => ({
-                        ...w,
-                        currentKm: Math.max(0, w.currentKm + deltaKm),
-                    })),
-                };
-                changed.push(updatedComp);
-                return updatedComp;
-            });
-            if (changed.length === 0) return true;
-            workingBikes = workingBikes.map((b) => (b.id === bikeId ? { ...b, components: updatedComps } : b));
-            // Batch write: one local cache patch + one cloud upsert for all affected rows
-            return syncUpdateComponents(bikeId, changed);
-        };
-
-        let wearOk = true;
-        if (editingRide) {
-            const oldKm = editingRide.wearTrackedKm ?? 0;
-            if (oldKm > 0 && editingRide.bikeId) wearOk = (await applyWear(editingRide.bikeId, -oldKm)) && wearOk;
-        }
-        if (newTrackedKm > 0) wearOk = (await applyWear(rideBikeId, newTrackedKm)) && wearOk;
-        if (workingBikes !== bikes) setBikes(workingBikes);
-        if (!wearOk) {
-            showAlert(t('common.sync_pending_title'), t('common.sync_pending_msg'));
-        }
-
-        const ok = await persist(updated);
+        await commitRide(rideData, editingRide);
         setModalVisible(false);
         resetForm();
-        if (ok) {
-            showAlert(t('ridelog.save_success_title'), t('ridelog.save_success_msg'));
-        } else {
-            showAlert(t('ridelog.save_error_title'), t('ridelog.save_error_msg'));
+    };
+
+    // ─── Quick-Log ───
+    const [quickModalVisible, setQuickModalVisible] = useState(false);
+    const [quickDate, setQuickDate] = useState(getTodayISO());
+    const [quickLocation, setQuickLocation] = useState('');
+    const [quickDistance, setQuickDistance] = useState('');
+    const [quickBikeId, setQuickBikeId] = useState('');
+    const [quickTrackWear, setQuickTrackWear] = useState(true);
+    const [quickDateError, setQuickDateError] = useState('');
+    const [quickKmError, setQuickKmError] = useState('');
+
+    const openQuickLog = () => {
+        setQuickDate(getTodayISO());
+        setQuickLocation('');
+        setQuickDistance('');
+        setQuickBikeId(bikes[0]?.id ?? '');
+        setQuickTrackWear(true);
+        setQuickDateError('');
+        setQuickKmError('');
+        setQuickModalVisible(true);
+    };
+
+    // Hand quick-log values over to the full form
+    const openFullFromQuick = () => {
+        resetForm();
+        setDate(quickDate || getTodayISO());
+        setLocation(quickLocation);
+        setDistanceKm(quickDistance);
+        setRideBikeId(quickBikeId);
+        setTrackWear(quickTrackWear);
+        setQuickModalVisible(false);
+        setModalVisible(true);
+    };
+
+    const handleQuickSave = async () => {
+        if (!quickLocation.trim()) return;
+        if (!isValidISODate(quickDate)) {
+            setQuickDateError(t('ridelog.error_date'));
+            return;
         }
+        setQuickDateError('');
+        const km = parseDecimal(quickDistance);
+        if (isNaN(km) || km <= 0) {
+            setQuickKmError(t('ridelog.quick_km_required'));
+            return;
+        }
+        setQuickKmError('');
+
+        const rideData: Ride = {
+            id: newId(),
+            date: quickDate,
+            location: quickLocation.trim(),
+            trail: '',
+            distanceKm: km,
+            durationMin: 0,
+            elevationM: 0,
+            descentM: 0,
+            maxSpeedKmh: 0,
+            terrain: 'trail',
+            difficulty: 'medium',
+            bikeType: 'enduro',
+            bikeId: quickBikeId,
+            setupId: '',
+            setupFeel: '',
+            setupRating: 0,
+            wearTrackedKm: quickTrackWear && quickBikeId && km > 0 ? km : 0,
+            condition: 'dry',
+            mood: 'good',
+            notes: '',
+            createdAt: new Date().toISOString(),
+        };
+
+        await commitRide(rideData, null);
+        setQuickModalVisible(false);
+        setQuickLocation('');
+        setQuickDistance('');
+        setQuickKmError('');
     };
 
     const formatDate = (dateString: string) => {
@@ -344,20 +514,91 @@ export default function RideLogScreen() {
                     </View>
                 </BPCard>
 
-                {/* Add button */}
-                <BPButton
-                    title={t('ridelog.add_ride')}
-                    onPress={openNew}
-                    color={ACCENT}
-                    fullWidth
-                    size="lg"
-                />
+                {/* Monthly km chart */}
+                {chartData.length > 0 && (
+                    <BPCard style={styles.chartCard}>
+                        <Text style={styles.chartTitle}>{t('ridelog.chart_title')}</Text>
+                        <View style={styles.chartRow}>
+                            {chartData.map(c => (
+                                <View key={c.month} style={styles.chartCol}>
+                                    <Text style={styles.chartValue}>
+                                        {c.km >= 1000 ? `${(c.km / 1000).toLocaleString(i18n.language, { maximumFractionDigits: 1 })}k` : Math.round(c.km)}
+                                    </Text>
+                                    <View style={[styles.chartBar, { height: Math.max(6, Math.round((c.km / maxChartKm) * 90)) }]} />
+                                    <Text style={styles.chartLabel}>{c.label}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    </BPCard>
+                )}
+
+                {/* Search & Filters */}
+                <BPCard style={styles.filterCard}>
+                    <BPSearchInput
+                        value={search}
+                        onChangeText={setSearch}
+                        placeholder={t('common.search')}
+                        accentColor={ACCENT}
+                        containerStyle={{ marginBottom: theme.spacing.sm }}
+                    />
+                    <View style={styles.filterRow}>
+                        <BPPicker
+                            label={t('ridelog.bike')}
+                            options={[{ label: t('ridelog.filter_all'), value: '' }, ...bikes.map(b => ({ label: b.name, value: b.id }))]}
+                            value={filterBikeId}
+                            onValueChange={setFilterBikeId}
+                            accentColor={ACCENT}
+                            containerStyle={{ flex: 1 }}
+                        />
+                        <BPPicker
+                            label={t('ridelog.terrain')}
+                            options={[{ label: t('ridelog.filter_all'), value: '' }, ...terrainTypeOptions]}
+                            value={filterTerrain}
+                            onValueChange={setFilterTerrain}
+                            accentColor={ACCENT}
+                            containerStyle={{ flex: 1 }}
+                        />
+                    </View>
+                    <BPPicker
+                        label={t('ridelog.filter_period')}
+                        options={[{ label: t('ridelog.filter_all'), value: '' }, ...periodOptions]}
+                        value={filterPeriod}
+                        onValueChange={setFilterPeriod}
+                        accentColor={ACCENT}
+                    />
+                    {hasFilters && (
+                        <Text style={styles.filterCount}>
+                            {t('ridelog.filtered_count', { count: filteredRides.length, total: rides.length })}
+                        </Text>
+                    )}
+                </BPCard>
+
+                {/* Add buttons */}
+                <View style={styles.addRow}>
+                    <BPButton
+                        title={t('ridelog.add_ride')}
+                        onPress={openNew}
+                        color={ACCENT}
+                        size="md"
+                        style={{ flex: 2 }}
+                    />
+                    <BPButton
+                        title={t('ridelog.quick_btn')}
+                        onPress={openQuickLog}
+                        color={theme.colors.accentLime}
+                        variant="outline"
+                        size="md"
+                        style={{ flex: 1 }}
+                    />
+                </View>
 
                 {/* Rides list */}
                 {rides.length === 0 ? (
                     <BPEmptyState icon="📖" title={t('ridelog.no_rides')} subtitle={t('ridelog.log_first')} />
+                ) : filteredRides.length === 0 ? (
+                    <BPEmptyState icon="🔍" title={t('ridelog.no_matches')} subtitle={t('ridelog.no_matches_hint')} />
                 ) : (
-                    rides.map((ride) => (
+                    filteredRides.map((ride) => (
                         <BPCard
                             key={ride.id}
                             onPress={() => openEdit(ride)}
@@ -417,6 +658,11 @@ export default function RideLogScreen() {
                                             {moodOptions.find((m) => m.value === ride.mood)?.label.split(' ')[0]}
                                         </Text>
                                     </View>
+                                    {ride.setupRating && ride.setupRating > 0 && (
+                                        <View style={styles.metric}>
+                                            <Text style={styles.metricValue}>{'⭐'.repeat(ride.setupRating)}</Text>
+                                        </View>
+                                    )}
                                 </View>
 
                                 {ride.notes ? (
@@ -463,6 +709,23 @@ export default function RideLogScreen() {
                     accentColor={ACCENT}
                 />
 
+                <BPPicker
+                    label={t('ridelog.park')}
+                    options={[
+                        { label: t('ridelog.park_none'), value: '' },
+                        ...bikeparks.map(p => ({ label: `${p.country} ${p.name}`, value: p.id })),
+                    ]}
+                    value={rideParkId}
+                    onValueChange={(v) => {
+                        setRideParkId(v);
+                        if (v && !location.trim()) {
+                            const park = bikeparks.find(p => p.id === v);
+                            if (park) setLocation(park.name);
+                        }
+                    }}
+                    accentColor={ACCENT}
+                />
+
                 <View style={styles.inputRow}>
                     <BPInput label={t('ridelog.distance')} placeholder="0" value={distanceKm} onChangeText={setDistanceKm} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                     <BPInput label={t('ridelog.duration')} placeholder="0" value={durationMin} onChangeText={setDurationMin} keyboardType="numeric" suffix="min" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
@@ -479,8 +742,8 @@ export default function RideLogScreen() {
 
                 {/* Bike & Setup Integration */}
                 <BPPicker
-                    label="Gewähltes Bike (für Verschleiß)"
-                    options={[{ label: 'Keins / Andere', value: '' }, ...bikes.map(b => ({ label: b.name, value: b.id }))]}
+                    label={t('ridelog.ride_bike')}
+                    options={[{ label: t('ridelog.ride_bike_none'), value: '' }, ...bikes.map(b => ({ label: b.name, value: b.id }))]}
                     value={rideBikeId}
                     onValueChange={setRideBikeId}
                     accentColor={ACCENT}
@@ -488,7 +751,7 @@ export default function RideLogScreen() {
 
                 {rideBikeId ? (
                     <BPToggle
-                        label="♻️ Verschleiß auf Bike anrechnen?"
+                        label={t('ridelog.track_wear')}
                         value={trackWear}
                         onValueChange={setTrackWear}
                         accentColor={ACCENT}
@@ -496,21 +759,30 @@ export default function RideLogScreen() {
                 ) : null}
 
                 <BPPicker
-                    label="Gefahrenes Fahrwerks-Setup"
-                    options={[{ label: 'Keins', value: '' }, ...setups.filter(s => rideBikeId ? s.bikeId === rideBikeId : true).map(s => ({ label: s.name, value: s.id }))]}
+                    label={t('ridelog.ride_setup')}
+                    options={[{ label: t('ridelog.ride_setup_none'), value: '' }, ...setups.filter(s => rideBikeId ? s.bikeId === rideBikeId : true).map(s => ({ label: s.name, value: s.id }))]}
                     value={rideSetupId}
                     onValueChange={setRideSetupId}
                     accentColor={ACCENT}
                 />
 
                 {rideSetupId ? (
-                    <BPInput
-                        label="Note zum Setup (Trail Feeling)"
-                        placeholder="z.B. Gabel taucht noch etwas ab"
-                        value={rideSetupFeel}
-                        onChangeText={setRideSetupFeel}
-                        accentColor={ACCENT}
-                    />
+                    <>
+                        <BPInput
+                            label={t('ridelog.setup_feel')}
+                            placeholder={t('ridelog.setup_feel_placeholder')}
+                            value={rideSetupFeel}
+                            onChangeText={setRideSetupFeel}
+                            accentColor={ACCENT}
+                        />
+                        <BPPicker
+                            label={t('ridelog.setup_rating')}
+                            options={setupRatingOptions}
+                            value={rideSetupRating.toString()}
+                            onValueChange={(v) => setRideSetupRating(parseInt(v, 10))}
+                            accentColor={ACCENT}
+                        />
+                    </>
                 ) : null}
 
                 <BPPicker label={t('ridelog.condition')} options={conditionOptions} value={condition} onValueChange={setCondition} accentColor={ACCENT} />
@@ -537,6 +809,78 @@ export default function RideLogScreen() {
                     />
                 </View>
             </BPModal>
+
+            {/* Quick-Log Modal */}
+            <BPModal
+                visible={quickModalVisible}
+                onClose={() => setQuickModalVisible(false)}
+                title={t('ridelog.quick_title')}
+            >
+                <BPInput
+                    label={t('ridelog.date')}
+                    placeholder="YYYY-MM-DD"
+                    value={quickDate}
+                    onChangeText={setQuickDate}
+                    accentColor={ACCENT}
+                    error={quickDateError}
+                />
+                <BPInput
+                    label={t('ridelog.location')}
+                    placeholder={t('ridelog.location_placeholder')}
+                    value={quickLocation}
+                    onChangeText={setQuickLocation}
+                    accentColor={ACCENT}
+                />
+                <BPInput
+                    label={t('ridelog.distance')}
+                    placeholder="0"
+                    value={quickDistance}
+                    onChangeText={setQuickDistance}
+                    keyboardType="numeric"
+                    suffix="km"
+                    accentColor={ACCENT}
+                    error={quickKmError}
+                />
+
+                {bikes.length > 0 && (
+                    <>
+                        <BPPicker
+                            label={t('ridelog.ride_bike')}
+                            options={[{ label: t('ridelog.ride_bike_none'), value: '' }, ...bikes.map(b => ({ label: b.name, value: b.id }))]}
+                            value={quickBikeId}
+                            onValueChange={setQuickBikeId}
+                            accentColor={ACCENT}
+                        />
+                        {quickBikeId ? (
+                            <BPToggle
+                                label={t('ridelog.track_wear')}
+                                value={quickTrackWear}
+                                onValueChange={setQuickTrackWear}
+                                accentColor={ACCENT}
+                            />
+                        ) : null}
+                    </>
+                )}
+
+                <View style={styles.modalActions}>
+                    <BPButton
+                        title={t('common.save')}
+                        onPress={handleQuickSave}
+                        color={ACCENT}
+                        fullWidth
+                        size="lg"
+                        disabled={!quickLocation.trim()}
+                    />
+                    <BPButton
+                        title={t('ridelog.quick_more')}
+                        onPress={openFullFromQuick}
+                        variant="secondary"
+                        color={theme.colors.textSecondary}
+                        fullWidth
+                        style={{ marginTop: theme.spacing.sm }}
+                    />
+                </View>
+            </BPModal>
         </View>
     );
 }
@@ -556,6 +900,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-around',
         marginBottom: theme.spacing.lg,
     },
+    addRow: {
+        flexDirection: 'row',
+        gap: theme.spacing.sm,
+        marginBottom: theme.spacing.sm,
+    },
     statItem: {
         alignItems: 'center',
     },
@@ -569,6 +918,59 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         letterSpacing: 1.5,
         marginTop: 2,
+    },
+    chartCard: {
+        marginBottom: theme.spacing.md,
+        padding: theme.spacing.md,
+    },
+    chartTitle: {
+        color: theme.colors.text,
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: theme.spacing.md,
+    },
+    chartRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-around',
+        height: 130,
+    },
+    chartCol: {
+        alignItems: 'center',
+        flex: 1,
+    },
+    chartValue: {
+        color: theme.colors.textSecondary,
+        fontSize: 10,
+        fontWeight: '700',
+        marginBottom: 4,
+    },
+    chartBar: {
+        width: '60%',
+        minWidth: 8,
+        maxWidth: 28,
+        borderRadius: theme.radius.sm,
+        backgroundColor: ACCENT + 'CC',
+    },
+    chartLabel: {
+        color: theme.colors.textMuted,
+        fontSize: 10,
+        fontWeight: '600',
+        marginTop: 4,
+    },
+    filterCard: {
+        marginBottom: theme.spacing.md,
+        padding: theme.spacing.md,
+    },
+    filterRow: {
+        flexDirection: 'row',
+        gap: theme.spacing.sm,
+    },
+    filterCount: {
+        color: theme.colors.textSecondary,
+        fontSize: 12,
+        fontWeight: '600',
+        marginTop: theme.spacing.sm,
     },
     rideCard: {
         marginTop: theme.spacing.md,
