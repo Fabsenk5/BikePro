@@ -13,7 +13,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
@@ -147,6 +147,7 @@ export default function DialedInScreen() {
     const [modalVisible, setModalVisible] = useState(false);
     const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
+    const [rides, setRides] = useState<any[]>([]);
     const [pressureUnit, setPressureUnit] = useState<'bar' | 'psi'>('bar');
 
     const [wizardVisible, setWizardVisible] = useState(false);
@@ -155,59 +156,59 @@ export default function DialedInScreen() {
     const [wizardSolution, setWizardSolution] = useState('');
 
     const TAG_OPTIONS = [
-        { label: '🌧 Nass', value: 'wet' },
-        { label: '☀️ Trocken', value: 'dry' },
-        { label: '🎢 Bikepark', value: 'park' },
-        { label: '🌲 Hometrail', value: 'trail' },
-        { label: '🤘 Tech', value: 'tech' },
-        { label: '🌊 Flow', value: 'flow' },
-        { label: '🏁 Race', value: 'race' }
+        { label: t('dialed.tag_wet'), value: 'wet' },
+        { label: t('dialed.tag_dry'), value: 'dry' },
+        { label: t('dialed.tag_park'), value: 'park' },
+        { label: t('dialed.tag_trail'), value: 'trail' },
+        { label: t('dialed.tag_tech'), value: 'tech' },
+        { label: t('dialed.tag_flow'), value: 'flow' },
+        { label: t('dialed.tag_race'), value: 'race' }
     ];
 
     const tuningCategories: WizardCategory[] = [
         {
             id: 'grip',
-            title: 'Grip & Traktion',
+            title: t('dialed.wizard_cat_grip'),
             icon: '🏁',
             issues: [
-                { label: 'Vorderrad wäscht in flachen Kurven schnell aus', solution: 'Reifendruck vorne minimal senken (0.1 bar). LSC an der Gabel 1-2 Klicks öffnen. Rebound (LSR) an der Gabel evtl. 1 Klick langsamer, um das Rad ruhiger am Boden zu halten.' },
-                { label: 'Hinterrad dreht bergauf auf Wurzeln durch', solution: 'Reifendruck hinten senken. LSC am Dämpfer öffnen. Rebound (LSR) Dämpfer minimal schneller, damit das Rad in Kuhlen folgen kann.' }
+                { label: t('dialed.wizard_grip_1_label'), solution: t('dialed.wizard_grip_1_solution') },
+                { label: t('dialed.wizard_grip_2_label'), solution: t('dialed.wizard_grip_2_solution') }
             ]
         },
         {
             id: 'balance',
-            title: 'Balance & Körperhaltung',
+            title: t('dialed.wizard_cat_balance'),
             icon: '🚲',
             issues: [
-                { label: 'Gabel taucht stark beim Bremsen/Kurven weg', solution: 'Erhöhe die Low-Speed Compression (LSC) um 2-3 Klicks. Wenn sie auch oft durchschlägt, füge 1 Token hinzu oder erhöhe den Druck um 5-10 PSI.' },
-                { label: 'Bike kickt beim Absprung vom Kicker nach vorn', solution: 'Rebound am Dämpfer (LSR) ist zu schnell! LSR um 1-2 Klicks schließen (langsamer machen).' }
+                { label: t('dialed.wizard_balance_1_label'), solution: t('dialed.wizard_balance_1_solution') },
+                { label: t('dialed.wizard_balance_2_label'), solution: t('dialed.wizard_balance_2_solution') }
             ]
         },
         {
             id: 'harsh',
-            title: 'Harte Schläge & Durchschläge',
+            title: t('dialed.wizard_cat_harsh'),
             icon: '⛰️',
             issues: [
-                { label: 'Dämpfer schlägt bei normalen Jumps oft hart durch', solution: 'Falls SAG (>30%) zu weich: Luftdruck erhöhen. Falls SAG stimmt (ca. 25-30%): Baue einen Volume Spacer (Token) ein, um die Endprogression zu erhöhen, oder erhöhe die HSC (High-Speed Compression).' },
-                { label: 'Gabel schlägt bei harten Landungen durch', solution: 'Falls SAG stimmt: +1 Token in die Gabel einbauen oder HSC (falls vorhanden) um 1-2 Klicks schließen.' }
+                { label: t('dialed.wizard_harsh_1_label'), solution: t('dialed.wizard_harsh_1_solution') },
+                { label: t('dialed.wizard_harsh_2_label'), solution: t('dialed.wizard_harsh_2_solution') }
             ]
         },
         {
             id: 'pedaling',
-            title: 'Antrieb & Treten',
+            title: t('dialed.wizard_cat_pedaling'),
             icon: '🦵',
             issues: [
-                { label: 'Starkes Wippen beim Pedalieren bergauf', solution: 'LSC (Low-Speed Compression) am Dämpfer erhöhen (oder Lockout/Climb-Switch nutzen). Evtl. etwas mehr Luftdruck in den Dämpfer, falls der SAG über 30% liegt.' },
-                { label: 'Spürbarer Pedal Kickback (Rückschlag in den Pedalen) bei rauen Passagen', solution: 'Oft kinematikbedingt. Ein höheres Setup (mehr Luftdruck / weniger SAG) hält das Bike höher im Federweg, wo der Kickback meist geringer ist. Rebound Dämpfer minimal schneller machen kann helfen, dass das Bike sich zwischen Schlägen erholt und nicht tief im Federweg "hängen" bleibt.' }
+                { label: t('dialed.wizard_pedaling_1_label'), solution: t('dialed.wizard_pedaling_1_solution') },
+                { label: t('dialed.wizard_pedaling_2_label'), solution: t('dialed.wizard_pedaling_2_solution') }
             ]
         },
         {
             id: 'chatter',
-            title: 'Kleine Unebenheiten (Chatter)',
+            title: t('dialed.wizard_cat_chatter'),
             icon: '🪨',
             issues: [
-                { label: 'Gabel reicht kleine Schläge extrem harsch an die Hände weiter', solution: 'Reifendruck vorne prüfen (evtl. zu hoch). LSC reduzieren. Rebound (LSR) 1-2 Klicks schneller machen (öffnen), damit die Gabel bei vielen schnellen Schlägen nicht im Federweg stecken bleibt ("Packing").' },
-                { label: 'Bremswellen verursachen starken Armpump / Ermüdung', solution: 'Reifendruck checken. LSC an der Gabel öffnen, damit sie feinfühliger anspricht. Rebound prüfen: Ist er zu langsam, verhärtet die Gabel in schnellen Schlägen. Ist er zu schnell, springt sie unkontrolliert.' }
+                { label: t('dialed.wizard_chatter_1_label'), solution: t('dialed.wizard_chatter_1_solution') },
+                { label: t('dialed.wizard_chatter_2_label'), solution: t('dialed.wizard_chatter_2_solution') }
             ]
         }
     ];
@@ -252,7 +253,7 @@ export default function DialedInScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            Promise.all([loadSetups(), loadBikes(), loadUnits()]).finally(() => setLoading(false));
+            Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides()]).finally(() => setLoading(false));
         }, [])
     );
 
@@ -364,6 +365,11 @@ export default function DialedInScreen() {
         const isGerman = i18n.language?.startsWith('de');
         const pref = await syncLoadPreference<{ pressure: 'bar' | 'psi'; weight: 'kg' | 'lb' }>('units', UNITS_KEY);
         setPressureUnit(pref?.pressure ?? (isGerman ? 'bar' : 'psi'));
+    };
+
+    const loadRides = async () => {
+        const data = await syncLoadTable<any>('rides', '@bikepro_rides');
+        setRides(data ?? []);
     };
 
     const saveSetups = async (updated: Setup[]) => {
@@ -560,6 +566,21 @@ export default function DialedInScreen() {
     
     const currentMaxClicks = getActiveComponentMaxClicks();
 
+    // Average setup rating from Ride-Log (rides with setupId + 1–5 setupRating)
+    const ratingStats = useMemo(() => {
+        const map: Record<string, { sum: number; count: number }> = {};
+        rides.forEach(r => {
+            const sid = r?.setupId;
+            const rating = Number(r?.setupRating);
+            if (!sid || !(rating >= 1 && rating <= 5)) return;
+            const cur = map[sid] ?? { sum: 0, count: 0 };
+            cur.sum += rating;
+            cur.count += 1;
+            map[sid] = cur;
+        });
+        return map;
+    }, [rides]);
+
     return (
         <View style={styles.container}>
             <Stack.Screen options={{ title: t('dialed.title') }} />
@@ -683,6 +704,15 @@ export default function DialedInScreen() {
                                             );
                                         })}
                                     </View>
+                                )}
+
+                                {ratingStats[setup.id] && ratingStats[setup.id].count > 0 && (
+                                    <Text style={styles.cardRating}>
+                                        {t('dialed.setup_rating', {
+                                            rating: (ratingStats[setup.id].sum / ratingStats[setup.id].count).toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
+                                            count: ratingStats[setup.id].count,
+                                        })}
+                                    </Text>
                                 )}
 
                                 {setup.notes ? <Text style={styles.cardNotes}>{setup.notes}</Text> : null}
@@ -843,7 +873,7 @@ export default function DialedInScreen() {
                     </>
                 )}
 
-                <Text style={styles.subSectionTitle}>Tags & Notizen</Text>
+                <Text style={styles.subSectionTitle}>{t('dialed.tags_notes')}</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: theme.spacing.md }}>
                     {TAG_OPTIONS.map(tagOpt => {
                         const isActive = tags.includes(tagOpt.value);
@@ -866,10 +896,10 @@ export default function DialedInScreen() {
             </BPModal>
 
             {/* Tuning Wizard Modal */}
-            <BPModal visible={wizardVisible} onClose={() => setWizardVisible(false)} title="🧙 Tuning Wizard">
+            <BPModal visible={wizardVisible} onClose={() => setWizardVisible(false)} title={t('dialed.wizard_title')}>
                 {wizardStep === 'category' && (
                     <>
-                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>In welchem Bereich suchst du nach Hilfe?</Text>
+                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>{t('dialed.wizard_q_category')}</Text>
                         {tuningCategories.map((cat) => (
                             <TouchableOpacity
                                 key={cat.id}
@@ -890,7 +920,7 @@ export default function DialedInScreen() {
 
                 {wizardStep === 'issue' && selectedCategory && (
                     <>
-                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>Was ist dein spezifisches Problem?</Text>
+                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.md, fontSize: 14 }}>{t('dialed.wizard_q_issue')}</Text>
                         {selectedCategory.issues.map((issue, idx) => (
                             <TouchableOpacity
                                 key={idx}
@@ -911,11 +941,11 @@ export default function DialedInScreen() {
 
                 {wizardStep === 'solution' && (
                     <>
-                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.sm, fontSize: 13, textTransform: 'uppercase', fontWeight: '700', letterSpacing: 1 }}>Empfehlung</Text>
+                        <Text style={{ color: theme.colors.textSecondary, marginBottom: theme.spacing.sm, fontSize: 13, textTransform: 'uppercase', fontWeight: '700', letterSpacing: 1 }}>{t('dialed.wizard_recommendation')}</Text>
                         <View style={{ backgroundColor: theme.colors.accentCyan + '20', padding: 16, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.accentCyan + '60', marginBottom: theme.spacing.lg }}>
                             <Text style={{ color: theme.colors.text, fontSize: 16, lineHeight: 24, fontWeight: '600' }}>💡 {wizardSolution}</Text>
                         </View>
-                        <BPButton title="Neues Setup damit anlegen" onPress={() => {
+                        <BPButton title={t('dialed.wizard_create')} onPress={() => {
                             setWizardVisible(false);
                             openNewSetup();
                         }} color={ACCENT} fullWidth />
@@ -948,6 +978,7 @@ const styles = StyleSheet.create({
     tiresRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, padding: theme.spacing.sm },
     tireText: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600' },
     cardNotes: { color: theme.colors.textMuted, fontSize: 12, fontStyle: 'italic', marginTop: theme.spacing.sm },
+    cardRating: { color: ACCENT, fontSize: 13, fontWeight: '700', marginTop: theme.spacing.sm },
     modalActions: { marginTop: theme.spacing.lg },
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     subSectionTitle: { color: theme.colors.textSecondary, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1, marginTop: theme.spacing.md, marginBottom: 4 },
