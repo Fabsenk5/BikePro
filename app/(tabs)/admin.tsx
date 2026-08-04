@@ -16,7 +16,7 @@ interface UserProfile {
 }
 
 export default function AdminScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const { isAdmin, isConfigured, isLoading } = useAuth();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
@@ -132,14 +132,14 @@ export default function AdminScreen() {
         <BPCard key={u.id} style={styles.userCard}>
             <View style={styles.userInfo}>
                 <Text style={styles.userEmail}>{u.email}</Text>
-                <Text style={styles.userDate}>{t('admin.registered_at', { date: new Date(u.created_at).toLocaleDateString('de-DE') })}</Text>
+                <Text style={styles.userDate}>{t('admin.registered_at', { date: new Date(u.created_at).toLocaleDateString(i18n.language) })}</Text>
             </View>
             <View style={styles.userActions}>
                 {isPending && (
                     <BPButton title={t('admin.btn_unlock')} style={styles.actionBtn} onPress={() => confirmUser(u.id)} />
                 )}
-                <BPButton title="Key" style={styles.actionBtn} variant="secondary" onPress={() => openPwdModal(u)} />
-                <BPButton title="Del" style={[styles.actionBtn, { borderColor: theme.colors.accentOrange }]} variant="outline" onPress={() => deleteUser(u)} />
+                <BPButton title={t('admin.btn_key')} style={styles.actionBtn} variant="secondary" onPress={() => openPwdModal(u)} />
+                <BPButton title={t('admin.btn_del')} style={[styles.actionBtn, { borderColor: theme.colors.accentOrange }]} variant="outline" onPress={() => deleteUser(u)} />
             </View>
         </BPCard>
     );

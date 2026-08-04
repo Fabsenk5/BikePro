@@ -578,7 +578,7 @@ export default function PressureBotScreen() {
 
                         <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
                             <BPButton
-                                title="✅ In Dialed In speichern"
+                                title={t('pressure_bot.save_dialed_in')}
                                 onPress={() => {
                                     const fb = result.front.toFixed(2);
                                     const rb = result.rear.toFixed(2);
@@ -591,7 +591,7 @@ export default function PressureBotScreen() {
                             />
                             {selectedBikeId ? (
                                 <BPButton
-                                    title={savingToBike ? "⏳ Wird gespeichert..." : "💾 Im Component Tracker (Räder) speichern"}
+                                    title={savingToBike ? t('pressure_bot.saving') : t('pressure_bot.save_tracker')}
                                     onPress={handleSaveToBike}
                                     variant="outline"
                                     color={theme.colors.accentCyan}
@@ -657,13 +657,13 @@ export default function PressureBotScreen() {
                             </View>
                         </View>
                         <View style={styles.notesBox}>
-                            <Text style={styles.noteText}>{t('pressure_bot.suspension_note', { defaultValue: '💡 Dies ist ein Näherungswert als Startpunkt (Basis: Fox/RockShox Enduro/Trail). Der exakte Wert hängt von der verbauten Kartusche ab. Bitte SAG prüfen (ca. 20% Gabel, 30% Dämpfer)!' })}</Text>
-                            <Text style={[styles.noteText, { marginTop: 4, color: theme.colors.accent }]}>⚠️ Wichtig: Alle Klicks werden von "komplett geschlossen" (im Uhrzeigersinn / +) in Richtung "offen" (gegen den Uhrzeigersinn / -) gezählt!</Text>
+                            <Text style={styles.noteText}>{t('pressure_bot.suspension_note')}</Text>
+                            <Text style={[styles.noteText, { marginTop: 4, color: theme.colors.accent }]}>⚠️ {t('pressure_bot.click_note')}</Text>
                         </View>
 
                         <View style={{ marginTop: theme.spacing.lg, gap: theme.spacing.sm }}>
                             <BPButton
-                                title="✅ Setup in Dialed In speichern"
+                                title={t('pressure_bot.save_dialed_in')}
                                 onPress={() => {
                                     const ts = newId();
                                     // Coil shocks hand over spring rate (lb/in) instead of air pressure
@@ -685,9 +685,9 @@ export default function PressureBotScreen() {
                     <Text style={styles.sectionTitle}>{t('pressure_bot.weight_section')}</Text>
                     {trackerBikes.length > 0 && (
                         <BPPicker
-                            label="🚲 Bike auswählen (Auto-Fill)"
+                            label={t('pressure_bot.select_bike')}
                             options={[
-                                { label: 'Kein Bike', value: '' },
+                                { label: t('pressure_bot.no_bike'), value: '' },
                                 ...trackerBikes.map(b => ({ label: `${b.name} (${b.model})`, value: b.id }))
                             ]}
                             value={selectedBikeId}
@@ -723,12 +723,12 @@ export default function PressureBotScreen() {
                 {/* Fahrwerk */}
                 {activeTab === 'suspension' && (
                     <BPCard style={styles.sectionCard}>
-                        <Text style={styles.sectionTitle}>Fahrwerks-Typ</Text>
-                        <BPPicker label="Dämpfer-Typ" options={[{label:'Luft (Air)', value:'air'}, {label:'Stahlfeder (Coil)', value:'coil'}]} value={shockType} onValueChange={setShockType} accentColor={ACCENT} />
+                        <Text style={styles.sectionTitle}>{t('pressure_bot.susp_type_section')}</Text>
+                        <BPPicker label={t('pressure_bot.shock_type_label')} options={[{label: t('pressure_bot.type_air'), value:'air'}, {label: t('pressure_bot.type_coil'), value:'coil'}]} value={shockType} onValueChange={setShockType} accentColor={ACCENT} />
                         {shockType === 'coil' && (
                             <View style={{flexDirection: 'row', gap: 10}}>
-                                <BPInput label="Federweg (mm)" value={rearTravel} onChangeText={setRearTravel} keyboardType="numeric" containerStyle={{flex:1}} accentColor={ACCENT} />
-                                <BPInput label="Dämpferhub (mm)" value={shockStroke} onChangeText={setShockStroke} keyboardType="numeric" containerStyle={{flex:1}} accentColor={ACCENT} />
+                                <BPInput label={t('pressure_bot.travel_mm')} value={rearTravel} onChangeText={setRearTravel} keyboardType="numeric" containerStyle={{flex:1}} accentColor={ACCENT} />
+                                <BPInput label={t('pressure_bot.stroke_mm')} value={shockStroke} onChangeText={setShockStroke} keyboardType="numeric" containerStyle={{flex:1}} accentColor={ACCENT} />
                             </View>
                         )}
                     </BPCard>

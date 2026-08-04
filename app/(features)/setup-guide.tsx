@@ -522,7 +522,7 @@ export default function SetupGuideScreen() {
     }, [categoryOrder, categories]);
 
     const augmentedCategories = [
-        ...(favorites.length > 0 ? [{ id: 'favorites', emoji: '⭐', title: 'Favoriten', description: `${favorites.length} gespeicherte Artikel` }] : []),
+        ...(favorites.length > 0 ? [{ id: 'favorites', emoji: '⭐', title: t('setup_guide.favorites_title'), description: t('setup_guide.favorites_desc', { count: favorites.length }) }] : []),
         ...sortedCategories
     ];
 
@@ -721,7 +721,7 @@ export default function SetupGuideScreen() {
             <BPModal
                 visible={!!isEditing}
                 onClose={() => setIsEditing(null)}
-                title="Artikel bearbeiten"
+                title={t('setup_guide.edit_article')}
                 variant="center"
                 footer={
                     <View style={styles.modalActions}>
@@ -730,11 +730,11 @@ export default function SetupGuideScreen() {
                     </View>
                 }
             >
-                <BPInput label="Titel" value={editForm.title} onChangeText={t => setEditForm(p => ({ ...p, title: t }))} />
-                <BPInput label="Zusammenfassung" value={editForm.summary} onChangeText={t => setEditForm(p => ({ ...p, summary: t }))} multiline />
-                <BPInput label="Inhalt" value={editForm.content} onChangeText={t => setEditForm(p => ({ ...p, content: t }))} multiline style={{ height: 100 }} />
-                <BPInput label="Empfohlene Werte" value={editForm.values} onChangeText={t => setEditForm(p => ({ ...p, values: t }))} multiline />
-                <BPInput label="Tipp" value={editForm.tip} onChangeText={t => setEditForm(p => ({ ...p, tip: t }))} multiline />
+                <BPInput label={t('setup_guide.edit_title')} value={editForm.title} onChangeText={t => setEditForm(p => ({ ...p, title: t }))} />
+                <BPInput label={t('setup_guide.edit_summary')} value={editForm.summary} onChangeText={t => setEditForm(p => ({ ...p, summary: t }))} multiline />
+                <BPInput label={t('setup_guide.edit_content')} value={editForm.content} onChangeText={t => setEditForm(p => ({ ...p, content: t }))} multiline style={{ height: 100 }} />
+                <BPInput label={t('setup_guide.edit_values')} value={editForm.values} onChangeText={t => setEditForm(p => ({ ...p, values: t }))} multiline />
+                <BPInput label={t('setup_guide.edit_tip')} value={editForm.tip} onChangeText={t => setEditForm(p => ({ ...p, tip: t }))} multiline />
             </BPModal>
         </View>
     );

@@ -6,6 +6,7 @@ import { BPButton, BPCard, BPInput, BPPicker, screenContentStyle } from '@/compo
 import { theme } from '@/constants/Colors';
 import { useAuth } from '@/context/AuthContext';
 import { showAlert } from '@/lib/dialog';
+import { downloadTextFile, exportComponentsCsv, exportRidesCsv, exportSetupsCsv } from '@/lib/exportData';
 import { syncLoadBikes, syncLoadPreference, syncLoadProfile, syncLoadTable, syncSavePreference, syncSaveProfile } from '@/lib/sync';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -58,6 +59,7 @@ export default function ProfileScreen() {
     const [weightError, setWeightError] = useState('');
     const [heightError, setHeightError] = useState('');
     const [inseamError, setInseamError] = useState('');
+    const [exporting, setExporting] = useState<'rides' | 'components' | 'setups' | null>(null);
 
     // Units preference (pressure bar/psi, weight kg/lb); weight is stored internally in kg
     const [units, setUnits] = useState<UnitsPref>({
@@ -143,6 +145,27 @@ export default function ProfileScreen() {
 
     const handleLogout = async () => {
         await signOut();
+    };
+
+    const handleExport = async (kind: 'rides' | 'components' | 'setups') => {
+        setExporting(kind);
+        try {
+            const stamp = new Date().toISOString().slice(0, 10);
+            if (kind === 'rides') {
+                const rides = await syncLoadTable('rides', '@bikepro_rides');
+                downloadTextFile(`bikepro_rides_${stamp}.csv`, exportRidesCsv(rides));
+            } else if (kind === 'components') {
+                const bikes = await syncLoadBikes();
+                downloadTextFile(`bikepro_components_${stamp}.csv`, exportComponentsCsv(bikes));
+            } else {
+                const setups = await syncLoadTable('suspension_setups', '@bikepro_setups');
+                downloadTextFile(`bikepro_setups_${stamp}.csv`, exportSetupsCsv(setups));
+            }
+        } catch {
+            showAlert(t('profile.export_error_title'), t('profile.export_error_msg'));
+        } finally {
+            setExporting(null);
+        }
     };
 
     if (isLoading && !loadingTimedOut) {
@@ -246,9 +269,9 @@ export default function ProfileScreen() {
 
                 {/* Account info */}
                 <BPCard style={styles.infoCard}>
-                    <Text style={styles.sectionTitle}>🔐 Account</Text>
+                    <Text style={styles.sectionTitle}>{t('profile.account_title')}</Text>
                     <View style={styles.infoRow}>
-                        <Text style={styles.infoLabel}>E-Mail</Text>
+                        <Text style={styles.infoLabel}>{t('profile.email_label')}</Text>
                         <Text style={styles.infoValue}>{user.email}</Text>
                     </View>
                     <View style={styles.infoRow}>
@@ -311,6 +334,37 @@ export default function ProfileScreen() {
                         accentColor={ACCENT}
                         containerStyle={{ marginBottom: 0 }}
                     />
+                </BPCard>
+
+                {/* Data export */}
+                <BPCard style={styles.infoCard}>
+                    <Text style={styles.sectionTitle}>📤 {t('profile.export_title')}</Text>
+                    <View style={{ marginTop: theme.spacing.sm, gap: theme.spacing.sm }}>
+                        <BPButton
+                            title={exporting === 'rides' ? t('profile.export_working') : t('profile.export_rides')}
+                            onPress={() => handleExport('rides')}
+                            variant="secondary"
+                            color={ACCENT}
+                            fullWidth
+                            disabled={exporting !== null}
+                        />
+                        <BPButton
+                            title={exporting === 'components' ? t('profile.export_working') : t('profile.export_components')}
+                            onPress={() => handleExport('components')}
+                            variant="secondary"
+                            color={ACCENT}
+                            fullWidth
+                            disabled={exporting !== null}
+                        />
+                        <BPButton
+                            title={exporting === 'setups' ? t('profile.export_working') : t('profile.export_setups')}
+                            onPress={() => handleExport('setups')}
+                            variant="secondary"
+                            color={ACCENT}
+                            fullWidth
+                            disabled={exporting !== null}
+                        />
+                    </View>
                 </BPCard>
 
                 {/* Logout */}

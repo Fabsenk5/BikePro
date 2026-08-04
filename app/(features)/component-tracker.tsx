@@ -8,6 +8,7 @@
 import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPSlider, BPToggle, screenContentStyle } from '@/components/ui';
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
+import { setupLabelLocalized, wearLabelLocalized } from '@/lib/componentLabels';
 import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -105,6 +106,7 @@ export default function ComponentTrackerScreen() {
     // Service Log Inline UI
     const [addingServiceForIndex, setAddingServiceForIndex] = useState(-1);
     const [newServiceNote, setNewServiceNote] = useState('');
+    const [newServiceCost, setNewServiceCost] = useState('');
 
     const componentTypes = [
         { label: t('tracker.type_handlebar'), value: 'handlebar' },
@@ -153,7 +155,8 @@ export default function ComponentTrackerScreen() {
     }
 
     function setupLabel(key: string): string {
-        return SEMANTIC_SETUP_KEYS.includes(key) ? t(`tracker.key_${key}`) : key;
+        if (SEMANTIC_SETUP_KEYS.includes(key)) return t(`tracker.key_${key}`);
+        return setupLabelLocalized(t, key) ?? key;
     }
 
     function getDefaultWearItems(type: string, installedDate: string): WearItem[] {
@@ -565,7 +568,7 @@ export default function ComponentTrackerScreen() {
                 {/* Bike selector */}
                 {bikes.length > 0 && (
                     <BPPicker
-                        label="Bike auswählen"
+                        label={t('tracker.select_bike')}
                         options={bikes.map(b => ({
                             label: `${bikeTypeOptions.find(t => t.value === b.type)?.label.split(' ')[0] ?? '🚵'} ${b.name}`,
                             value: b.id,
@@ -578,7 +581,7 @@ export default function ComponentTrackerScreen() {
 
                 <View style={styles.btnRow}>
                     <BPButton
-                        title="+ Neues Bike"
+                        title={t('tracker.add_bike_btn')}
                         onPress={openNewBike}
                         color={ACCENT}
                         size="md"
@@ -586,7 +589,7 @@ export default function ComponentTrackerScreen() {
                     />
                     {selectedBike && (
                         <BPButton
-                            title="+ Komponente"
+                            title={t('tracker.add_comp_btn')}
                             onPress={openNewComp}
                             variant="secondary"
                             color={ACCENT}
@@ -620,12 +623,12 @@ export default function ComponentTrackerScreen() {
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                             <Text style={styles.compCount}>
-                                {selectedBike.components.length} Komponenten
+                                {t('tracker.comp_count', { count: selectedBike.components.length })}
                             </Text>
                             <Text style={styles.compCount}>
-                                💶 Gesamtwert: {
-                                    selectedBike.components.reduce((sum, c) => sum + (parseFloat(c.price ?? '0') || 0), 0).toFixed(2)
-                                } €
+                                {t('tracker.total_value', { value: selectedBike.components.reduce((sum, c) => sum + (parseFloat(c.price ?? '0') || 0), 0).toFixed(2) })}
+                                {'  '}
+                                {t('tracker.total_maintenance', { value: selectedBike.components.reduce((sum, c) => sum + (c.wearItems ?? []).reduce((s, w) => s + (w.serviceHistory ?? []).reduce((h, sh) => h + (sh.cost || 0), 0), 0), 0).toFixed(2) })}
                             </Text>
                         </View>
                     </BPCard>
@@ -690,15 +693,15 @@ export default function ComponentTrackerScreen() {
                 onClose={() => setBikeModalVisible(false)}
                 title={editingBike ? t('tracker.edit_bike') : t('tracker.add_bike')}
             >
-                <BPInput label={t('tracker.name')} placeholder="z.B. Canyon Torque" value={bikeName} onChangeText={setBikeName} accentColor={ACCENT} />
+                <BPInput label={t('tracker.name')} placeholder={t('tracker.placeholder_bike')} value={bikeName} onChangeText={setBikeName} accentColor={ACCENT} />
                 <BPPicker label={t('tracker.type')} options={bikeTypeOptions} value={bikeType} onValueChange={setBikeType} accentColor={ACCENT} />
                 <View style={[styles.inputRow, { gap: theme.spacing.md }]}>
-                    <BPInput label={t('tracker.model')} placeholder="z.B. CF 8.0" value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 3 }} />
+                    <BPInput label={t('tracker.model')} placeholder={t('tracker.placeholder_model')} value={bikeModel} onChangeText={setBikeModel} accentColor={ACCENT} containerStyle={{ flex: 3 }} />
                     <BPPicker label={t('tracker.size')} options={bikeSizeOptions} value={bikeSize} onValueChange={setBikeSize} accentColor={ACCENT} containerStyle={{ flex: 2 }} />
                 </View>
                 <View style={[styles.inputRow, { gap: theme.spacing.md }]}>
                     <BPInput label={t('tracker.year')} placeholder="2024" value={bikeYear} onChangeText={setBikeYear} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                    <BPInput label="Gewicht (kg)" placeholder="15.5" value={bikeWeight} onChangeText={setBikeWeight} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('tracker.weight_kg')} placeholder="15.5" value={bikeWeight} onChangeText={setBikeWeight} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
                 <View style={{ marginTop: theme.spacing.lg }}>
                     <BPButton title={t('common.save')} onPress={saveBike} color={ACCENT} fullWidth size="lg" disabled={!bikeName.trim()} />
@@ -718,21 +721,21 @@ export default function ComponentTrackerScreen() {
                 </View>
                 <View style={styles.inputRow}>
                     <BPInput label={t('tracker.weight')} placeholder="0" value={compWeight} onChangeText={setCompWeight} suffix="g" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
-                    <BPInput label="Preis" placeholder="0.00" value={compPrice} onChangeText={setCompPrice} suffix="€" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                    <BPInput label={t('tracker.price')} placeholder="0.00" value={compPrice} onChangeText={setCompPrice} suffix="€" keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                 </View>
                 {['fork', 'shock'].includes(compType) && (
                     <>
-                        <BPInput label="Verfügbare Klicks (Max)" placeholder="z.B. 14" value={compMaxClicks} onChangeText={setCompMaxClicks} keyboardType="numeric" accentColor={ACCENT} />
+                        <BPInput label={t('tracker.max_clicks')} placeholder="z.B. 14" value={compMaxClicks} onChangeText={setCompMaxClicks} keyboardType="numeric" accentColor={ACCENT} />
                         <BPPicker 
-                            label="Rebound Modus" 
-                            options={[{label: 'Wählen... (Standard)', value: ''}, {label: 'Keine Einstellung', value: 'none'}, {label: 'Nur Clicks', value: 'clicks'}, {label: 'High/Low Speed (HSR/LSR)', value: 'hsls'}]} 
+                            label={t('tracker.rebound_mode')} 
+                            options={[{label: t('tracker.mode_select'), value: ''}, {label: t('tracker.mode_none'), value: 'none'}, {label: t('tracker.mode_clicks'), value: 'clicks'}, {label: t('tracker.mode_hsls'), value: 'hsls'}]} 
                             value={compReboundMode} 
                             onValueChange={setCompReboundMode} 
                             accentColor={ACCENT} 
                         />
                         <BPPicker 
-                            label="Compression Modus" 
-                            options={[{label: 'Wählen... (Standard)', value: ''}, {label: 'Keine Einstellung', value: 'none'}, {label: 'Nur Clicks', value: 'clicks'}, {label: 'Hebel (Open/Mid/Closed)', value: 'lever'}, {label: 'High/Low Speed (HSC/LSC)', value: 'hsls'}]} 
+                            label={t('tracker.compression_mode')} 
+                            options={[{label: t('tracker.mode_select'), value: ''}, {label: t('tracker.mode_none'), value: 'none'}, {label: t('tracker.mode_clicks'), value: 'clicks'}, {label: t('tracker.mode_lever'), value: 'lever'}, {label: t('tracker.mode_comp_hsls'), value: 'hsls'}]} 
                             value={compCompressionMode} 
                             onValueChange={setCompCompressionMode} 
                             accentColor={ACCENT} 
@@ -746,7 +749,7 @@ export default function ComponentTrackerScreen() {
                         <Text style={styles.setupSectionTitle}>⚙️ {t('tracker.setup_values')}</Text>
                         {compSetup.map((sv, i) => {
                             if (sv.key === 'size') {
-                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...wheelSizeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: t('tracker.select_placeholder'), value: '' }, ...wheelSizeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
                             if (sv.key === 'Breite' && compType === 'handlebar') {
                                 return (
@@ -764,16 +767,16 @@ export default function ComponentTrackerScreen() {
                                 )
                             }
                             if (sv.key === 'width') {
-                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...tireWidthOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: t('tracker.select_placeholder'), value: '' }, ...tireWidthOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
                             if (sv.key === 'tire_type') {
-                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...tireTypeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: t('tracker.select_placeholder'), value: '' }, ...tireTypeOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
                             if (sv.key === 'casing') {
-                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...casingOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: t('tracker.select_placeholder'), value: '' }, ...casingOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
                             if (sv.key === 'mount') {
-                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: 'Wählen...', value: '' }, ...setupMountOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
+                                return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: t('tracker.select_placeholder'), value: '' }, ...setupMountOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
                             if (sv.key === 'pressure') {
                                 const isBar = tirePressureUnit === 'bar';
@@ -814,7 +817,7 @@ export default function ComponentTrackerScreen() {
                     </View>
                 )}
 
-                <BPInput label="Notizen" placeholder="..." value={compNotes} onChangeText={setCompNotes} multiline numberOfLines={2} accentColor={ACCENT} />
+                <BPInput label={t('tracker.notes')} placeholder="..." value={compNotes} onChangeText={setCompNotes} multiline numberOfLines={2} accentColor={ACCENT} />
 
                 {/* --- Wear Tracking Section --- */}
                 <View style={styles.wearSection}>
@@ -827,7 +830,7 @@ export default function ComponentTrackerScreen() {
 
                     {compIsWearTracked && compWearItems.map((item, index) => (
                         <View key={item.id} style={{ marginTop: 12, padding: 12, backgroundColor: theme.colors.background, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border }}>
-                            <Text style={{ fontWeight: 'bold', color: theme.colors.text, marginBottom: 8 }}>{item.label}</Text>
+                            <Text style={{ fontWeight: 'bold', color: theme.colors.text, marginBottom: 8 }}>{wearLabelLocalized(t, item)}</Text>
                             <View style={styles.inputRow}>
                                 <BPInput label={t('tracker.wear_current_km')} value={item.currentKm.toString()} onChangeText={(val) => updateWearItem(index, 'currentKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
                                 <BPInput label={t('tracker.wear_interval')} value={item.serviceIntervalKm.toString()} onChangeText={(val) => updateWearItem(index, 'serviceIntervalKm', val)} keyboardType="numeric" suffix="km" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
@@ -838,22 +841,28 @@ export default function ComponentTrackerScreen() {
                             </View>
                             {/* Service Log Injection */}
                             <View style={{ marginTop: 4, alignItems: 'flex-start' }}>
-                                <BPButton title={t('tracker.wear_log_service')} onPress={() => setAddingServiceForIndex(addingServiceForIndex === index ? -1 : index)} size="sm" variant="secondary" color={ACCENT} />
+                                <BPButton title={t('tracker.wear_log_service')} onPress={() => {
+                                    if (addingServiceForIndex !== index) { setNewServiceNote(''); setNewServiceCost(''); }
+                                    setAddingServiceForIndex(addingServiceForIndex === index ? -1 : index);
+                                }} size="sm" variant="secondary" color={ACCENT} />
                             </View>
 
                             {addingServiceForIndex === index && (
                                 <View style={{ marginTop: 8, padding: 8, backgroundColor: theme.colors.surface, borderRadius: theme.radius.sm }}>
                                     <Text style={{ fontSize: 13, fontWeight: '700', marginBottom: 4, color: theme.colors.text }}>{t('tracker.wear_add_service')}</Text>
                                     <BPInput label={t('tracker.wear_service_note')} placeholder={t('tracker.wear_service_note_placeholder')} value={newServiceNote} onChangeText={setNewServiceNote} accentColor={ACCENT} />
+                                    <BPInput label={t('tracker.wear_service_cost')} placeholder="0" value={newServiceCost} onChangeText={setNewServiceCost} keyboardType="numeric" suffix="€" accentColor={ACCENT} />
                                     <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                                         <BPButton title={t('tracker.wear_save_reset')} onPress={() => {
                                             const today = getTodayISO();
-                                            const updatedHistory = [...(item.serviceHistory ?? []), { date: today, note: newServiceNote, type: 'maintenance' }];
+                                            const cost = parseFloat(newServiceCost.replace(',', '.')) || 0;
+                                            const updatedHistory = [...(item.serviceHistory ?? []), { date: today, note: newServiceNote, cost: cost > 0 ? cost : undefined, type: 'maintenance' }];
                                             setCompWearItems(prev => prev.map((w, i) => i === index ? { ...w, currentKm: 0, lastServiceDate: today, serviceHistory: updatedHistory } : w));
                                             setAddingServiceForIndex(-1);
                                             setNewServiceNote('');
+                                            setNewServiceCost('');
                                         }} size="sm" color={theme.colors.accentCyan} style={{ flex: 1 }} />
-                                        <BPButton title={t('common.cancel')} onPress={() => { setAddingServiceForIndex(-1); setNewServiceNote(''); }} size="sm" variant="secondary" color={theme.colors.textMuted} />
+                                        <BPButton title={t('common.cancel')} onPress={() => { setAddingServiceForIndex(-1); setNewServiceNote(''); setNewServiceCost(''); }} size="sm" variant="secondary" color={theme.colors.textMuted} />
                                     </View>
                                 </View>
                             )}
@@ -864,7 +873,7 @@ export default function ComponentTrackerScreen() {
                                     {item.serviceHistory.map((sh, idx) => (
                                         <View key={idx} style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
                                             <Text style={{ color: theme.colors.textSecondary, fontSize: 12, fontWeight: '600', width: 80 }}>{sh.date}</Text>
-                                            <Text style={{ color: theme.colors.text, fontSize: 12, flex: 1 }}>{sh.note}</Text>
+                                            <Text style={{ color: theme.colors.text, fontSize: 12, flex: 1 }}>{sh.note}{sh.cost ? ` · ${sh.cost}€` : ''}</Text>
                                         </View>
                                     ))}
                                 </View>
@@ -878,11 +887,11 @@ export default function ComponentTrackerScreen() {
                     <View style={styles.moveSection}>
                         <Text style={styles.moveSectionTitle}>🔄 {t('tracker.move_component')}</Text>
                         <BPPicker
-                            label="Ziel-Bike"
+                            label={t('tracker.move_bike_label')}
                             options={[
-                                { label: `📌 Aktuell: ${selectedBike?.name}`, value: '' },
+                                { label: t('tracker.move_current', { name: selectedBike?.name ?? '' }), value: '' },
                                 ...bikes.filter(b => b.id !== selectedBikeId).map(b => ({
-                                    label: `→ ${b.name} (${b.size ?? ''})`,
+                                    label: t('tracker.move_option', { name: b.name, size: b.size ?? '' }),
                                     value: b.id,
                                 })),
                             ]}
