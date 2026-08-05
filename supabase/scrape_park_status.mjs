@@ -14,10 +14,13 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCES_FILE = path.join(__dirname, 'park_sources.json');
+const execFileP = promisify(execFile);
 
 const STATUS_OPEN = 'open';
 const STATUS_PARTIAL = 'partial';
@@ -54,8 +57,34 @@ const SEASON_END_SIGNALS = [
 
 const CONCURRENCY = 5;
 const TIMEOUT_MS = 9000;
+const UA = 'Mozilla/5.0 (compatible; BikeProStatusBot/1.0; +https://github.com/Fabsenk5/BikePro)';
 
-async function fetchHtml(url) {
+function stripHtml(text) {
+    return text
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .slice(0, 300_000);
+}
+
+/**
+ * Fetch a page with curl first (bypasses undici TLS quirks that block many
+ * German tourism sites), falling back to Node fetch. Returns null on failure.
+ */
+async function fetchHtml(url, retries = 1) {
+    try {
+        const { stdout } = await execFileP('curl', [
+            '-sSL', '--max-time', String(TIMEOUT_MS / 1000),
+            '-A', UA,
+            '-H', 'accept-language: de-DE,de;q=0.9',
+            url,
+        ]);
+        if (stdout && stdout.length > 0) return stripHtml(stdout);
+    } catch (e) {
+        // curl failed — fall through to fetch
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
@@ -63,21 +92,18 @@ async function fetchHtml(url) {
             signal: controller.signal,
             redirect: 'follow',
             headers: {
-                'user-agent': 'Mozilla/5.0 (compatible; BikeProStatusBot/1.0; +https://github.com/Fabsenk5/BikePro)',
+                'user-agent': UA,
                 accept: 'text/html,application/xhtml+xml',
                 'accept-language': 'de-DE,de;q=0.9,en;q=0.8',
             },
         });
         if (!res.ok) return null;
-        const text = await res.text();
-        // Strip tags/scripts/styles for keyword matching
-        return text
-            .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-            .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .slice(0, 300_000);
+        return stripHtml(await res.text());
     } catch (e) {
+        if (retries > 0) {
+            await new Promise(r => setTimeout(r, 1500));
+            return fetchHtml(url, retries - 1);
+        }
         console.warn(`  fetch failed (${e.name}${e.message ? ': ' + e.message : ''})`);
         return null;
     } finally {
