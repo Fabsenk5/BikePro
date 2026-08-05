@@ -8,7 +8,6 @@ MTB setup & riding companion. Expo (React Native) + expo-router + TypeScript, we
 - `npm run build:web` — static export to `dist/`
 - `npx tsc --noEmit` — type-check (no test suite, no lint script)
 - `node supabase/run_migration.js` — apply DB migrations (needs `DATABASE_URL` in `supabase/.env`)
-- `node supabase/scrape_park_status.mjs` — manual Park-Picker lift-status scrape (needs `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`)
 
 ## Layout
 
@@ -16,13 +15,12 @@ MTB setup & riding companion. Expo (React Native) + expo-router + TypeScript, we
 - `components/ui/` — shared BP* components (BPCard, BPButton, BPInput, BPSlider, BPModal, BPPicker, BPProgressBar), barrel `index.ts`
 - `constants/Features.ts` — feature registry (id, route, accentColor, `ready` flag) — one tile = one entry
 - `constants/Colors.ts` — `theme` object: colors/spacing/radius (dark theme only, system fonts)
-- `constants/bikeparks.ts` — park DB (58 DACH parks, static fallback; live status in `park_status` table, live weather via `lib/weather.ts`)
+- `constants/bikeparks.ts` — park DB (58 DACH parks, trail breakdown blau/rot/schwarz + km; live weather via `lib/weather.ts`)
 - `lib/supabase.ts` — lazy client (`getSupabase()`), `loadFromStorage`/`saveToStorage` helpers, `ADMIN_EMAIL`
 - `lib/sync.ts` — cloud-sync layer: `syncLoad*`/`syncSave*`/`syncDelete*`, falls back to AsyncStorage when unauthenticated; camelCase↔snake_case mapping in `mapRowToLocal`/`mapLocalToRow`
 - `lib/weather.ts` — OpenWeatherMap (needs `EXPO_PUBLIC_OPENWEATHER_KEY`), AsyncStorage cache 30 min
 - `context/AuthContext.tsx` — auth state; `lib/i18n.ts` + `locales/{de,en}.json` — i18next, de fallback
 - `.agents/` — per-feature agent manifests (f1–f10), coordinator, `rules/` (see below)
-- `.github/workflows/scrape-park-status.yml` — daily 06:00 UTC lift-status scrape → `park_status` (needs repo secrets `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`)
 
 ## Conventions
 
@@ -44,7 +42,6 @@ MTB setup & riding companion. Expo (React Native) + expo-router + TypeScript, we
 - `rides` (Ride-Log; data JSONB overflow)
 - `user_preferences` (key/value JSONB, UNIQUE(user_id,key); favorites, tile order, shred-check, rider profile)
 - `profiles` (auth.users trigger, `is_active` gate) + `wiki_overrides` (Setup-Guide admin content)
-- `park_status` (Park-Picker; scraped daily by GitHub Actions, public read, service-role write)
 - Admin RPCs (`admin_get_users`, `admin_update_user_status`, `admin_delete_user`, `admin_update_user_password`), gated by `is_admin()` = `ADMIN_EMAIL`
 - Migrations: numbered SQL in `supabase/`, run via `run_migration.js` (add new file there too); snake_case columns mapped in `lib/sync.ts`
 

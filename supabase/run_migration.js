@@ -15,7 +15,6 @@ const MIGRATIONS = [
     'migration_004_add_max_clicks.sql',
     'migration_005_suspension_modes.sql',
     'migration_006_rls_is_active.sql',
-    'migration_007_park_status.sql',
     'migration_008_rls_hardening.sql',
 ];
 
