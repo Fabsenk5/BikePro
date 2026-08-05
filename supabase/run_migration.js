@@ -15,6 +15,8 @@ const MIGRATIONS = [
     'migration_004_add_max_clicks.sql',
     'migration_005_suspension_modes.sql',
     'migration_006_rls_is_active.sql',
+    'migration_007_park_status.sql',
+    'migration_008_rls_hardening.sql',
 ];
 
 async function migrate() {
@@ -37,6 +39,8 @@ async function migrate() {
                 applied_at TIMESTAMPTZ DEFAULT now()
             )
         `);
+        // Bookkeeping table must not be publicly readable (Security Advisor)
+        await client.query('ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY');
         const applied = await client.query('SELECT filename FROM public.schema_migrations');
         const done = new Set(applied.rows.map(r => r.filename));
 
