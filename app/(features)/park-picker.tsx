@@ -1,15 +1,16 @@
 /**
  * F3: Park-Picker Pro — Bikepark-Aggregator
- * Agent Manifest: f3_park_picker.md
  *
- * Aggregator: Wetter, Liftstatus, Ampelsystem (Go/No-Go)
- * Phase 1: Curated park data + OpenWeatherMap ready
- * Phase 2: Live Wetter-API + Web-Scraping für Liftstatus
+ * Live data:
+ * - Weather: OpenWeatherMap (lib/weather.ts, EXPO_PUBLIC_OPENWEATHER_KEY)
+ * - Lift status: scraped daily by GitHub Actions into the park_status table
+ *   (fresh rows override the static fallback in constants/bikeparks.ts)
  */
 import { BPCard, BPChip, BPPicker, screenContentStyle } from '@/components/ui';
-import { bikeparks, Bikepark } from '@/constants/bikeparks';
+import { bikeparks, Bikepark, LiftStatus } from '@/constants/bikeparks';
 import { featureColors, theme } from '@/constants/Colors';
-import { syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
+import { syncLoadParkStatus, syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
+import { fetchParkWeather, fetchWeatherForParks, hasWeatherKey, ParkWeather, weatherInfo } from '@/lib/weather';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,8 @@ import {
 
 const ACCENT = featureColors['park-picker'];
 const FAVORITES_KEY = '@bikepro_park_favorites';
+// Scraped rows older than this are ignored (fallback to static data)
+const STATUS_FRESH_MS = 26 * 60 * 60 * 1000;
 
 function getGoLabel(score: number, t: any): { label: string; color: string } {
     if (score >= 8) return { label: t('park_picker.go_lets_go'), color: theme.colors.accentLime };
@@ -39,7 +42,7 @@ const countryMap: Record<string, string> = {
 };
 
 export default function ParkPickerScreen() {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const [region, setRegion] = useState('all');
 
     const regionFilter = [
@@ -52,7 +55,7 @@ export default function ParkPickerScreen() {
         { label: t('park_picker.region_cz'), value: 'CZ' },
     ];
 
-    function getStatusInfo(status: Bikepark['liftStatus']) {
+    function getStatusInfo(status: LiftStatus) {
         switch (status) {
             case 'open':
                 return { color: theme.colors.accentLime, label: t('park_picker.status_open'), emoji: '🟢' };
@@ -62,18 +65,43 @@ export default function ParkPickerScreen() {
                 return { color: theme.colors.accentRed, label: t('park_picker.status_closed'), emoji: '🔴' };
             case 'season_end':
                 return { color: theme.colors.textMuted, label: t('park_picker.status_season_end'), emoji: '⚫' };
+            case 'unknown':
+                return { color: theme.colors.textMuted, label: t('park_picker.status_unknown'), emoji: '⚪' };
         }
     }
+
     const [refreshing, setRefreshing] = useState(false);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [rides, setRides] = useState<any[]>([]);
+    const [statusByPark, setStatusByPark] = useState<Record<string, { status: LiftStatus; checkedAt: string }>>({});
+    const [weatherByPark, setWeatherByPark] = useState<Record<string, ParkWeather>>({});
+
+    const loadStatus = useCallback(async () => {
+        const rows = await syncLoadParkStatus();
+        const now = Date.now();
+        const fresh: Record<string, { status: LiftStatus; checkedAt: string }> = {};
+        for (const [parkId, row] of Object.entries(rows)) {
+            const checked = new Date(row.checkedAt).getTime();
+            if (isNaN(checked) || now - checked > STATUS_FRESH_MS) continue;
+            fresh[parkId] = { status: row.status, checkedAt: row.checkedAt };
+        }
+        setStatusByPark(fresh);
+    }, []);
+
+    const loadWeather = useCallback(async (force: boolean) => {
+        if (!hasWeatherKey) return;
+        const map = await fetchWeatherForParks(bikeparks, force);
+        setWeatherByPark(map);
+    }, []);
 
     useEffect(() => {
         syncLoadPreference<string[]>('park_favorites', FAVORITES_KEY).then(data => {
             if (data) setFavorites(data);
         });
         syncLoadTable<any>('rides', '@bikepro_rides').then(data => setRides(data ?? []));
-    }, []);
+        loadStatus();
+        loadWeather(false);
+    }, [loadStatus, loadWeather]);
 
     // parkId → ride count (ride-log integration: "dort gewesen")
     const rideCountByPark = useMemo(() => {
@@ -83,6 +111,16 @@ export default function ParkPickerScreen() {
         });
         return map;
     }, [rides]);
+
+    // Latest scrape timestamp across all parks (for the "updated at" hint)
+    const latestCheck = useMemo(() => {
+        let latest = 0;
+        for (const row of Object.values(statusByPark)) {
+            const ts = new Date(row.checkedAt).getTime();
+            if (!isNaN(ts) && ts > latest) latest = ts;
+        }
+        return latest > 0 ? latest : null;
+    }, [statusByPark]);
 
     const toggleFavorite = async (parkId: string) => {
         const updated = favorites.includes(parkId)
@@ -98,14 +136,21 @@ export default function ParkPickerScreen() {
             ? bikeparks
             : bikeparks.filter((p) => countryMap[p.country] === region);
 
+    // Effective lift status: fresh scraped row wins, static value is fallback
+    const effectiveStatus = (park: Bikepark): LiftStatus =>
+        statusByPark[park.id]?.status ?? park.liftStatus;
+
     const getGoScore = (park: Bikepark) => {
         let score = 0;
-        if (park.liftStatus === 'open') score += 5;
-        if (park.liftStatus === 'partial') score += 2;
-        if (park.weather.icon === '☀️') score += 3;
-        if (park.weather.icon === '⛅') score += 2;
-        if (park.weather.icon === '🌧️') score -= 2;
-        if (park.weather.temp > 15 && park.weather.temp < 25) score += 2; // Optimal temp
+        const status = effectiveStatus(park);
+        if (status === 'open') score += 5;
+        if (status === 'partial') score += 2;
+        const weather = weatherByPark[park.id];
+        if (weather) {
+            const info = weatherInfo(weather.code);
+            score += info.score;
+            if (weather.temp > 15 && weather.temp < 25) score += 2; // Optimal temp
+        }
         return score;
     };
 
@@ -117,11 +162,24 @@ export default function ParkPickerScreen() {
     });
 
     const onRefresh = useCallback(async () => {
-        // No live data yet — refresh only reloads persisted favorites
         setRefreshing(true);
         try {
-            const data = await syncLoadPreference<string[]>('park_favorites', FAVORITES_KEY);
-            if (data) setFavorites(data);
+            const [favs, status, weather] = await Promise.all([
+                syncLoadPreference<string[]>('park_favorites', FAVORITES_KEY),
+                syncLoadParkStatus(),
+                hasWeatherKey ? fetchWeatherForParks(bikeparks, true) : Promise.resolve({}),
+            ]);
+            if (favs) setFavorites(favs);
+            const now = Date.now();
+            const fresh: Record<string, { status: LiftStatus; checkedAt: string }> = {};
+            for (const [parkId, row] of Object.entries(status)) {
+                const checked = new Date(row.checkedAt).getTime();
+                if (!isNaN(checked) && now - checked <= STATUS_FRESH_MS) {
+                    fresh[parkId] = { status: row.status, checkedAt: row.checkedAt };
+                }
+            }
+            setStatusByPark(fresh);
+            if (hasWeatherKey) setWeatherByPark(weather);
         } finally {
             setRefreshing(false);
         }
@@ -156,14 +214,20 @@ export default function ParkPickerScreen() {
                 />
 
                 <Text style={styles.hint}>
-                    {t('park_picker.weather_hint')}
+                    {hasWeatherKey
+                        ? (latestCheck
+                            ? t('park_picker.live_hint', { date: new Date(latestCheck).toLocaleTimeString(i18n.language, { hour: '2-digit', minute: '2-digit' }) })
+                            : t('park_picker.live_hint_no_status'))
+                        : t('park_picker.no_weather_hint')}
                 </Text>
 
                 {/* Park cards */}
                 {sorted.map((park) => {
-                    const status = getStatusInfo(park.liftStatus);
+                    const statusInfo = getStatusInfo(effectiveStatus(park));
                     const goScore = getGoScore(park);
                     const go = getGoLabel(goScore, t);
+                    const weather = weatherByPark[park.id];
+                    const wInfo = weather ? weatherInfo(weather.code) : null;
 
                     return (
                         <BPCard
@@ -195,23 +259,44 @@ export default function ParkPickerScreen() {
                             <View style={styles.infoRow}>
                                 {/* Weather */}
                                 <View style={styles.weatherBlock}>
-                                    <Text style={styles.weatherIcon}>{park.weather.icon}</Text>
-                                    <View>
-                                        <Text style={styles.weatherTemp}>{park.weather.temp}°C</Text>
-                                        <Text style={styles.weatherDesc}>{park.weather.condition}</Text>
-                                    </View>
+                                    {weather && wInfo ? (
+                                        <>
+                                            <Text style={styles.weatherIcon}>{wInfo.icon}</Text>
+                                            <View>
+                                                <Text style={styles.weatherTemp}>{weather.temp}°C</Text>
+                                                <Text style={styles.weatherDesc}>{t(`park_picker.cond_${wInfo.key}`)}</Text>
+                                            </View>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.weatherIcon}>🌡️</Text>
+                                            <View>
+                                                <Text style={styles.weatherTemp}>—</Text>
+                                                <Text style={styles.weatherDesc}>{t('park_picker.weather_na')}</Text>
+                                            </View>
+                                        </>
+                                    )}
                                 </View>
 
                                 {/* Wind & Rain */}
                                 <View style={styles.weatherDetails}>
-                                    <Text style={styles.detailText}>💨 {park.weather.wind} km/h</Text>
-                                    <Text style={styles.detailText}>💧 {park.weather.rain} mm</Text>
+                                    {weather ? (
+                                        <>
+                                            <Text style={styles.detailText}>💨 {weather.wind} km/h</Text>
+                                            <Text style={styles.detailText}>💧 {weather.rain} mm</Text>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.detailText}>💨 —</Text>
+                                            <Text style={styles.detailText}>💧 —</Text>
+                                        </>
+                                    )}
                                 </View>
 
                                 {/* Lift status */}
                                 <View style={styles.liftBlock}>
-                                    <Text style={[styles.liftStatus, { color: status.color }]}>
-                                        {status.emoji} {status.label}
+                                    <Text style={[styles.liftStatus, { color: statusInfo.color }]}>
+                                        {statusInfo.emoji} {statusInfo.label}
                                     </Text>
                                     <Text style={styles.liftCount}>
                                         {t('park_picker.lifts_count', { open: park.openLifts, total: park.lifts })}
