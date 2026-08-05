@@ -1,0 +1,25 @@
+# Scrapes the lift status of all bikeparks once a day and writes it to the
+# Supabase `park_status` table. 6:00 UTC = 7:00 in winter (CET) /
+# 8:00 in summer (CEST) — close enough for a morning refresh.
+name: Scrape Park Status
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Scrape & upsert park status
+        run: node supabase/scrape_park_status.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

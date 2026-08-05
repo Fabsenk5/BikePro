@@ -621,6 +621,41 @@ export async function syncSavePreference<T>(key: string, storageKey: string, val
     }
 }
 
+// ─── PARK STATUS (scraped daily by GitHub Actions, public read) ───
+
+export interface ParkStatusRow {
+    status: 'open' | 'partial' | 'closed' | 'season_end' | 'unknown';
+    note: string;
+    checkedAt: string;
+}
+
+/**
+ * Load the scraped lift status for all parks (park_status table, public read).
+ * Cloud-only — returns an empty map when Supabase is not configured.
+ */
+export async function syncLoadParkStatus(): Promise<Record<string, ParkStatusRow>> {
+    const supabase = getSupabase();
+    if (!supabase) return {};
+
+    try {
+        const { data, error } = await supabase.from('park_status').select('*');
+        if (error) throw error;
+
+        const map: Record<string, ParkStatusRow> = {};
+        for (const row of data ?? []) {
+            map[row.park_id] = {
+                status: row.status ?? 'unknown',
+                note: row.note ?? '',
+                checkedAt: row.checked_at ?? '',
+            };
+        }
+        return map;
+    } catch (e) {
+        console.warn('[sync] Load park status failed:', e);
+        return {};
+    }
+}
+
 // ─── WIKI OVERRIDES (Setup Guide admin content) ───
 
 export interface WikiOverride {

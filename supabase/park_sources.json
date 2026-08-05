@@ -1,0 +1,234 @@
+[
+    {
+        "id":  "winterberg",
+        "website":  "https://www.bikepark-winterberg.de"
+    },
+    {
+        "id":  "willingen",
+        "website":  "https://www.bikepark-willingen.de"
+    },
+    {
+        "id":  "warstein",
+        "website":  "https://www.bikepark-warstein.de"
+    },
+    {
+        "id":  "schulenberg",
+        "website":  "https://www.bikepark-schulenberg.de"
+    },
+    {
+        "id":  "hahnenklee",
+        "website":  "https://www.bikepark-hahnenklee.de"
+    },
+    {
+        "id":  "msb-x-trail",
+        "website":  "https://www.msb-x-trail.de"
+    },
+    {
+        "id":  "braunlage",
+        "website":  "https://www.bikepark-braunlage.de"
+    },
+    {
+        "id":  "thale",
+        "website":  "https://www.bikepark-thale.de"
+    },
+    {
+        "id":  "hellental",
+        "website":  "https://www.bikepark-hellental.de"
+    },
+    {
+        "id":  "geisskopf",
+        "website":  "https://www.bikepark-geisskopf.de"
+    },
+    {
+        "id":  "osternohe",
+        "website":  "https://www.bikepark-osternohe.de"
+    },
+    {
+        "id":  "beerfelden",
+        "website":  "https://www.bikepark-beerfelden.de"
+    },
+    {
+        "id":  "bad-wildbad",
+        "website":  "https://www.bikepark-bad-wildbad.de"
+    },
+    {
+        "id":  "todtnau",
+        "website":  "https://www.todtnau.de"
+    },
+    {
+        "id":  "feldberg",
+        "website":  "https://www.feldberg-schwarzwald.de"
+    },
+    {
+        "id":  "samerberg",
+        "website":  "https://www.bikepark-samerberg.de"
+    },
+    {
+        "id":  "lenggries",
+        "website":  "https://www.bikepark-lenggries.com"
+    },
+    {
+        "id":  "garmisch",
+        "website":  "https://www.gapa-tourismus.de/bike"
+    },
+    {
+        "id":  "oberammergau",
+        "website":  "https://www.bikepark-oberammergau.de"
+    },
+    {
+        "id":  "ilmenau",
+        "website":  "https://www.bikepark-ilmenau.de"
+    },
+    {
+        "id":  "bad-tabarz",
+        "website":  "https://www.tabarz.de"
+    },
+    {
+        "id":  "schoeneck",
+        "website":  "https://www.schoeneck.info"
+    },
+    {
+        "id":  "oberwiesenthal",
+        "website":  "https://www.oberwiesenthal.de"
+    },
+    {
+        "id":  "bottrop",
+        "website":  "https://www.bottrop.de"
+    },
+    {
+        "id":  "leogang",
+        "website":  "https://www.bikepark-leogang.com"
+    },
+    {
+        "id":  "saalbach",
+        "website":  "https://www.saalbach.com/bike"
+    },
+    {
+        "id":  "schladming",
+        "website":  "https://www.planai.at/bike"
+    },
+    {
+        "id":  "wagrain",
+        "website":  "https://www.wagrain-kleinarl.at/bike"
+    },
+    {
+        "id":  "flachau",
+        "website":  "https://www.flachau.com"
+    },
+    {
+        "id":  "zell-am-see",
+        "website":  "https://www.schmitten.at"
+    },
+    {
+        "id":  "innsbruck-mutters",
+        "website":  "https://www.bikepark-innsbruck.com"
+    },
+    {
+        "id":  "serfaus-fiss-ladis",
+        "website":  "https://www.serfaus-fiss-ladis.at/bike"
+    },
+    {
+        "id":  "ischgl",
+        "website":  "https://www.ischgl.com/bike"
+    },
+    {
+        "id":  "soelden",
+        "website":  "https://www.soelden.com/bike"
+    },
+    {
+        "id":  "obergurgl",
+        "website":  "https://www.obergurgl.com"
+    },
+    {
+        "id":  "kirchberg",
+        "website":  "https://www.kitzbueheler-alpen.com/bike"
+    },
+    {
+        "id":  "mayrhofen",
+        "website":  "https://www.mayrhofen.at/bike"
+    },
+    {
+        "id":  "fieberbrunn",
+        "website":  "https://www.fieberbrunn.com"
+    },
+    {
+        "id":  "kitzbuehel",
+        "website":  "https://www.kitzbuehel.com"
+    },
+    {
+        "id":  "brandnertal",
+        "website":  "https://www.brandnertal.at"
+    },
+    {
+        "id":  "semmering",
+        "website":  "https://www.semmering.at"
+    },
+    {
+        "id":  "bad-kleinkirchheim",
+        "website":  "https://www.badkleinkirchheim.at"
+    },
+    {
+        "id":  "lenzerheide",
+        "website":  "https://www.bikekingdom.ch"
+    },
+    {
+        "id":  "davos",
+        "website":  "https://www.davos.ch/bike"
+    },
+    {
+        "id":  "brambruesch",
+        "website":  "https://www.brambruesch.ch"
+    },
+    {
+        "id":  "laax",
+        "website":  "https://www.laax.com"
+    },
+    {
+        "id":  "flumserberg",
+        "website":  "https://www.flumserberg.ch"
+    },
+    {
+        "id":  "hasliberg",
+        "website":  "https://www.hasliberg.ch"
+    },
+    {
+        "id":  "engelberg",
+        "website":  "https://www.engelberg.ch"
+    },
+    {
+        "id":  "zermatt",
+        "website":  "https://www.zermatt.ch"
+    },
+    {
+        "id":  "verbier",
+        "website":  "https://www.verbier.ch"
+    },
+    {
+        "id":  "lac-blanc",
+        "website":  "https://www.lac-blanc.com/vtt"
+    },
+    {
+        "id":  "les-gets",
+        "website":  "https://www.lesgets.com/vtt"
+    },
+    {
+        "id":  "mottolino",
+        "website":  "https://www.mottolino.com/bike"
+    },
+    {
+        "id":  "klinovec",
+        "website":  "https://www.klinovec.cz/bike"
+    },
+    {
+        "id":  "spicak",
+        "website":  "https://www.spicak.cz/bike"
+    },
+    {
+        "id":  "rokytnice",
+        "website":  "https://www.rokytnice.com/bike"
+    },
+    {
+        "id":  "lipno",
+        "website":  "https://www.lipno.info/bike"
+    }
+]
