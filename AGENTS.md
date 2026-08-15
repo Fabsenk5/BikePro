@@ -48,4 +48,4 @@ MTB setup & riding companion. Expo (React Native) + expo-router + TypeScript, we
 ## Rules (from .agents/rules)
 
 - No agent-driven browser testing (token cost) — hand the user a manual test script instead.
-- After validated changes: `git add . && git commit -m "..." && git push` (confirm with user first per session policy).
+- Git-Regeln (Push-Pflicht bei verifizierten Änderungen) gelten global — siehe globale Konventionen.
