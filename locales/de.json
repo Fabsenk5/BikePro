@@ -792,7 +792,8 @@
         "type_coil": "Stahlfeder (Coil)",
         "travel_mm": "Federweg (mm)",
         "stroke_mm": "Dämpferhub (mm)",
-        "click_note": "Wichtig: Alle Klicks werden von komplett geschlossen (im Uhrzeigersinn / +) in Richtung offen (gegen den Uhrzeigersinn / -) gezählt!"
+        "click_note": "Wichtig: Alle Klicks werden von komplett geschlossen (im Uhrzeigersinn / +) in Richtung offen (gegen den Uhrzeigersinn / -) gezählt!",
+        "spec_label": "Hersteller"
     },
     "dialed": {
         "title": "⚙️ Dialed In",
@@ -887,7 +888,10 @@
         "wizard_baseline_1_solution": "Mach zuerst das Grundsetup: 1) Dämpfung komplett öffnen, 2) Sag einstellen, 3) Rebound, 4) Compression. Ziel-Sag: Gabel 20 %, Dämpfer 27 % (ausgewogen). Öffne den Grundsetup-Guide für die komplette Checkliste.",
         "wizard_baseline_2_label": "Ich weiß nicht, ob mein Sag stimmt",
         "wizard_baseline_2_solution": "Sag in Fahrermontur messen (O-Ring/Zip-Tie): Gabel 20 %, Dämpfer 27 % als Startwert. Passt nicht? Druck in 5-PSI-Schritten anpassen und wiederholen, bis der Ziel-Sag erreicht ist.",
-        "wizard_open_guide": "📖 Grundsetup-Guide öffnen"
+        "wizard_open_guide": "📖 Grundsetup-Guide öffnen",
+        "spec_reco_title": "Hersteller-Empfehlung ({{weight}} kg)",
+        "spec_reco_title_generic": "Hersteller-Empfehlung",
+        "spec_apply": "Übernehmen"
     },
     "shred": {
         "title": "🔧 Shred Check",

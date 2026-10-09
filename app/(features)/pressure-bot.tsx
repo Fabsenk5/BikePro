@@ -9,6 +9,7 @@
 import { BPButton, BPCard, BPInput, BPPicker, BPSegmentedControl, BPSlider, screenContentStyle } from '@/components/ui';
 import { featureColors, theme } from '@/constants/Colors';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
+import { formatRange, midpoint, resolveSpecRow, SpecRow } from '@/lib/specTable';
 import { showAlert } from '@/lib/dialog';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
@@ -381,33 +382,75 @@ export default function PressureBotScreen() {
         const fork = selectedBike?.components.find((c: any) => c.type === 'fork');
         const shock = selectedBike?.components.find((c: any) => c.type === 'shock');
 
-        // Per-channel suggestion: same "open %" logic, capped by the channel's own
-        // max clicks (channel value → legacy value → model default, see clickLimits.ts)
-        const clickFor = (comp: any, channel: ClickChannel, openPct: number): { value: number; max: number } => {
-            const max = resolveMaxClicks(comp, channel);
-            return { value: Math.max(1, Math.round(max * (openPct / 100))), max };
+        // Manufacturer recommendations for the rider's weight (optional per component)
+        const forkSpec = fork ? resolveSpecRow(fork.specTable, riderWeight) : null;
+        const shockSpec = shock ? resolveSpecRow(shock.specTable, riderWeight) : null;
+
+        let forkPsiSource: 'spec' | 'formula' = 'formula';
+        let forkPsiSpecText: string | null = null;
+        const forkSpecPsi = forkSpec ? midpoint(forkSpec.row.psi) : null;
+        if (forkSpecPsi !== null) {
+            fPsi = forkSpecPsi;
+            forkPsiSource = 'spec';
+            forkPsiSpecText = formatRange(forkSpec?.row.psi);
+        }
+
+        let shockPsiSource: 'spec' | 'formula' = 'formula';
+        let shockPsiSpecText: string | null = null;
+        const shockSpecPsi = shockType === 'coil' ? null : (shockSpec ? midpoint(shockSpec.row.psi) : null);
+        if (shockSpecPsi !== null) {
+            sPsi = shockSpecPsi;
+            shockPsiSource = 'spec';
+            shockPsiSpecText = formatRange(shockSpec?.row.psi);
+        }
+
+        type ClickSuggestion = { value: number; max: number; specText: string | null };
+
+        const pickSpecClicks = (row: SpecRow | undefined, channel: ClickChannel): string | null => {
+            if (!row) return null;
+            switch (channel) {
+                case 'rebound': return row.lsr ?? row.hsr ?? null;
+                case 'reboundLsr': return row.lsr ?? null;
+                case 'reboundHsr': return row.hsr ?? null;
+                case 'compression': return row.lsc ?? row.hsc ?? null;
+                case 'compressionLsc': return row.lsc ?? null;
+                case 'compressionHsc': return row.hsc ?? null;
+            }
         };
-        const fmtClicks = (r: { value: number; max: number } | null, pct: number) =>
-            r ? `${r.value} (${r.max} max)` : `${Math.round(pct)}%`;
-        const rawClicks = (r: { value: number; max: number } | null, pct: number) =>
+
+        // Manufacturer value first; otherwise "open %" logic capped by the channel max
+        const clickFor = (comp: any, specRow: SpecRow | undefined, channel: ClickChannel, openPct: number): ClickSuggestion => {
+            const specText = pickSpecClicks(specRow, channel);
+            const specValue = specText ? midpoint(specText) : null;
+            const max = resolveMaxClicks(comp, channel);
+            if (specValue !== null) return { value: specValue, max, specText };
+            return { value: Math.max(1, Math.round(max * (openPct / 100))), max, specText: null };
+        };
+        const fmtClicks = (r: ClickSuggestion | null, pct: number) => {
+            if (!r) return `${Math.round(pct)}%`;
+            if (r.specText) return `${formatRange(r.specText)} 🏭`;
+            return `${r.value} (${r.max} max)`;
+        };
+        const rawClicks = (r: ClickSuggestion | null, pct: number) =>
             r ? r.value : Math.round(pct);
 
-        const forkRebound = fork ? clickFor(fork, 'rebound', reboundOpenPct) : null;
-        const forkLsr = fork ? clickFor(fork, 'reboundLsr', reboundOpenPct) : null;
-        const forkHsr = fork ? clickFor(fork, 'reboundHsr', reboundOpenPct) : null;
-        const forkComp = fork ? clickFor(fork, 'compression', compOpenPct) : null;
-        const forkCompLsc = fork ? clickFor(fork, 'compressionLsc', compOpenPct) : null;
-        const forkCompHsc = fork ? clickFor(fork, 'compressionHsc', compOpenPct) : null;
+        const forkRebound = fork ? clickFor(fork, forkSpec?.row, 'rebound', reboundOpenPct) : null;
+        const forkLsr = fork ? clickFor(fork, forkSpec?.row, 'reboundLsr', reboundOpenPct) : null;
+        const forkHsr = fork ? clickFor(fork, forkSpec?.row, 'reboundHsr', reboundOpenPct) : null;
+        const forkComp = fork ? clickFor(fork, forkSpec?.row, 'compression', compOpenPct) : null;
+        const forkCompLsc = fork ? clickFor(fork, forkSpec?.row, 'compressionLsc', compOpenPct) : null;
+        const forkCompHsc = fork ? clickFor(fork, forkSpec?.row, 'compressionHsc', compOpenPct) : null;
 
-        const shockRebound = shock ? clickFor(shock, 'rebound', reboundOpenPct) : null;
-        const shockLsr = shock ? clickFor(shock, 'reboundLsr', reboundOpenPct) : null;
-        const shockHsr = shock ? clickFor(shock, 'reboundHsr', reboundOpenPct) : null;
-        const shockComp = shock ? clickFor(shock, 'compression', compOpenPct) : null;
-        const shockCompLsc = shock ? clickFor(shock, 'compressionLsc', compOpenPct) : null;
-        const shockCompHsc = shock ? clickFor(shock, 'compressionHsc', compOpenPct) : null;
+        const shockRebound = shock ? clickFor(shock, shockSpec?.row, 'rebound', reboundOpenPct) : null;
+        const shockLsr = shock ? clickFor(shock, shockSpec?.row, 'reboundLsr', reboundOpenPct) : null;
+        const shockHsr = shock ? clickFor(shock, shockSpec?.row, 'reboundHsr', reboundOpenPct) : null;
+        const shockComp = shock ? clickFor(shock, shockSpec?.row, 'compression', compOpenPct) : null;
+        const shockCompLsc = shock ? clickFor(shock, shockSpec?.row, 'compressionLsc', compOpenPct) : null;
+        const shockCompHsc = shock ? clickFor(shock, shockSpec?.row, 'compressionHsc', compOpenPct) : null;
 
         return { 
-            forkPsi: fPsi, shockPsi: sPsi, 
+            forkPsi: fPsi, shockPsi: sPsi,
+            forkPsiSource, forkPsiSpecText, shockPsiSource, shockPsiSpecText,
             forkClicks: fmtClicks(forkRebound, reboundOpenPct),
             forkLsrClicks: fmtClicks(forkLsr, reboundOpenPct),
             forkHsrClicks: fmtClicks(forkHsr, reboundOpenPct),
@@ -619,6 +662,9 @@ export default function PressureBotScreen() {
                                 <Text style={styles.resultLabel}>{t('pressure_bot.fork_label', { defaultValue: 'Gabel (Fork)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.forkPsi}</Text>
                                 <Text style={styles.resultUnit}>PSI</Text>
+                                {suspResult.forkPsiSource === 'spec' && (
+                                    <Text style={styles.resultPSI}>🏭 {suspResult.forkPsiSpecText} {t('pressure_bot.spec_label')}</Text>
+                                )}
                                 {suspResult.forkReboundMode === 'none' ? null : suspResult.forkReboundMode === 'hsls' ? (
                                     <>
                                         <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.forkLsrClicks}</Text>
@@ -643,6 +689,9 @@ export default function PressureBotScreen() {
                                 <Text style={styles.resultLabel}>{t('pressure_bot.shock_label', { defaultValue: 'Dämpfer (Shock)' })}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>{suspResult.shockPsi}</Text>
                                 <Text style={styles.resultUnit}>{shockType === 'coil' ? 'lbs' : 'PSI'}</Text>
+                                {suspResult.shockPsiSource === 'spec' && (
+                                    <Text style={styles.resultPSI}>🏭 {suspResult.shockPsiSpecText} {t('pressure_bot.spec_label')}</Text>
+                                )}
                                 {suspResult.shockReboundMode === 'none' ? null : suspResult.shockReboundMode === 'hsls' ? (
                                     <>
                                         <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.shockLsrClicks}</Text>

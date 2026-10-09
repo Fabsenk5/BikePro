@@ -12,7 +12,8 @@ import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPS
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
-import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
+import { formatSpecSummary, midpoint, resolveSpecRow, SpecRow } from '@/lib/specTable';
+import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -157,6 +158,7 @@ export default function DialedInScreen() {
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
     const [rides, setRides] = useState<any[]>([]);
     const [pressureUnit, setPressureUnit] = useState<'bar' | 'psi'>('bar');
+    const [riderWeightKg, setRiderWeightKg] = useState<number | null>(null);
 
     const [wizardVisible, setWizardVisible] = useState(false);
     const [wizardStep, setWizardStep] = useState<'category' | 'issue' | 'solution'>('category');
@@ -270,12 +272,12 @@ export default function DialedInScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides()]).finally(() => setLoading(false));
+            Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides(), loadProfileWeight()]).finally(() => setLoading(false));
         }, [])
     );
 
     const refreshOnForeground = useCallback(() => {
-        Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides()]).catch(() => {});
+        Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides(), loadProfileWeight()]).catch(() => {});
     }, []);
 
     // Pull newer cloud data when the app/tab becomes visible again
@@ -397,6 +399,14 @@ export default function DialedInScreen() {
         const isGerman = i18n.language?.startsWith('de');
         const pref = await syncLoadPreference<{ pressure: 'bar' | 'psi'; weight: 'kg' | 'lb' }>('units', UNITS_KEY);
         setPressureUnit(pref?.pressure ?? (isGerman ? 'bar' : 'psi'));
+    };
+
+    const loadProfileWeight = async () => {
+        try {
+            const profile = await syncLoadProfile();
+            const w = parseFloat(profile.weight ?? '');
+            setRiderWeightKg(Number.isFinite(w) && w > 0 ? w : null);
+        } catch { /* profile is optional */ }
     };
 
     const loadRides = async () => {
@@ -562,6 +572,27 @@ export default function DialedInScreen() {
         }
     };
 
+    // Apply the manufacturer row to the current form (ranges → midpoint)
+    const applySpecRecommendation = () => {
+        if (!activeSpecInfo || !activeSuspension) return;
+        const row = activeSpecInfo.row;
+        const psi = midpoint(row.psi);
+        const lsr = midpoint(row.lsr);
+        const hsr = midpoint(row.hsr);
+        const lsc = midpoint(row.lsc);
+        const hsc = midpoint(row.hsc);
+        setActiveSuspension((prev: SuspensionValues) => ({
+            ...prev,
+            ...(psi !== null ? { psi } : {}),
+            reboundClicks: lsr ?? hsr ?? prev.reboundClicks,
+            reboundLSR: lsr ?? prev.reboundLSR,
+            reboundHSR: hsr ?? prev.reboundHSR,
+            compressionClicks: lsc ?? hsc ?? prev.compressionClicks,
+            compressionLSC: lsc ?? prev.compressionLSC,
+            compressionHSC: hsc ?? prev.compressionHSC,
+        }));
+    };
+
     const activeConfig = activeSuspension?.config ?? defaultConfig;
 
     const getActiveComponentConfig = () => {
@@ -594,6 +625,16 @@ export default function DialedInScreen() {
 
     const getChannelMaxClicks = (channel: ClickChannel) =>
         resolveMaxClicks(getActiveComponent(), channel);
+
+    // Manufacturer recommendation for the active fork/shock + rider weight
+    const activeSpecInfo = useMemo(() => {
+        const comp: any = getActiveComponent();
+        const resolved = resolveSpecRow(comp?.specTable, riderWeightKg);
+        if (!resolved) return null;
+        const summary = formatSpecSummary(resolved.row);
+        if (!summary) return null;
+        return { summary, nearest: resolved.fallback, row: resolved.row as SpecRow };
+    }, [bikeId, activeTab, trackerBikes, riderWeightKg]);
 
     // Average setup rating from Ride-Log (rides with setupId + 1–5 setupRating)
     const ratingStats = useMemo(() => {
@@ -778,6 +819,26 @@ export default function DialedInScreen() {
                 {/* Suspension Inputs */}
                 {activeSuspension && (
                     <>
+                        {activeSpecInfo && (
+                            <View style={styles.specBox}>
+                                <Text style={styles.specBoxTitle}>
+                                    📋 {riderWeightKg !== null
+                                        ? t('dialed.spec_reco_title', { weight: riderWeightKg })
+                                        : t('dialed.spec_reco_title_generic')}
+                                </Text>
+                                <Text style={styles.specBoxText}>
+                                    {activeSpecInfo.summary}
+                                    {activeSpecInfo.nearest ? ` (${t('setup_guide.sag_spec_nearest')})` : ''}
+                                </Text>
+                                <BPButton
+                                    title={t('dialed.spec_apply')}
+                                    onPress={applySpecRecommendation}
+                                    variant="secondary"
+                                    color={theme.colors.accentCyan}
+                                    size="sm"
+                                />
+                            </View>
+                        )}
                         {activeTab === 'shock' && (
                             <BPToggle
                                 label={t('dialed.coil_shock')}
@@ -1006,6 +1067,9 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
     scrollContent: { ...screenContentStyle, padding: theme.spacing.lg, paddingBottom: theme.spacing.xxl },
     btnRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
+    specBox: { marginBottom: theme.spacing.md, padding: theme.spacing.sm, backgroundColor: theme.colors.background, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.accentCyan + '40' },
+    specBoxTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '800', marginBottom: 4 },
+    specBoxText: { color: theme.colors.textSecondary, fontSize: 12, marginBottom: theme.spacing.sm },
     emptyState: { alignItems: 'center', paddingVertical: theme.spacing.xxl * 2 },
     setupCard: { marginTop: theme.spacing.md, padding: theme.spacing.md },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

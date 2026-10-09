@@ -439,7 +439,10 @@
         "wizard_baseline_1_solution": "Do the base setup first: 1) open all damping, 2) set sag, 3) rebound, 4) compression. Target sag: fork 20 %, shock 27 % (balanced). Open the base setup guide for the full checklist.",
         "wizard_baseline_2_label": "I'm not sure my sag is right",
         "wizard_baseline_2_solution": "Measure sag in full riding gear (o-ring/zip tie): fork 20 %, shock 27 % as a starting point. Off? Adjust pressure in 5-PSI steps and repeat until the target sag is reached.",
-        "wizard_open_guide": "📖 Open base setup guide"
+        "wizard_open_guide": "📖 Open base setup guide",
+        "spec_reco_title": "Manufacturer recommendation ({{weight}} kg)",
+        "spec_reco_title_generic": "Manufacturer recommendation",
+        "spec_apply": "Apply"
     },
     "shred": {
         "title": "🔧 Shred Check",
@@ -1020,7 +1023,8 @@
         "type_coil": "Coil",
         "travel_mm": "Travel (mm)",
         "stroke_mm": "Shock stroke (mm)",
-        "click_note": "Important: All clicks are counted from fully closed (clockwise / +) toward open (counter-clockwise / -)!"
+        "click_note": "Important: All clicks are counted from fully closed (clockwise / +) toward open (counter-clockwise / -)!",
+        "spec_label": "Manufacturer"
     },
     "pending": {
         "title": "Account pending",
