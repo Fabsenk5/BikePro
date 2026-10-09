@@ -30,6 +30,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClickLimits, sanitizeClickLimits } from './clickLimits';
+import { SpecRow, sanitizeSpecTable } from './specTable';
 import { getSupabase, isSupabaseConfigured } from './supabase';
 
 // ─── Generic Helpers ───
@@ -243,6 +244,10 @@ export interface SyncComponent {
     clickLimits?: ClickLimits;
     reboundMode?: string;
     compressionMode?: string;
+    /** Manufacturer recommendation table (maintained in the Component Tracker) */
+    specTable?: SpecRow[];
+    /** Optional source note for the spec table (e.g. manual reference) */
+    specSource?: string;
 }
 
 const BIKES_KEY = '@bikepro_bikes';
@@ -310,6 +315,8 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         wearItems: c.wear_items ?? [],
                         maxClicks: c.max_clicks ?? undefined,
                         clickLimits: sanitizeClickLimits(c.click_limits),
+                        specTable: sanitizeSpecTable(c.spec_table),
+                        specSource: c.spec_source ?? undefined,
                         reboundMode: c.rebound_mode ?? undefined,
                         compressionMode: c.compression_mode ?? undefined,
                         price: c.price,
@@ -411,6 +418,8 @@ function componentToRow(bikeId: string, c: SyncComponent, userId: string): any {
         wear_items: c.wearItems ?? [],
         max_clicks: c.maxClicks,
         click_limits: c.clickLimits ?? null,
+        spec_table: c.specTable ?? null,
+        spec_source: c.specSource ?? null,
         rebound_mode: c.reboundMode,
         compression_mode: c.compressionMode,
         price: c.price,

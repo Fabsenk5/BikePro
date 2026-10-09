@@ -10,6 +10,7 @@ import { BPButton, BPCard, BPInput, BPPicker, BPSegmentedControl, BPSlider, scre
 import { featureColors, theme } from '@/constants/Colors';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { showAlert } from '@/lib/dialog';
+import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -28,19 +29,6 @@ const ACCENT = featureColors['pressure-bot'];
 const getSetupValue = (values: any[] | undefined, key: string, legacyKey: string): string | undefined => {
     if (!Array.isArray(values)) return undefined;
     return values.find((s: any) => s.key === key)?.value ?? values.find((s: any) => s.key === legacyKey)?.value;
-};
-
-// Default rear travel / shock stroke (mm) per bike type when the tracker has no values.
-const travelStrokeDefaults = (bikeType?: string): { travel: number; stroke: number } => {
-    switch (bikeType) {
-        case 'downhill': return { travel: 200, stroke: 75 };
-        case 'enduro':
-        case 'emtb':
-        case 'e-mtb': return { travel: 170, stroke: 65 };
-        case 'trail': return { travel: 140, stroke: 57.5 };
-        case 'xc': return { travel: 115, stroke: 45 };
-        default: return { travel: 160, stroke: 60 };
-    }
 };
 
 export default function PressureBotScreen() {
