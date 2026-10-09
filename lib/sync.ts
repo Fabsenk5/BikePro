@@ -22,6 +22,11 @@
  * while the set is non-empty (local data wins). A successful save removes its IDs;
  * full saves (syncSaveBikes/syncSaveTable) clear the whole set. A legacy boolean
  * flag ('true') is read conservatively as ['*'] (unknown entities, still dirty).
+ *
+ * Pending deletes: deletes that could not reach the cloud (offline or request
+ * failed) are queued per storage key in `@bikepro_pending_deletes_<storageKey>`
+ * and retried before the next cloud load. While entries remain, the cloud must
+ * not overwrite local data — otherwise deleted rows would be pulled back in.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSupabase, isSupabaseConfigured } from './supabase';
@@ -116,6 +121,74 @@ async function clearDirty(storageKey: string, ids?: string[]): Promise<void> {
 
 async function isDirty(storageKey: string): Promise<boolean> {
     return (await readDirtySet(storageKey)).size > 0;
+}
+
+// ─── Pending Deletes (failed or offline cloud deletes) ───
+
+interface PendingDelete {
+    table: string;
+    id: string;
+}
+
+const pendingDeletesKey = (storageKey: string) => `@bikepro_pending_deletes_${storageKey}`;
+
+async function readPendingDeletes(storageKey: string): Promise<PendingDelete[]> {
+    try {
+        const raw = await AsyncStorage.getItem(pendingDeletesKey(storageKey));
+        if (!raw) return [];
+        const arr = JSON.parse(raw);
+        return Array.isArray(arr)
+            ? arr.filter((x): x is PendingDelete =>
+                !!x && typeof x.table === 'string' && typeof x.id === 'string')
+            : [];
+    } catch {
+        return [];
+    }
+}
+
+async function writePendingDeletes(storageKey: string, deletes: PendingDelete[]): Promise<void> {
+    try {
+        if (deletes.length === 0) {
+            await AsyncStorage.removeItem(pendingDeletesKey(storageKey));
+        } else {
+            await AsyncStorage.setItem(pendingDeletesKey(storageKey), JSON.stringify(deletes));
+        }
+    } catch (e) {
+        console.warn('[sync] Failed to update pending deletes:', e);
+    }
+}
+
+async function addPendingDelete(storageKey: string, table: string, id: string): Promise<void> {
+    const list = await readPendingDeletes(storageKey);
+    if (!list.some(d => d.table === table && d.id === id)) {
+        list.push({ table, id });
+        await writePendingDeletes(storageKey, list);
+    }
+}
+
+/**
+ * Retry queued cloud deletes before a cloud load.
+ * Returns true when the queue is empty afterwards — only then may the cloud
+ * overwrite local data (otherwise deleted rows would come back).
+ */
+async function flushPendingDeletes(storageKey: string): Promise<boolean> {
+    const supabase = getSupabase();
+    if (!supabase) return true;
+    const pending = await readPendingDeletes(storageKey);
+    if (pending.length === 0) return true;
+
+    const remaining: PendingDelete[] = [];
+    for (const entry of pending) {
+        try {
+            const { error } = await supabase.from(entry.table).delete().eq('id', entry.id);
+            if (error) throw error;
+        } catch (e) {
+            console.warn(`[sync] Pending delete ${entry.table}/${entry.id} failed:`, e);
+            remaining.push(entry);
+        }
+    }
+    await writePendingDeletes(storageKey, remaining);
+    return remaining.length === 0;
 }
 
 // ─── BIKES ───
@@ -222,10 +295,12 @@ function migrateSetupValues(values: SetupValue[]): SetupValue[] {
 
 export async function syncLoadBikes(): Promise<SyncBike[]> {
     const { available } = await isCloudAvailable();
+    // Retry failed deletes first; while any remain, local data must win
+    const deletesSynced = available ? await flushPendingDeletes(BIKES_KEY) : true;
     const dirty = await isDirty(BIKES_KEY);
 
     // Skip cloud overwrite while local changes are unsynced
-    if (available && !dirty) {
+    if (available && deletesSynced && !dirty) {
         try {
             const supabase = getSupabase()!;
             const { data: bikes, error } = await supabase.from('bikes').select('*').order('created_at');
@@ -437,7 +512,11 @@ export async function syncUpdateComponents(bikeId: string, components: SyncCompo
 
 export async function syncDeleteBike(bikeId: string): Promise<void> {
     const { available } = await isCloudAvailable();
-    if (!available) return;
+    if (!available) {
+        // Offline/unauth: remember the delete, otherwise the next cloud load resurrects the row
+        await addPendingDelete(BIKES_KEY, 'bikes', bikeId);
+        return;
+    }
 
     try {
         const supabase = getSupabase()!;
@@ -445,28 +524,36 @@ export async function syncDeleteBike(bikeId: string): Promise<void> {
         const { error } = await supabase.from('bikes').delete().eq('id', bikeId);
         if (error) {
             console.warn('[sync] Delete bike error:', error.message);
+            await addPendingDelete(BIKES_KEY, 'bikes', bikeId);
         } else {
             await clearDirty(BIKES_KEY, [bikeId]);
         }
     } catch (e) {
         console.warn('[sync] Cloud delete bike failed:', e);
+        await addPendingDelete(BIKES_KEY, 'bikes', bikeId);
     }
 }
 
 export async function syncDeleteComponent(componentId: string): Promise<void> {
     const { available } = await isCloudAvailable();
-    if (!available) return;
+    if (!available) {
+        // Offline/unauth: remember the delete, otherwise the next cloud load resurrects the row
+        await addPendingDelete(BIKES_KEY, 'components', componentId);
+        return;
+    }
 
     try {
         const supabase = getSupabase()!;
         const { error } = await supabase.from('components').delete().eq('id', componentId);
         if (error) {
             console.warn('[sync] Delete component error:', error.message);
+            await addPendingDelete(BIKES_KEY, 'components', componentId);
         } else {
             await clearDirty(BIKES_KEY, [componentId]);
         }
     } catch (e) {
         console.warn('[sync] Cloud delete component failed:', e);
+        await addPendingDelete(BIKES_KEY, 'components', componentId);
     }
 }
 
@@ -477,10 +564,12 @@ export async function syncLoadTable<T extends { id: string }>(
     storageKey: string,
 ): Promise<T[]> {
     const { available } = await isCloudAvailable();
+    // Retry failed deletes first; while any remain, local data must win
+    const deletesSynced = available ? await flushPendingDeletes(storageKey) : true;
     const dirty = await isDirty(storageKey);
 
     // Skip cloud overwrite while local changes are unsynced
-    if (available && !dirty) {
+    if (available && deletesSynced && !dirty) {
         try {
             const supabase = getSupabase()!;
             const { data, error } = await supabase.from(table).select('*').order('created_at', { ascending: false });
@@ -548,7 +637,11 @@ export async function syncDeleteFromTable(table: string, storageKey: string, ite
     }
 
     const { available } = await isCloudAvailable();
-    if (!available) return true;
+    if (!available) {
+        // Offline/unauth: remember the delete, otherwise the next cloud load resurrects the row
+        await addPendingDelete(storageKey, table, itemId);
+        return true;
+    }
 
     try {
         const supabase = getSupabase()!;
@@ -558,6 +651,7 @@ export async function syncDeleteFromTable(table: string, storageKey: string, ite
         return true;
     } catch (e) {
         console.warn(`[sync] Cloud delete ${table} failed:`, e);
+        await addPendingDelete(storageKey, table, itemId);
         return false;
     }
 }
