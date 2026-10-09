@@ -671,7 +671,7 @@ export default function RideLogScreen() {
 
                                 <TouchableOpacity
                                     style={styles.deleteBtn}
-                                    onPress={() => confirmDelete(ride.id)}
+                                    onPress={(e) => { e.stopPropagation?.(); confirmDelete(ride.id); }}
                                 >
                                     <Text style={styles.deleteBtnText}>🗑</Text>
                                 </TouchableOpacity>

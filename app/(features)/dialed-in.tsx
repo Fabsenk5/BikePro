@@ -613,7 +613,7 @@ export default function DialedInScreen() {
                                         ) : null}
                                         {setup.location ? <Text style={styles.cardLocation}>📍 {setup.location}</Text> : null}
                                     </View>
-                                    <TouchableOpacity onPress={() => handleDelete(setup.id)}>
+                                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); handleDelete(setup.id); }}>
                                         <Text style={styles.deleteBtn}>🗑</Text>
                                     </TouchableOpacity>
                                 </View>

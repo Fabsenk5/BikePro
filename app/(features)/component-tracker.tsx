@@ -684,7 +684,7 @@ export default function ComponentTrackerScreen() {
                                 )}
                             </View>
                         )}
-                        <TouchableOpacity onPress={() => deleteComp(comp.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.compRowDelete}>
+                        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); deleteComp(comp.id); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.compRowDelete}>
                             <Text style={{ fontSize: 18 }}>🗑</Text>
                         </TouchableOpacity>
                     </BPCard>
