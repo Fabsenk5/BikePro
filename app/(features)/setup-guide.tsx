@@ -11,7 +11,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { syncLoadPreference, syncLoadWikiOverrides, syncSavePreference, syncSaveWikiOverride } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { showAlert } from '@/lib/dialog';
-import { Stack } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -62,6 +62,14 @@ export default function SetupGuideScreen() {
     const [isSaving, setIsSaving] = useState(false);
     const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
     const [articleOrder, setArticleOrder] = useState<string[]>([]);
+
+    const params = useLocalSearchParams<{ article?: string; category?: string }>();
+
+    // Deep link from the Dialed-In wizard: open the category and expand the article
+    useEffect(() => {
+        if (typeof params.category === 'string' && params.category) setSelectedCategory(params.category);
+        if (typeof params.article === 'string' && params.article) setExpandedArticle(params.article);
+    }, [params.category, params.article]);
 
     const refreshOnForeground = useCallback(() => {
         syncLoadPreference<string[]>('setup_favorites', '@bikepro_favorites').then(res => setFavorites(res ?? []));

@@ -14,7 +14,7 @@ import { confirmDialog } from '@/lib/dialog';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -175,6 +175,15 @@ export default function DialedInScreen() {
 
     const tuningCategories: WizardCategory[] = [
         {
+            id: 'baseline',
+            title: t('dialed.wizard_cat_baseline'),
+            icon: '🧰',
+            issues: [
+                { label: t('dialed.wizard_baseline_1_label'), solution: t('dialed.wizard_baseline_1_solution') },
+                { label: t('dialed.wizard_baseline_2_label'), solution: t('dialed.wizard_baseline_2_solution') }
+            ]
+        },
+        {
             id: 'grip',
             title: t('dialed.wizard_cat_grip'),
             icon: '🏁',
@@ -256,6 +265,7 @@ export default function DialedInScreen() {
     const [activeTab, setActiveTab] = useState<'fork' | 'shock' | 'tires'>('fork');
 
     const params = useLocalSearchParams();
+    const router = useRouter();
     const [lastHandledTs, setLastHandledTs] = useState('');
 
     useFocusEffect(
@@ -968,6 +978,18 @@ export default function DialedInScreen() {
                         <View style={{ backgroundColor: theme.colors.accentCyan + '20', padding: 16, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.accentCyan + '60', marginBottom: theme.spacing.lg }}>
                             <Text style={{ color: theme.colors.text, fontSize: 16, lineHeight: 24, fontWeight: '600' }}>💡 {wizardSolution}</Text>
                         </View>
+                        {selectedCategory?.id === 'baseline' && (
+                            <BPButton
+                                title={t('dialed.wizard_open_guide')}
+                                onPress={() => {
+                                    setWizardVisible(false);
+                                    router.push({ pathname: '/(features)/setup-guide', params: { article: 'base_procedure', category: 'baseline' } });
+                                }}
+                                color={theme.colors.accentCyan}
+                                fullWidth
+                                style={{ marginBottom: 8 }}
+                            />
+                        )}
                         <BPButton title={t('dialed.wizard_create')} onPress={() => {
                             setWizardVisible(false);
                             openNewSetup();
