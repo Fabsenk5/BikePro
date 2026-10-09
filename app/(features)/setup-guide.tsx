@@ -15,7 +15,7 @@ import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ScrollView,
+    FlatList,
     StatusBar,
     StyleSheet,
     Text,
@@ -572,11 +572,14 @@ export default function SetupGuideScreen() {
             />
             <StatusBar barStyle="light-content" />
 
-            <ScrollView
+            <FlatList
+                data={filteredArticles}
+                keyExtractor={(article) => article.id}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
-            >
-                <BPSearchInput
+                ListHeaderComponent={
+                    <>
+                        <BPSearchInput
                     value={searchQuery}
                     onChangeText={(text) => {
                         setSearchQuery(text);
@@ -624,11 +627,15 @@ export default function SetupGuideScreen() {
                     </View>
                 )}
 
-                {filteredArticles.map((article) => {
+                    </>
+                }
+                ListEmptyComponent={
+                    <BPEmptyState icon="📚" title={t('setup_guide.no_articles')} />
+                }
+                renderItem={({ item: article }) => {
                     const expanded = expandedArticle === article.id;
                     return (
                         <BPCard
-                            key={article.id}
                             onPress={() => toggleArticle(article.id)}
                             style={[styles.articleCard, expanded ? styles.articleExpanded : undefined]}
                         >
@@ -726,12 +733,8 @@ export default function SetupGuideScreen() {
                                 )}
                         </BPCard>
                     );
-                })}
-
-                {filteredArticles.length === 0 && (
-                    <BPEmptyState icon="📚" title={t('setup_guide.no_articles')} />
-                )}
-            </ScrollView>
+                }}
+            />
 
             {/* Admin Edit Modal */}
             <BPModal

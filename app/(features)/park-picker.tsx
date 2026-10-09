@@ -15,9 +15,9 @@ import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+    FlatList,
     Linking,
     RefreshControl,
-    ScrollView,
     StatusBar,
     StyleSheet,
     Text,
@@ -143,33 +143,36 @@ export default function ParkPickerScreen() {
             />
             <StatusBar barStyle="light-content" />
 
-            <ScrollView
+            <FlatList
+                data={sorted}
+                keyExtractor={(park) => park.id}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
-            >
-                {/* Region filter */}
-                <BPPicker
-                    label={t('park_picker.region_label')}
-                    options={[
-                        { label: t('park_picker.favorites_label', { count: favorites.length }), value: 'favorites' },
-                        ...regionFilter,
-                    ]}
-                    value={region}
-                    onValueChange={setRegion}
-                    accentColor={ACCENT}
-                />
+                ListHeaderComponent={
+                    <>
+                        {/* Region filter */}
+                        <BPPicker
+                            label={t('park_picker.region_label')}
+                            options={[
+                                { label: t('park_picker.favorites_label', { count: favorites.length }), value: 'favorites' },
+                                ...regionFilter,
+                            ]}
+                            value={region}
+                            onValueChange={setRegion}
+                            accentColor={ACCENT}
+                        />
 
-                <Text style={styles.hint}>
-                    {hasWeatherKey
-                        ? t('park_picker.weather_hint')
-                        : t('park_picker.no_weather_hint')}
-                </Text>
-
-                {/* Park cards */}
-                {sorted.map((park) => {
+                        <Text style={styles.hint}>
+                            {hasWeatherKey
+                                ? t('park_picker.weather_hint')
+                                : t('park_picker.no_weather_hint')}
+                        </Text>
+                    </>
+                }
+                renderItem={({ item: park }) => {
                     const goScore = getGoScore(park);
                     const go = getGoLabel(goScore, t);
                     const weather = weatherByPark[park.id];
@@ -177,7 +180,6 @@ export default function ParkPickerScreen() {
 
                     return (
                         <BPCard
-                            key={park.id}
                             style={styles.parkCard}
                             onPress={() => Linking.openURL(mapsUrl(park)).catch(() => {})}
                         >
@@ -297,8 +299,8 @@ export default function ParkPickerScreen() {
                             </View>
                         </BPCard>
                     );
-                })}
-            </ScrollView>
+                }}
+            />
         </View>
     );
 }

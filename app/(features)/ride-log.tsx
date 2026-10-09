@@ -16,7 +16,7 @@ import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-    ScrollView,
+    FlatList,
     StatusBar,
     StyleSheet,
     Text,
@@ -492,11 +492,14 @@ export default function RideLogScreen() {
             />
             <StatusBar barStyle="light-content" />
 
-            <ScrollView
+            <FlatList
+                data={filteredRides}
+                keyExtractor={(ride) => ride.id}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
-            >
-                {/* Stats bar */}
+                ListHeaderComponent={
+                    <>
+                        {/* Stats bar */}
                 <BPCard style={styles.statsRow}>
                     <View style={styles.statItem}>
                         <Text style={[styles.statValue, { color: ACCENT }]}>{totalRides}</Text>
@@ -598,15 +601,17 @@ export default function RideLogScreen() {
                     />
                 </View>
 
-                {/* Rides list */}
-                {rides.length === 0 ? (
-                    <BPEmptyState icon="📖" title={t('ridelog.no_rides')} subtitle={t('ridelog.log_first')} />
-                ) : filteredRides.length === 0 ? (
-                    <BPEmptyState icon="🔍" title={t('ridelog.no_matches')} subtitle={t('ridelog.no_matches_hint')} />
-                ) : (
-                    filteredRides.map((ride) => (
+                    </>
+                }
+                ListEmptyComponent={
+                    rides.length === 0 ? (
+                        <BPEmptyState icon="📖" title={t('ridelog.no_rides')} subtitle={t('ridelog.log_first')} />
+                    ) : (
+                        <BPEmptyState icon="🔍" title={t('ridelog.no_matches')} subtitle={t('ridelog.no_matches_hint')} />
+                    )
+                }
+                renderItem={({ item: ride }) => (
                         <BPCard
-                            key={ride.id}
                             onPress={() => openEdit(ride)}
                             accentColor={ACCENT}
                             style={styles.rideCard}
@@ -684,9 +689,8 @@ export default function RideLogScreen() {
                                     <Text style={styles.deleteBtnText}>🗑</Text>
                                 </TouchableOpacity>
                         </BPCard>
-                    ))
                 )}
-            </ScrollView>
+            />
 
             {/* Create/Edit Modal */}
             <BPModal
