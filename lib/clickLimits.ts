@@ -84,6 +84,7 @@ export function getModelDefaultClicks(model?: string): number | null {
 }
 
 export interface ClickLimitSource {
+    brand?: string;
     maxClicks?: string;
     clickLimits?: ClickLimits;
     model?: string;
@@ -104,7 +105,11 @@ export function resolveMaxClicks(
     if (specific !== null) return specific;
     const legacy = parseClicks(source.maxClicks);
     if (legacy !== null) return legacy;
-    const modelDefault = getModelDefaultClicks(source.model || source.name);
+    // Brand and model are stored separately in the tracker — combine them so
+    // patterns like "fox 36" or "zeb ultimate" actually match.
+    const modelDefault = getModelDefaultClicks(
+        [source.brand, source.model, source.name].filter(Boolean).join(' '),
+    );
     if (modelDefault !== null) return modelDefault;
     return fallback;
 }

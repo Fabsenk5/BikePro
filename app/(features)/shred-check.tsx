@@ -114,11 +114,18 @@ export default function ShredCheckScreen() {
             t('common.cancel')
         );
         if (!confirmed) return;
+        const today = getTodayISO();
         await updateComponentInBikes(comp.id, c => ({
             ...c,
             wearItems: (c.wearItems || []).map(w =>
                 w.id === item.id
-                    ? { ...w, currentKm: 0, lastServiceDate: getTodayISO() }
+                    ? {
+                        ...w,
+                        currentKm: 0,
+                        lastServiceDate: today,
+                        // Keep the maintenance history complete (same as the tracker flow)
+                        serviceHistory: [...(w.serviceHistory ?? []), { date: today, note: w.label, type: 'service' }],
+                    }
                     : w
             )
         }));

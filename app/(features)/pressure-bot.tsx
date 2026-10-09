@@ -423,7 +423,11 @@ export default function PressureBotScreen() {
             const specText = pickSpecClicks(specRow, channel);
             const specValue = specText ? midpoint(specText) : null;
             const max = resolveMaxClicks(comp, channel);
-            if (specValue !== null) return { value: specValue, max, specText };
+            if (specValue !== null) {
+                // Inconsistent manual data (spec above the max) → clamp and fall back to the normal display
+                const clamped = Math.min(specValue, max);
+                return { value: clamped, max, specText: clamped === specValue ? specText : null };
+            }
             return { value: Math.max(1, Math.round(max * (openPct / 100))), max, specText: null };
         };
         const fmtClicks = (r: ClickSuggestion | null, pct: number) => {

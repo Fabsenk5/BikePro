@@ -85,6 +85,8 @@ describe('resolveMaxClicks', () => {
 
     it('falls back to the model default, then to the generic fallback', () => {
         expect(resolveMaxClicks({ model: 'FOX 36' }, 'rebound')).toBe(14);
+        expect(resolveMaxClicks({ brand: 'FOX', model: '36' }, 'rebound')).toBe(14);
+        expect(resolveMaxClicks({ brand: 'RockShox', model: 'Zeb Ultimate' }, 'rebound')).toBe(18);
         expect(resolveMaxClicks({}, 'rebound')).toBe(25);
         expect(resolveMaxClicks({}, 'rebound', 30)).toBe(30);
         expect(resolveMaxClicks(undefined, 'compression')).toBe(25);
