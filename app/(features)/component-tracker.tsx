@@ -11,6 +11,7 @@ import { confirmDialog, showAlert } from '@/lib/dialog';
 import { setupLabelLocalized, wearLabelLocalized } from '@/lib/componentLabels';
 import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
 import { ClickChannel, channelsForModes, sanitizeClickLimits } from '@/lib/clickLimits';
+import { sanitizeSpecTable } from '@/lib/specTable';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -27,6 +28,18 @@ import {
 } from 'react-native';
 
 const ACCENT = featureColors['component-tracker'];
+
+/** Inline form shape for the manufacturer spec table (all fields as strings). */
+type SpecRowInput = {
+    id: string;
+    weightMin: string;
+    weightMax: string;
+    psi: string;
+    lsc: string;
+    hsc: string;
+    lsr: string;
+    hsr: string;
+};
 
 /** i18n labels for the per-channel click limit inputs */
 const CLICK_LABEL_KEYS: Record<ClickChannel, string> = {
@@ -107,6 +120,9 @@ export default function ComponentTrackerScreen() {
     const [compCompressionMode, setCompCompressionMode] = useState('');
     // Per-channel max clicks as form strings; converted on save via sanitizeClickLimits
     const [compClickLimits, setCompClickLimits] = useState<Partial<Record<ClickChannel, string>>>({});
+    // Manufacturer recommendation table (fork/shock), edited inline
+    const [compSpecTable, setCompSpecTable] = useState<SpecRowInput[]>([]);
+    const [compSpecSource, setCompSpecSource] = useState('');
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
@@ -375,6 +391,8 @@ export default function ComponentTrackerScreen() {
         setCompWeight('');
         setCompPrice('');
         setCompClickLimits({});
+        setCompSpecTable([]);
+        setCompSpecSource('');
         setCompReboundMode('');
         setCompCompressionMode('');
         setCompNotes('');
@@ -399,6 +417,17 @@ export default function ComponentTrackerScreen() {
             limitInputs[channel as ClickChannel] = String(value);
         }
         setCompClickLimits(limitInputs);
+        setCompSpecTable((comp.specTable ?? []).map(r => ({
+            id: r.id,
+            weightMin: r.weightMin !== undefined ? String(r.weightMin) : '',
+            weightMax: r.weightMax !== undefined ? String(r.weightMax) : '',
+            psi: r.psi ?? '',
+            lsc: r.lsc ?? '',
+            hsc: r.hsc ?? '',
+            lsr: r.lsr ?? '',
+            hsr: r.hsr ?? '',
+        })));
+        setCompSpecSource(comp.specSource ?? '');
         setCompReboundMode(comp.reboundMode ?? '');
         setCompCompressionMode(comp.compressionMode ?? '');
         setCompNotes(comp.notes);
@@ -469,6 +498,22 @@ export default function ComponentTrackerScreen() {
         }));
     };
 
+    // --- Manufacturer spec table (fork/shock) ---
+    const addSpecRow = () => {
+        setCompSpecTable(prev => [...prev, {
+            id: newId(), weightMin: '', weightMax: '',
+            psi: '', lsc: '', hsc: '', lsr: '', hsr: '',
+        }]);
+    };
+
+    const updateSpecRow = (index: number, field: keyof Omit<SpecRowInput, 'id'>, value: string) => {
+        setCompSpecTable(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row));
+    };
+
+    const removeSpecRow = (index: number) => {
+        setCompSpecTable(prev => prev.filter((_, i) => i !== index));
+    };
+
     const saveComp = async () => {
         if (!selectedBike) return;
         const compData: SyncComponent = {
@@ -483,6 +528,8 @@ export default function ComponentTrackerScreen() {
             // Legacy single value is preserved as silent fallback, no longer edited in the UI
             maxClicks: editingComp?.maxClicks,
             clickLimits: sanitizeClickLimits(compClickLimits),
+            specTable: sanitizeSpecTable(compSpecTable),
+            specSource: compSpecSource.trim() || undefined,
             reboundMode: compReboundMode || undefined,
             compressionMode: compCompressionMode || undefined,
             notes: compNotes.trim(),
@@ -799,6 +846,42 @@ export default function ComponentTrackerScreen() {
                     </>
                 )}
 
+                {/* Manufacturer recommendation table (fork/shock) */}
+                {['fork', 'shock'].includes(compType) && (
+                    <View style={styles.specSection}>
+                        <Text style={styles.specSectionTitle}>📋 {t('tracker.spec_section')}</Text>
+                        <Text style={styles.specHint}>{t('tracker.spec_hint')}</Text>
+                        {compSpecTable.map((row, index) => (
+                            <View key={row.id} style={styles.specRow}>
+                                <View style={styles.inputRow}>
+                                    <BPInput label={t('tracker.spec_weight_from')} placeholder="82" value={row.weightMin} onChangeText={(v) => updateSpecRow(index, 'weightMin', v)} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                    <BPInput label={t('tracker.spec_weight_to')} placeholder="87" value={row.weightMax} onChangeText={(v) => updateSpecRow(index, 'weightMax', v)} keyboardType="numeric" accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                </View>
+                                <BPInput label={t('tracker.spec_psi')} placeholder="80 oder 78-82" value={row.psi} onChangeText={(v) => updateSpecRow(index, 'psi', v)} accentColor={ACCENT} />
+                                <View style={styles.inputRow}>
+                                    <BPInput label={t('tracker.spec_lsr')} placeholder="10" value={row.lsr} onChangeText={(v) => updateSpecRow(index, 'lsr', v)} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                    <BPInput label={t('tracker.spec_hsr')} placeholder="5-6" value={row.hsr} onChangeText={(v) => updateSpecRow(index, 'hsr', v)} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                </View>
+                                <View style={styles.inputRow}>
+                                    <BPInput label={t('tracker.spec_lsc')} placeholder="8" value={row.lsc} onChangeText={(v) => updateSpecRow(index, 'lsc', v)} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                    <BPInput label={t('tracker.spec_hsc')} placeholder="4" value={row.hsc} onChangeText={(v) => updateSpecRow(index, 'hsc', v)} accentColor={ACCENT} containerStyle={{ flex: 1 }} />
+                                </View>
+                                <TouchableOpacity
+                                    onPress={() => removeSpecRow(index)}
+                                    style={styles.specRowDelete}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('a11y.remove')}
+                                >
+                                    <Text style={{ fontSize: 16 }}>🗑</Text>
+                                </TouchableOpacity>
+                            </View>
+                        ))}
+                        <BPButton title={t('tracker.spec_add_row')} onPress={addSpecRow} variant="secondary" color={ACCENT} size="sm" fullWidth />
+                        <View style={{ height: theme.spacing.sm }} />
+                        <BPInput label={t('tracker.spec_source_label')} placeholder={t('tracker.spec_source_placeholder')} value={compSpecSource} onChangeText={setCompSpecSource} accentColor={ACCENT} />
+                    </View>
+                )}
+
                 {/* Dynamic setup fields */}
                 {compSetup.length > 0 && (
                     <View style={styles.setupSection}>
@@ -1010,6 +1093,11 @@ const styles = StyleSheet.create({
     setupSection: { marginTop: theme.spacing.sm, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md },
     setupSectionTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
     clickHint: { color: theme.colors.textMuted, fontSize: 12, marginTop: -theme.spacing.sm, marginBottom: theme.spacing.md },
+    specSection: { marginTop: theme.spacing.md, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md },
+    specSectionTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.xs },
+    specHint: { color: theme.colors.textMuted, fontSize: 12, marginBottom: theme.spacing.sm },
+    specRow: { backgroundColor: theme.colors.background, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing.sm, marginBottom: theme.spacing.sm },
+    specRowDelete: { alignSelf: 'flex-end', padding: 4 },
     moveSection: { marginTop: theme.spacing.md, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, borderWidth: 1, borderColor: ACCENT + '40' },
     moveSectionTitle: { color: ACCENT, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
 });

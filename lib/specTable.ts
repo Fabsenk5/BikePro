@@ -91,6 +91,11 @@ export function sanitizeSpecTable(raw: unknown): SpecRow[] | undefined {
         const weightMax = num(r.weightMax);
         if (weightMin !== undefined) row.weightMin = weightMin;
         if (weightMax !== undefined) row.weightMax = weightMax;
+        if (row.weightMin !== undefined && row.weightMax !== undefined && row.weightMin > row.weightMax) {
+            const tmp = row.weightMin;
+            row.weightMin = row.weightMax;
+            row.weightMax = tmp;
+        }
         for (const key of ['psi', 'lsc', 'hsc', 'lsr', 'hsr'] as const) {
             const value = str(r[key]);
             if (value) row[key] = value;

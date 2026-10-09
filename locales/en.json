@@ -332,7 +332,19 @@
         "wear_jockey": "Jockey wheels",
         "wear_battery": "Battery",
         "wear_motor": "Motor",
-        "wear_general": "Wear part"
+        "wear_general": "Wear part",
+        "spec_section": "Manufacturer recommendations (optional)",
+        "spec_hint": "Rows from your fork/shock manual — all fields optional, clicks from closed. PSI also as a range (e.g. 78-82), clicks as single value or range (e.g. 5-6).",
+        "spec_weight_from": "Weight from (kg)",
+        "spec_weight_to": "Weight to (kg)",
+        "spec_psi": "PSI (single or range)",
+        "spec_lsr": "LSR (from closed)",
+        "spec_hsr": "HSR (from closed)",
+        "spec_lsc": "LSC (from closed)",
+        "spec_hsc": "HSC (from closed)",
+        "spec_add_row": "+ Add row",
+        "spec_source_label": "Source (optional)",
+        "spec_source_placeholder": "e.g. Fox 36 GRIP2 manual 2024"
     },
     "dialed": {
         "title": "⚙️ Dialed In",

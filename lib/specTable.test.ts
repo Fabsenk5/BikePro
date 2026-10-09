@@ -51,6 +51,11 @@ describe('sanitizeSpecTable', () => {
         expect(sanitizeSpecTable(null)).toBeUndefined();
         expect(sanitizeSpecTable([{ weightMin: '' }])).toBeUndefined();
     });
+
+    it('normalizes swapped weight bounds', () => {
+        const rows = sanitizeSpecTable([{ weightMin: '90', weightMax: '80', psi: '90' }]);
+        expect(rows![0]).toMatchObject({ weightMin: 80, weightMax: 90 });
+    });
 });
 
 describe('resolveSpecRow', () => {

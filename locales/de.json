@@ -332,7 +332,19 @@
         "wear_jockey": "Schaltröllchen",
         "wear_battery": "Akku",
         "wear_motor": "Motor",
-        "wear_general": "Verschleißteil"
+        "wear_general": "Verschleißteil",
+        "spec_section": "Hersteller-Empfehlungen (optional)",
+        "spec_hint": "Zeilen aus dem Handbuch deiner Gabel/deines Dämpfers — alle Felder optional, Klicks von geschlossen. PSI auch als Range (z.B. 78-82), Klicks als Einzelwert oder Range (z.B. 5-6).",
+        "spec_weight_from": "Gewicht von (kg)",
+        "spec_weight_to": "Gewicht bis (kg)",
+        "spec_psi": "PSI (einzeln oder Range)",
+        "spec_lsr": "LSR (von geschlossen)",
+        "spec_hsr": "HSR (von geschlossen)",
+        "spec_lsc": "LSC (von geschlossen)",
+        "spec_hsc": "HSC (von geschlossen)",
+        "spec_add_row": "+ Zeile hinzufügen",
+        "spec_source_label": "Quelle (optional)",
+        "spec_source_placeholder": "z.B. Fox 36 GRIP2 Handbuch 2024"
     },
     "setup_guide": {
         "title": "📚 Setup Guide",
