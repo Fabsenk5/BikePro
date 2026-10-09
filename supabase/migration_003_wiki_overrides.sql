@@ -1,7 +1,7 @@
 -- Migration 003: Wiki Overrides Table
 
 CREATE TABLE IF NOT EXISTS public.wiki_overrides (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     article_id TEXT NOT NULL,
     locale TEXT NOT NULL,
     title TEXT,

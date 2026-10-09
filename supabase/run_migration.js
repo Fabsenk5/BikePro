@@ -16,6 +16,7 @@ const MIGRATIONS = [
     'migration_005_suspension_modes.sql',
     'migration_006_rls_is_active.sql',
     'migration_008_rls_hardening.sql',
+    'migration_009_security_hardening.sql',
 ];
 
 async function migrate() {

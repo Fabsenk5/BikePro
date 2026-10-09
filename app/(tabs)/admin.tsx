@@ -93,6 +93,9 @@ export default function AdminScreen() {
         setPwdModalVisible(true);
     };
 
+    // Note: admin_update_user_password writes auth.users.encrypted_password directly
+    // (GoTrue is bypassed on purpose). Existing sessions of the target user are NOT
+    // revoked by this — accepted trade-off for the private beta.
     const handlePasswordChange = async () => {
         if (!newPassword || newPassword.length < 8) {
             showAlert(t('admin.error_title'), t('admin.pwd_too_short'));
