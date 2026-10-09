@@ -28,7 +28,6 @@ import {
 const ACCENT = featureColors['component-tracker'];
 
 type Bike = SyncBike;
-type Component = SyncComponent;
 
 interface UnitsPref {
     pressure: 'bar' | 'psi';

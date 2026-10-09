@@ -193,28 +193,6 @@ async function flushPendingDeletes(storageKey: string): Promise<boolean> {
 
 // ─── BIKES ───
 
-interface BikeRow {
-    id: string;
-    name: string;
-    type: string;
-    model: string;
-    year: string;
-    size: string;
-    weight: number | null;
-}
-
-interface ComponentRow {
-    id: string;
-    bike_id: string;
-    type: string;
-    brand: string;
-    model: string;
-    weight: string;
-    purchase_date: string;
-    setup_values: any;
-    notes: string;
-}
-
 export interface SyncBike {
     id: string;
     name: string;

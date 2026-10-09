@@ -2,13 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
+import { Platform } from 'react-native';
 
 import de from '../locales/de.json';
 import en from '../locales/en.json';
 
 const LANGUAGE_KEY = '@bikepro_language';
-
-import { Platform } from 'react-native';
 
 const languageDetector = {
     type: 'languageDetector' as const,
@@ -50,6 +49,7 @@ const languageDetector = {
     },
 };
 
+// eslint-disable-next-line import/no-named-as-default-member -- i18next chains .use on the default export by design
 i18n
     .use(languageDetector)
     .use(initReactI18next)

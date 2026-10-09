@@ -10,14 +10,18 @@ import { useEffect, useRef } from 'react';
 import { AppState, Platform } from 'react-native';
 
 export function useRefreshOnForeground(refresh: () => void, minIntervalMs = 30_000): void {
-    const lastRefresh = useRef(Date.now());
+    const lastRefresh = useRef<number | null>(null);
     const refreshRef = useRef(refresh);
-    refreshRef.current = refresh;
+
+    // Keep the latest callback without re-subscribing (refs may not be written during render)
+    useEffect(() => {
+        refreshRef.current = refresh;
+    });
 
     useEffect(() => {
         const maybeRefresh = () => {
             const now = Date.now();
-            if (now - lastRefresh.current < minIntervalMs) return;
+            if (lastRefresh.current !== null && now - lastRefresh.current < minIntervalMs) return;
             lastRefresh.current = now;
             refreshRef.current();
         };

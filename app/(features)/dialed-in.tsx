@@ -13,7 +13,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
-import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -249,7 +249,6 @@ export default function DialedInScreen() {
     const [activeTab, setActiveTab] = useState<'fork' | 'shock' | 'tires'>('fork');
 
     const params = useLocalSearchParams();
-    const router = useRouter();
     const [lastHandledTs, setLastHandledTs] = useState('');
 
     useFocusEffect(
