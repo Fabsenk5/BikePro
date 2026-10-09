@@ -11,6 +11,7 @@
 import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPSegmentedControl, BPSlider, BPToggle, screenContentStyle } from '@/components/ui';
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
+import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -108,6 +109,12 @@ interface WizardCategory {
 }
 
 const defaultConfig: SuspensionConfig = { reboundMode: 'clicks', compressionMode: 'clicks' };
+
+/** Parse URL params to a click count (0 is a valid click setting). */
+function toClicks(value: unknown, fallback: number): number {
+    const n = parseInt(String(value), 10);
+    return Number.isNaN(n) ? fallback : Math.max(0, n);
+}
 
 const defaultFork: SuspensionValues = {
     psi: 80, sagPercent: 20, travel: 170, stroke: 170,
@@ -311,17 +318,21 @@ export default function DialedInScreen() {
                 setName(t('dialed.pressure_bot_name'));
             }
             if (params.forkClicks) {
-                const c = parseInt(params.forkClicks as string, 10) || parsedFork.reboundClicks;
+                const c = toClicks(params.forkClicks, parsedFork.reboundClicks);
                 parsedFork.reboundClicks = c;
                 parsedFork.reboundLSR = c;
                 parsedFork.reboundHSR = c;
             }
+            if (params.forkLsrClicks) parsedFork.reboundLSR = toClicks(params.forkLsrClicks, parsedFork.reboundLSR);
+            if (params.forkHsrClicks) parsedFork.reboundHSR = toClicks(params.forkHsrClicks, parsedFork.reboundHSR);
             if (params.forkCompClicks) {
-                const c = parseInt(params.forkCompClicks as string, 10) || parsedFork.compressionClicks;
+                const c = toClicks(params.forkCompClicks, parsedFork.compressionClicks);
                 parsedFork.compressionClicks = c;
                 parsedFork.compressionLSC = c;
                 parsedFork.compressionHSC = c;
             }
+            if (params.forkCompLscClicks) parsedFork.compressionLSC = toClicks(params.forkCompLscClicks, parsedFork.compressionLSC);
+            if (params.forkCompHscClicks) parsedFork.compressionHSC = toClicks(params.forkCompHscClicks, parsedFork.compressionHSC);
 
             if (params.shockPsi) {
                 parsedShock.psi = parseInt(params.shockPsi as string, 10) || parsedShock.psi;
@@ -333,17 +344,21 @@ export default function DialedInScreen() {
                 parsedShock.springRate = parseInt(params.springRate as string, 10) || parsedShock.springRate;
             }
             if (params.shockClicks) {
-                const c = parseInt(params.shockClicks as string, 10) || parsedShock.reboundClicks;
+                const c = toClicks(params.shockClicks, parsedShock.reboundClicks);
                 parsedShock.reboundClicks = c;
                 parsedShock.reboundLSR = c;
                 parsedShock.reboundHSR = c;
             }
+            if (params.shockLsrClicks) parsedShock.reboundLSR = toClicks(params.shockLsrClicks, parsedShock.reboundLSR);
+            if (params.shockHsrClicks) parsedShock.reboundHSR = toClicks(params.shockHsrClicks, parsedShock.reboundHSR);
             if (params.shockCompClicks) {
-                const c = parseInt(params.shockCompClicks as string, 10) || parsedShock.compressionClicks;
+                const c = toClicks(params.shockCompClicks, parsedShock.compressionClicks);
                 parsedShock.compressionClicks = c;
                 parsedShock.compressionLSC = c;
                 parsedShock.compressionHSC = c;
             }
+            if (params.shockCompLscClicks) parsedShock.compressionLSC = toClicks(params.shockCompLscClicks, parsedShock.compressionLSC);
+            if (params.shockCompHscClicks) parsedShock.compressionHSC = toClicks(params.shockCompHscClicks, parsedShock.compressionHSC);
 
             setFork(parsedFork);
             setShock(parsedShock);
@@ -560,18 +575,15 @@ export default function DialedInScreen() {
 
     const compConfig = getActiveComponentConfig();
 
-    // Helper to get max clicks for the active component from the bike
-    const getActiveComponentMaxClicks = () => {
-        if (!bikeId) return 25; // fallback
+    // Effective max clicks per channel from the tracked fork/shock (mode-aware)
+    const getActiveComponent = () => {
+        if (!bikeId) return undefined;
         const bike = trackerBikes.find(b => b.id === bikeId);
-        if (!bike) return 25;
-        const comp = bike.components.find(c => c.type === activeTab);
-        if (!comp || !comp.maxClicks) return 25;
-        const parsed = parseInt(comp.maxClicks, 10);
-        return isNaN(parsed) ? 25 : parsed;
+        return bike?.components.find((c: any) => c.type === activeTab);
     };
-    
-    const currentMaxClicks = getActiveComponentMaxClicks();
+
+    const getChannelMaxClicks = (channel: ClickChannel) =>
+        resolveMaxClicks(getActiveComponent(), channel);
 
     // Average setup rating from Ride-Log (rides with setupId + 1–5 setupRating)
     const ratingStats = useMemo(() => {
@@ -799,15 +811,15 @@ export default function DialedInScreen() {
                                 )}
 
                                 {compConfig.rMode === 'clicks' && (
-                                    <BPSlider label="Rebound Clicks" value={activeSuspension.reboundClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundClicks', v)} />
+                                    <BPSlider label="Rebound Clicks" value={activeSuspension.reboundClicks} min={0} max={getChannelMaxClicks('rebound')} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundClicks', v)} />
                                 )}
                                 {compConfig.rMode === 'hsls' && (
                                     <View style={styles.inputRow}>
                                         <View style={{ flex: 1 }}>
-                                            <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
+                                            <BPSlider label="Low-Speed (LSR)" value={activeSuspension.reboundLSR} min={0} max={getChannelMaxClicks('reboundLsr')} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundLSR', v)} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
+                                            <BPSlider label="High-Speed (HSR)" value={activeSuspension.reboundHSR} min={0} max={getChannelMaxClicks('reboundHsr')} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('reboundHSR', v)} />
                                         </View>
                                     </View>
                                 )}
@@ -833,7 +845,7 @@ export default function DialedInScreen() {
                                 )}
 
                                 {compConfig.cMode === 'clicks' && (
-                                    <BPSlider label="Compression Clicks" value={activeSuspension.compressionClicks} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionClicks', v)} />
+                                    <BPSlider label="Compression Clicks" value={activeSuspension.compressionClicks} min={0} max={getChannelMaxClicks('compression')} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionClicks', v)} />
                                 )}
 
                                 {compConfig.cMode === 'lever' && (
@@ -843,10 +855,10 @@ export default function DialedInScreen() {
                                 {compConfig.cMode === 'hsls' && (
                                     <View style={styles.inputRow}>
                                         <View style={{ flex: 1 }}>
-                                            <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
+                                            <BPSlider label="Low-Speed (LSC)" value={activeSuspension.compressionLSC} min={0} max={getChannelMaxClicks('compressionLsc')} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionLSC', v)} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={currentMaxClicks} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
+                                            <BPSlider label="High-Speed (HSC)" value={activeSuspension.compressionHSC} min={0} max={getChannelMaxClicks('compressionHsc')} step={1} accentColor={ACCENT} onValueChange={v => updateSusValue('compressionHSC', v)} />
                                         </View>
                                     </View>
                                 )}

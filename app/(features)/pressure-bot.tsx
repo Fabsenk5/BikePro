@@ -8,6 +8,7 @@
  */
 import { BPButton, BPCard, BPInput, BPPicker, BPSegmentedControl, BPSlider, screenContentStyle } from '@/components/ui';
 import { featureColors, theme } from '@/constants/Colors';
+import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { showAlert } from '@/lib/dialog';
 import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useRouter } from 'expo-router';
@@ -371,64 +372,70 @@ export default function PressureBotScreen() {
             sPsi = Math.max(150, Math.round(springRate / 25) * 25);
         }
 
-        // Click recommendations (Rebound)
-        // Heavier rider = higher pressure = more rebound damping (less clicks from closed)
+        // Click recommendations
+        // Heavier rider = higher pressure = more rebound damping (less clicks from open)
         const reboundOpenPct = Math.max(10, Math.min(100, 100 - ((riderWeight - 40) / 80 * 100)));
         // Aggressive riding style needs more compression damping
         const compOpenPct = ridingStyle === 'race' ? 30 : ridingStyle === 'aggressive' ? 50 : 80;
 
-        let forkClicks = `${Math.round(reboundOpenPct)}%`;
-        let shockClicks = `${Math.round(reboundOpenPct)}%`;
-        let forkCompClicks = `${Math.round(compOpenPct)}%`;
-        let shockCompClicks = `${Math.round(compOpenPct)}%`;
+        const fork = selectedBike?.components.find((c: any) => c.type === 'fork');
+        const shock = selectedBike?.components.find((c: any) => c.type === 'shock');
 
-        let rawForkClicks = Math.round(reboundOpenPct);
-        let rawShockClicks = Math.round(reboundOpenPct);
-        let rawForkCompClicks = Math.round(compOpenPct);
-        let rawShockCompClicks = Math.round(compOpenPct);
+        // Per-channel suggestion: same "open %" logic, capped by the channel's own
+        // max clicks (channel value → legacy value → model default, see clickLimits.ts)
+        const clickFor = (comp: any, channel: ClickChannel, openPct: number): { value: number; max: number } => {
+            const max = resolveMaxClicks(comp, channel);
+            return { value: Math.max(1, Math.round(max * (openPct / 100))), max };
+        };
+        const fmtClicks = (r: { value: number; max: number } | null, pct: number) =>
+            r ? `${r.value} (${r.max} max)` : `${Math.round(pct)}%`;
+        const rawClicks = (r: { value: number; max: number } | null, pct: number) =>
+            r ? r.value : Math.round(pct);
 
-        if (selectedBikeId) {
-            const bike = trackerBikes.find(b => b.id === selectedBikeId);
-            if (bike) {
-                const fork = bike.components.find((c: any) => c.type === 'fork');
-                const shock = bike.components.find((c: any) => c.type === 'shock');
+        const forkRebound = fork ? clickFor(fork, 'rebound', reboundOpenPct) : null;
+        const forkLsr = fork ? clickFor(fork, 'reboundLsr', reboundOpenPct) : null;
+        const forkHsr = fork ? clickFor(fork, 'reboundHsr', reboundOpenPct) : null;
+        const forkComp = fork ? clickFor(fork, 'compression', compOpenPct) : null;
+        const forkCompLsc = fork ? clickFor(fork, 'compressionLsc', compOpenPct) : null;
+        const forkCompHsc = fork ? clickFor(fork, 'compressionHsc', compOpenPct) : null;
 
-                const getClicksForModel = (model: string = '') => {
-                    const m = model.toLowerCase();
-                    if (m.includes('fox 38') || m.includes('fox 36') || m.includes('grip2') || m.includes('float x2')) return 14; 
-                    if (m.includes('zeb') || m.includes('lyrik') || m.includes('super deluxe')) return 18;
-                    if (m.includes('ohlins') || m.includes('öhlins') || m.includes('ttx')) return 15;
-                    return null;
-                };
-
-                const forkMax = fork?.maxClicks ? parseInt(fork.maxClicks) : getClicksForModel(fork?.model || fork?.name);
-                const shockMax = shock?.maxClicks ? parseInt(shock.maxClicks) : getClicksForModel(shock?.model || shock?.name);
-
-                if (forkMax) {
-                    rawForkClicks = Math.max(1, Math.round(forkMax * (reboundOpenPct / 100)));
-                    rawForkCompClicks = Math.max(1, Math.round(forkMax * (compOpenPct / 100)));
-                    forkClicks = `${rawForkClicks} (${forkMax} max)`;
-                    forkCompClicks = `${rawForkCompClicks}`;
-                }
-                if (shockMax) {
-                    rawShockClicks = Math.max(1, Math.round(shockMax * (reboundOpenPct / 100)));
-                    rawShockCompClicks = Math.max(1, Math.round(shockMax * (compOpenPct / 100)));
-                    shockClicks = `${rawShockClicks} (${shockMax} max)`;
-                    shockCompClicks = `${rawShockCompClicks}`;
-                }
-            }
-        }
-
-        const forkReboundMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'fork')?.reboundMode;
-        const forkCompMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'fork')?.compressionMode;
-        const shockReboundMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'shock')?.reboundMode;
-        const shockCompMode = trackerBikes.find(b => b.id === selectedBikeId)?.components.find((c: any) => c.type === 'shock')?.compressionMode;
+        const shockRebound = shock ? clickFor(shock, 'rebound', reboundOpenPct) : null;
+        const shockLsr = shock ? clickFor(shock, 'reboundLsr', reboundOpenPct) : null;
+        const shockHsr = shock ? clickFor(shock, 'reboundHsr', reboundOpenPct) : null;
+        const shockComp = shock ? clickFor(shock, 'compression', compOpenPct) : null;
+        const shockCompLsc = shock ? clickFor(shock, 'compressionLsc', compOpenPct) : null;
+        const shockCompHsc = shock ? clickFor(shock, 'compressionHsc', compOpenPct) : null;
 
         return { 
             forkPsi: fPsi, shockPsi: sPsi, 
-            forkClicks, shockClicks, forkCompClicks, shockCompClicks,
-            rawForkClicks, rawShockClicks, rawForkCompClicks, rawShockCompClicks,
-            forkReboundMode, forkCompMode, shockReboundMode, shockCompMode
+            forkClicks: fmtClicks(forkRebound, reboundOpenPct),
+            forkLsrClicks: fmtClicks(forkLsr, reboundOpenPct),
+            forkHsrClicks: fmtClicks(forkHsr, reboundOpenPct),
+            forkCompClicks: fmtClicks(forkComp, compOpenPct),
+            forkCompLscClicks: fmtClicks(forkCompLsc, compOpenPct),
+            forkCompHscClicks: fmtClicks(forkCompHsc, compOpenPct),
+            shockClicks: fmtClicks(shockRebound, reboundOpenPct),
+            shockLsrClicks: fmtClicks(shockLsr, reboundOpenPct),
+            shockHsrClicks: fmtClicks(shockHsr, reboundOpenPct),
+            shockCompClicks: fmtClicks(shockComp, compOpenPct),
+            shockCompLscClicks: fmtClicks(shockCompLsc, compOpenPct),
+            shockCompHscClicks: fmtClicks(shockCompHsc, compOpenPct),
+            rawForkClicks: rawClicks(forkRebound, reboundOpenPct),
+            rawForkLsrClicks: rawClicks(forkLsr, reboundOpenPct),
+            rawForkHsrClicks: rawClicks(forkHsr, reboundOpenPct),
+            rawForkCompClicks: rawClicks(forkComp, compOpenPct),
+            rawForkCompLscClicks: rawClicks(forkCompLsc, compOpenPct),
+            rawForkCompHscClicks: rawClicks(forkCompHsc, compOpenPct),
+            rawShockClicks: rawClicks(shockRebound, reboundOpenPct),
+            rawShockLsrClicks: rawClicks(shockLsr, reboundOpenPct),
+            rawShockHsrClicks: rawClicks(shockHsr, reboundOpenPct),
+            rawShockCompClicks: rawClicks(shockComp, compOpenPct),
+            rawShockCompLscClicks: rawClicks(shockCompLsc, compOpenPct),
+            rawShockCompHscClicks: rawClicks(shockCompHsc, compOpenPct),
+            forkReboundMode: fork?.reboundMode,
+            forkCompMode: fork?.compressionMode,
+            shockReboundMode: shock?.reboundMode,
+            shockCompMode: shock?.compressionMode
         };
     }, [riderWeight, bikeWeight, terrain, tireType, ridingStyle, selectedBikeId, trackerBikes, shockType, rearTravel, shockStroke]);
 
@@ -614,16 +621,16 @@ export default function PressureBotScreen() {
                                 <Text style={styles.resultUnit}>PSI</Text>
                                 {suspResult.forkReboundMode === 'none' ? null : suspResult.forkReboundMode === 'hsls' ? (
                                     <>
-                                        <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.forkClicks}</Text>
-                                        <Text style={styles.resultPSI}>Rebound HSR: {suspResult.forkClicks}</Text>
+                                        <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.forkLsrClicks}</Text>
+                                        <Text style={styles.resultPSI}>Rebound HSR: {suspResult.forkHsrClicks}</Text>
                                     </>
                                 ) : (
                                     <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.forkClicks}</Text>
                                 )}
                                 {suspResult.forkCompMode === 'none' ? null : suspResult.forkCompMode === 'hsls' ? (
                                     <>
-                                        <Text style={styles.resultPSI}>Compress LSC: {suspResult.forkCompClicks}</Text>
-                                        <Text style={styles.resultPSI}>Compress HSC: {suspResult.forkCompClicks}</Text>
+                                        <Text style={styles.resultPSI}>Compress LSC: {suspResult.forkCompLscClicks}</Text>
+                                        <Text style={styles.resultPSI}>Compress HSC: {suspResult.forkCompHscClicks}</Text>
                                     </>
                                 ) : suspResult.forkCompMode === 'lever' ? (
                                     <Text style={styles.resultPSI}>Compress: {suspResult.forkCompClicks} (Open)</Text>
@@ -638,16 +645,16 @@ export default function PressureBotScreen() {
                                 <Text style={styles.resultUnit}>{shockType === 'coil' ? 'lbs' : 'PSI'}</Text>
                                 {suspResult.shockReboundMode === 'none' ? null : suspResult.shockReboundMode === 'hsls' ? (
                                     <>
-                                        <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.shockClicks}</Text>
-                                        <Text style={styles.resultPSI}>Rebound HSR: {suspResult.shockClicks}</Text>
+                                        <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound LSR: {suspResult.shockLsrClicks}</Text>
+                                        <Text style={styles.resultPSI}>Rebound HSR: {suspResult.shockHsrClicks}</Text>
                                     </>
                                 ) : (
                                     <Text style={[styles.resultPSI, { marginTop: 8 }]}>Rebound: {suspResult.shockClicks}</Text>
                                 )}
                                 {suspResult.shockCompMode === 'none' ? null : suspResult.shockCompMode === 'hsls' ? (
                                     <>
-                                        <Text style={styles.resultPSI}>Compress LSC: {suspResult.shockCompClicks}</Text>
-                                        <Text style={styles.resultPSI}>Compress HSC: {suspResult.shockCompClicks}</Text>
+                                        <Text style={styles.resultPSI}>Compress LSC: {suspResult.shockCompLscClicks}</Text>
+                                        <Text style={styles.resultPSI}>Compress HSC: {suspResult.shockCompHscClicks}</Text>
                                     </>
                                 ) : suspResult.shockCompMode === 'lever' ? (
                                     <Text style={styles.resultPSI}>Compress: {suspResult.shockCompClicks} (Open)</Text>
@@ -670,7 +677,7 @@ export default function PressureBotScreen() {
                                     const shockParams = shockType === 'coil'
                                         ? `shockMode=coil&springRate=${suspResult.shockPsi}`
                                         : `shockPsi=${suspResult.shockPsi}`;
-                                    router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&ts=${ts}&forkPsi=${suspResult.forkPsi}&forkClicks=${suspResult.rawForkClicks}&forkCompClicks=${suspResult.rawForkCompClicks}&${shockParams}&shockClicks=${suspResult.rawShockClicks}&shockCompClicks=${suspResult.rawShockCompClicks}`);
+                                    router.push(`/(features)/dialed-in?bikeId=${selectedBikeId}&ts=${ts}&forkPsi=${suspResult.forkPsi}&forkClicks=${suspResult.rawForkClicks}&forkLsrClicks=${suspResult.rawForkLsrClicks}&forkHsrClicks=${suspResult.rawForkHsrClicks}&forkCompClicks=${suspResult.rawForkCompClicks}&forkCompLscClicks=${suspResult.rawForkCompLscClicks}&forkCompHscClicks=${suspResult.rawForkCompHscClicks}&${shockParams}&shockClicks=${suspResult.rawShockClicks}&shockLsrClicks=${suspResult.rawShockLsrClicks}&shockHsrClicks=${suspResult.rawShockHsrClicks}&shockCompClicks=${suspResult.rawShockCompClicks}&shockCompLscClicks=${suspResult.rawShockCompLscClicks}&shockCompHscClicks=${suspResult.rawShockCompHscClicks}`);
                                 }}
                                 variant="outline"
                                 color={ACCENT}

@@ -10,6 +10,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
 import { setupLabelLocalized, wearLabelLocalized } from '@/lib/componentLabels';
 import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
+import { ClickChannel, channelsForModes, sanitizeClickLimits } from '@/lib/clickLimits';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -26,6 +27,16 @@ import {
 } from 'react-native';
 
 const ACCENT = featureColors['component-tracker'];
+
+/** i18n labels for the per-channel click limit inputs */
+const CLICK_LABEL_KEYS: Record<ClickChannel, string> = {
+    rebound: 'tracker.max_clicks_rebound',
+    reboundHsr: 'tracker.max_clicks_rebound_hsr',
+    reboundLsr: 'tracker.max_clicks_rebound_lsr',
+    compression: 'tracker.max_clicks_compression',
+    compressionHsc: 'tracker.max_clicks_compression_hsc',
+    compressionLsc: 'tracker.max_clicks_compression_lsc',
+};
 
 type Bike = SyncBike;
 
@@ -92,9 +103,10 @@ export default function ComponentTrackerScreen() {
     const [compModel, setCompModel] = useState('');
     const [compWeight, setCompWeight] = useState('');
     const [compPrice, setCompPrice] = useState('');
-    const [compMaxClicks, setCompMaxClicks] = useState('');
     const [compReboundMode, setCompReboundMode] = useState('');
     const [compCompressionMode, setCompCompressionMode] = useState('');
+    // Per-channel max clicks as form strings; converted on save via sanitizeClickLimits
+    const [compClickLimits, setCompClickLimits] = useState<Partial<Record<ClickChannel, string>>>({});
     const [compNotes, setCompNotes] = useState('');
     const [compSetup, setCompSetup] = useState<SetupValue[]>([]);
     const [compMoveToBikeId, setCompMoveToBikeId] = useState<string>('');
@@ -362,7 +374,7 @@ export default function ComponentTrackerScreen() {
         setCompModel('');
         setCompWeight('');
         setCompPrice('');
-        setCompMaxClicks('');
+        setCompClickLimits({});
         setCompReboundMode('');
         setCompCompressionMode('');
         setCompNotes('');
@@ -382,7 +394,11 @@ export default function ComponentTrackerScreen() {
         setCompModel(comp.model);
         setCompWeight(comp.weight);
         setCompPrice(comp.price ?? '');
-        setCompMaxClicks(comp.maxClicks ?? '');
+        const limitInputs: Partial<Record<ClickChannel, string>> = {};
+        for (const [channel, value] of Object.entries(comp.clickLimits ?? {})) {
+            limitInputs[channel as ClickChannel] = String(value);
+        }
+        setCompClickLimits(limitInputs);
         setCompReboundMode(comp.reboundMode ?? '');
         setCompCompressionMode(comp.compressionMode ?? '');
         setCompNotes(comp.notes);
@@ -464,7 +480,9 @@ export default function ComponentTrackerScreen() {
             price: compPrice.trim(),
             purchaseDate: editingComp?.purchaseDate ?? getTodayISO(),
             setupValues: compSetup.filter(s => s.value.trim() !== ''),
-            maxClicks: compMaxClicks.trim() || undefined,
+            // Legacy single value is preserved as silent fallback, no longer edited in the UI
+            maxClicks: editingComp?.maxClicks,
+            clickLimits: sanitizeClickLimits(compClickLimits),
             reboundMode: compReboundMode || undefined,
             compressionMode: compCompressionMode || undefined,
             notes: compNotes.trim(),
@@ -750,7 +768,6 @@ export default function ComponentTrackerScreen() {
                 </View>
                 {['fork', 'shock'].includes(compType) && (
                     <>
-                        <BPInput label={t('tracker.max_clicks')} placeholder="z.B. 14" value={compMaxClicks} onChangeText={setCompMaxClicks} keyboardType="numeric" accentColor={ACCENT} />
                         <BPPicker 
                             label={t('tracker.rebound_mode')} 
                             options={[{label: t('tracker.mode_select'), value: ''}, {label: t('tracker.mode_none'), value: 'none'}, {label: t('tracker.mode_clicks'), value: 'clicks'}, {label: t('tracker.mode_hsls'), value: 'hsls'}]} 
@@ -765,6 +782,20 @@ export default function ComponentTrackerScreen() {
                             onValueChange={setCompCompressionMode} 
                             accentColor={ACCENT} 
                         />
+                        {channelsForModes(compReboundMode, compCompressionMode).map(channel => (
+                            <BPInput
+                                key={channel}
+                                label={t(CLICK_LABEL_KEYS[channel])}
+                                placeholder="z.B. 14"
+                                value={compClickLimits[channel] ?? ''}
+                                onChangeText={(v) => setCompClickLimits(prev => ({ ...prev, [channel]: v }))}
+                                keyboardType="numeric"
+                                accentColor={ACCENT}
+                            />
+                        ))}
+                        {channelsForModes(compReboundMode, compCompressionMode).length > 0 && (
+                            <Text style={styles.clickHint}>{t('tracker.click_fallback_hint')}</Text>
+                        )}
                     </>
                 )}
 
@@ -978,6 +1009,7 @@ const styles = StyleSheet.create({
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     setupSection: { marginTop: theme.spacing.sm, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md },
     setupSectionTitle: { color: theme.colors.text, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
+    clickHint: { color: theme.colors.textMuted, fontSize: 12, marginTop: -theme.spacing.sm, marginBottom: theme.spacing.md },
     moveSection: { marginTop: theme.spacing.md, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, borderWidth: 1, borderColor: ACCENT + '40' },
     moveSectionTitle: { color: ACCENT, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
 });
