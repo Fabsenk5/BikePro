@@ -31,6 +31,13 @@ export interface ResolvedSpecRow {
     fallback: boolean;
 }
 
+export interface ResolvedSpec {
+    /** Merged row: weight-specific values override the universal row's values */
+    row: SpecRow;
+    nearest: boolean;
+    matchedRowId: string | null;
+}
+
 const rowId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 /** Parse "8", "5-6", "5 – 6" or numbers into a numeric range. */
@@ -165,4 +172,30 @@ export function formatSpecSummary(row: SpecRow): string {
     if (row.lsc) parts.push(`LSC ${formatRange(row.lsc)}`);
     if (row.hsc) parts.push(`HSC ${formatRange(row.hsc)}`);
     return parts.join(' · ');
+}
+
+/**
+ * Weight-matched row merged with the universal row (no weight bounds):
+ * per field the weight-specific value wins, the universal row fills the gaps.
+ * This lets users keep one generic row (e.g. "LSC 10 · HSC 5" from the manual)
+ * plus weight-specific rows (pressure/rebound) without duplicating values.
+ */
+export function resolveSpecValues(
+    rows: SpecRow[] | undefined,
+    weightKg: number | null | undefined,
+): ResolvedSpec | null {
+    const resolved = resolveSpecRow(rows, weightKg);
+    if (!resolved) return null;
+
+    const universal = (rows ?? []).find(r =>
+        r.id !== resolved.row.id && r.weightMin === undefined && r.weightMax === undefined);
+
+    const merged: SpecRow = { id: resolved.row.id };
+    if (resolved.row.weightMin !== undefined) merged.weightMin = resolved.row.weightMin;
+    if (resolved.row.weightMax !== undefined) merged.weightMax = resolved.row.weightMax;
+    for (const key of ['psi', 'lsc', 'hsc', 'lsr', 'hsr'] as const) {
+        const value = resolved.row[key] ?? universal?.[key];
+        if (value !== undefined) merged[key] = value;
+    }
+    return { row: merged, nearest: resolved.fallback, matchedRowId: resolved.row.id };
 }

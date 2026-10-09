@@ -9,7 +9,7 @@
 import { BPButton, BPCard, BPInput, BPPicker, BPSegmentedControl, BPSlider, screenContentStyle } from '@/components/ui';
 import { featureColors, theme } from '@/constants/Colors';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
-import { formatRange, midpoint, resolveSpecRow, SpecRow } from '@/lib/specTable';
+import { formatRange, midpoint, resolveSpecValues, SpecRow } from '@/lib/specTable';
 import { showAlert } from '@/lib/dialog';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
@@ -381,8 +381,8 @@ export default function PressureBotScreen() {
         const shock = selectedBike?.components.find((c: any) => c.type === 'shock');
 
         // Manufacturer recommendations for the rider's weight (optional per component)
-        const forkSpec = fork ? resolveSpecRow(fork.specTable, riderWeight) : null;
-        const shockSpec = shock ? resolveSpecRow(shock.specTable, riderWeight) : null;
+        const forkSpec = fork ? resolveSpecValues(fork.specTable, riderWeight) : null;
+        const shockSpec = shock ? resolveSpecValues(shock.specTable, riderWeight) : null;
 
         let forkPsiSource: 'spec' | 'formula' = 'formula';
         let forkPsiSpecText: string | null = null;

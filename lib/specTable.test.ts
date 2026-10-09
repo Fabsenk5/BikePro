@@ -5,6 +5,7 @@ import {
     midpoint,
     parseNumericRange,
     resolveSpecRow,
+    resolveSpecValues,
     sanitizeSpecTable,
 } from './specTable';
 
@@ -87,5 +88,30 @@ describe('formatSpecSummary', () => {
     it('joins the values that are present', () => {
         expect(formatSpecSummary({ id: '1', psi: '78-82', lsr: '10', hsr: '5-6', hsc: '4' }))
             .toBe('78–82 psi · LSR 10 · HSR 5–6 · HSC 4');
+    });
+});
+
+describe('resolveSpecValues (merge weight row + universal row)', () => {
+    const rows = [
+        { id: 'w', weightMin: 86, weightMax: 91, psi: '84', lsr: '5', hsr: '4' },
+        { id: 'u', lsc: '10', hsc: '5' },
+    ];
+
+    it('merges universal values into the weight-matched row', () => {
+        const resolved = resolveSpecValues(rows, 88);
+        expect(resolved).toMatchObject({ nearest: false, matchedRowId: 'w' });
+        expect(resolved!.row).toMatchObject({ psi: '84', lsr: '5', hsr: '4', lsc: '10', hsc: '5' });
+    });
+
+    it('keeps the universal row as the whole result when no range matches', () => {
+        const resolved = resolveSpecValues(rows, 55);
+        expect(resolved!.row).toMatchObject({ lsc: '10', hsc: '5' });
+        expect(resolved!.row.psi).toBeUndefined();
+    });
+
+    it('works without a universal row and for empty tables', () => {
+        expect(resolveSpecValues([{ id: 'a', weightMin: 80, psi: '80' }], 82)!.row.psi).toBe('80');
+        expect(resolveSpecValues([], 80)).toBeNull();
+        expect(resolveSpecValues(undefined, 80)).toBeNull();
     });
 });

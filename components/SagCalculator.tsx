@@ -5,7 +5,7 @@
  */
 import { BPButton, BPCard, BPPicker, BPSegmentedControl } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { formatSpecSummary, resolveSpecRow } from '@/lib/specTable';
+import { formatSpecSummary, resolveSpecValues } from '@/lib/specTable';
 import { sagRangeMm, SagCharacter, SagRange, SAG_TARGETS, travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { SyncBike, syncLoadBikes, syncLoadPreference, syncLoadProfile } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -61,7 +61,7 @@ export default function SagCalculator() {
         for (const type of ['fork', 'shock'] as const) {
             const comp = bike.components.find(c => c.type === type);
             if (!comp?.specTable?.length) continue;
-            const resolved = resolveSpecRow(comp.specTable, weightKg);
+            const resolved = resolveSpecValues(comp.specTable, weightKg);
             if (!resolved) continue;
             const summary = formatSpecSummary(resolved.row);
             if (!summary) continue;
@@ -69,7 +69,7 @@ export default function SagCalculator() {
                 key: type,
                 label: t(type === 'fork' ? 'setup_guide.sag_fork_label' : 'setup_guide.sag_shock_label'),
                 values: summary,
-                nearest: resolved.fallback,
+                nearest: resolved.nearest,
                 source: comp.specSource || undefined,
             });
         }

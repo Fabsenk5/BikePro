@@ -12,7 +12,7 @@ import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPS
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
-import { formatSpecSummary, midpoint, resolveSpecRow, SpecRow } from '@/lib/specTable';
+import { formatSpecSummary, midpoint, resolveSpecValues, SpecRow } from '@/lib/specTable';
 import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadProfile, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -235,21 +235,25 @@ export default function DialedInScreen() {
         { label: t('dialed.closed'), value: 'closed' },
     ];
 
-    // Helper: render rebound display text for card
-    function reboundDisplay(sus: SuspensionValues): string {
+    // Helper: render rebound display text for card (the component defines the adjusters)
+    function reboundDisplay(sus: SuspensionValues, overrideMode?: string): string {
         const cfg = sus.config ?? defaultConfig;
-        if (cfg.reboundMode === 'hsls') return `LSR ${sus.reboundLSR}  HSR ${sus.reboundHSR}`;
+        const mode = (overrideMode as ReboundMode | undefined) ?? cfg.reboundMode;
+        if (mode === 'hsls') return `LSR ${sus.reboundLSR}  HSR ${sus.reboundHSR}`;
+        if (mode === 'none') return '—';
         return `Rebound ${sus.reboundClicks} Clicks`;
     }
 
     // Helper: render compression display text for card
-    function compDisplay(sus: SuspensionValues): string {
+    function compDisplay(sus: SuspensionValues, overrideMode?: string): string {
         const cfg = sus.config ?? defaultConfig;
-        if (cfg.compressionMode === 'hsls') return `LSC ${sus.compressionLSC}  HSC ${sus.compressionHSC}`;
-        if (cfg.compressionMode === 'lever') {
+        const mode = (overrideMode as CompressionMode | undefined) ?? cfg.compressionMode;
+        if (mode === 'hsls') return `LSC ${sus.compressionLSC}  HSC ${sus.compressionHSC}`;
+        if (mode === 'lever') {
             const lbl = leverOptions.find(l => l.value === sus.compressionLever)?.label ?? sus.compressionLever;
             return `Comp: ${lbl}`;
         }
+        if (mode === 'none') return '—';
         return `Comp ${sus.compressionClicks} Clicks`;
     }
 
@@ -311,6 +315,7 @@ export default function DialedInScreen() {
                     if (travel) parsedFork.travel = parseInt(travel, 10) || parsedFork.travel;
                     if (stroke) parsedFork.stroke = parseInt(stroke, 10) || parsedFork.stroke;
                 }
+                if (forkComp) parsedFork = buildSuspensionFromComponent(forkComp, parsedFork);
 
                 const shockComp = bike.components.find((c: any) => c.type === 'shock');
                 if (shockComp && shockComp.setupValues) {
@@ -319,6 +324,7 @@ export default function DialedInScreen() {
                     if (travel) parsedShock.travel = parseInt(travel, 10) || parsedShock.travel;
                     if (stroke) parsedShock.stroke = parseInt(stroke, 10) || parsedShock.stroke;
                 }
+                if (shockComp) parsedShock = buildSuspensionFromComponent(shockComp, parsedShock);
             }
 
             // Apply Pressure Bot Overrides
@@ -433,6 +439,31 @@ export default function DialedInScreen() {
         return `${bar.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} bar`;
     };
 
+    // Component modes + manufacturer values as the starting point for a setup
+    const buildSuspensionFromComponent = (comp: any, base: SuspensionValues): SuspensionValues => {
+        if (!comp) return base;
+        const next: SuspensionValues = { ...base, config: { ...base.config } };
+        if (comp.reboundMode) next.config.reboundMode = comp.reboundMode as ReboundMode;
+        if (comp.compressionMode) next.config.compressionMode = comp.compressionMode as CompressionMode;
+        const spec = resolveSpecValues(comp.specTable, riderWeightKg)?.row;
+        if (!spec) return next;
+        const psi = midpoint(spec.psi);
+        if (psi !== null) next.psi = psi;
+        const clamp = (value: number | null, channel: ClickChannel) =>
+            value === null ? null : Math.min(value, resolveMaxClicks(comp, channel));
+        const lsr = clamp(midpoint(spec.lsr), 'reboundLsr');
+        const hsr = clamp(midpoint(spec.hsr), 'reboundHsr');
+        const lsc = clamp(midpoint(spec.lsc), 'compressionLsc');
+        const hsc = clamp(midpoint(spec.hsc), 'compressionHsc');
+        next.reboundClicks = lsr ?? hsr ?? next.reboundClicks;
+        next.reboundLSR = lsr ?? next.reboundLSR;
+        next.reboundHSR = hsr ?? next.reboundHSR;
+        next.compressionClicks = lsc ?? hsc ?? next.compressionClicks;
+        next.compressionLSC = lsc ?? next.compressionLSC;
+        next.compressionHSC = hsc ?? next.compressionHSC;
+        return next;
+    };
+
     const handleBikeChange = (newBikeId: string) => {
         setBikeId(newBikeId);
         if (!newBikeId) return;
@@ -449,7 +480,7 @@ export default function DialedInScreen() {
                 if (travel) next.travel = parseInt(travel, 10) || next.travel;
                 if (stroke) next.stroke = parseInt(stroke, 10) || next.stroke;
             }
-            return next;
+            return buildSuspensionFromComponent(forkComp, next);
         });
 
         setShock(prev => {
@@ -461,7 +492,7 @@ export default function DialedInScreen() {
                 if (travel) next.travel = parseInt(travel, 10) || next.travel;
                 if (stroke) next.stroke = parseInt(stroke, 10) || next.stroke;
             }
-            return next;
+            return buildSuspensionFromComponent(shockComp, next);
         });
     };
 
@@ -485,6 +516,7 @@ export default function DialedInScreen() {
                 if (travel) resetFork.travel = parseInt(travel, 10) || resetFork.travel;
                 if (stroke) resetFork.stroke = parseInt(stroke, 10) || resetFork.stroke;
             }
+            if (forkComp) resetFork = buildSuspensionFromComponent(forkComp, resetFork);
 
             const shockComp = bike.components.find((c: any) => c.type === 'shock');
             if (shockComp && shockComp.setupValues) {
@@ -493,6 +525,7 @@ export default function DialedInScreen() {
                 if (travel) resetShock.travel = parseInt(travel, 10) || resetShock.travel;
                 if (stroke) resetShock.stroke = parseInt(stroke, 10) || resetShock.stroke;
             }
+            if (shockComp) resetShock = buildSuspensionFromComponent(shockComp, resetShock);
         } else {
             setBikeId('');
         }
@@ -560,25 +593,22 @@ export default function DialedInScreen() {
         }
     };
 
-    // Apply the manufacturer row to the current form (ranges → midpoint,
-    // clamped to the slider ranges and the component's channel maxima)
+    // Apply the manufacturer clicks to the current form (ranges → midpoint,
+    // clamped to the component's channel maxima). PSI is NOT touched — the
+    // pressure is governed by the sag you measured (or the new-setup prefill).
     const applySpecRecommendation = () => {
         if (!activeSpecInfo || !activeSuspension) return;
         const row = activeSpecInfo.row;
-        const isCoil = activeTab === 'shock' && (activeSuspension.mode ?? 'air') === 'coil';
-        const psiMin = activeTab === 'fork' ? 40 : 80;
-        const psiMax = activeTab === 'fork' ? 160 : 400;
-        const rawPsi = isCoil ? null : midpoint(row.psi);
-        const psi = rawPsi !== null ? Math.min(psiMax, Math.max(psiMin, rawPsi)) : null;
         const clampChannel = (value: number | null, channel: ClickChannel) =>
             value === null ? null : Math.min(value, getChannelMaxClicks(channel));
         const lsr = clampChannel(midpoint(row.lsr), 'reboundLsr');
         const hsr = clampChannel(midpoint(row.hsr), 'reboundHsr');
         const lsc = clampChannel(midpoint(row.lsc), 'compressionLsc');
         const hsc = clampChannel(midpoint(row.hsc), 'compressionHsc');
+        const { rMode, cMode } = getActiveComponentConfig();
         setActiveSuspension((prev: SuspensionValues) => ({
             ...prev,
-            ...(psi !== null ? { psi } : {}),
+            config: { reboundMode: rMode, compressionMode: cMode },
             reboundClicks: lsr ?? hsr ?? prev.reboundClicks,
             reboundLSR: lsr ?? prev.reboundLSR,
             reboundHSR: hsr ?? prev.reboundHSR,
@@ -624,13 +654,13 @@ export default function DialedInScreen() {
     // Manufacturer recommendation for the active fork/shock + rider weight
     const activeSpecInfo = useMemo(() => {
         const comp: any = getActiveComponent();
-        const resolved = resolveSpecRow(comp?.specTable, riderWeightKg);
+        const resolved = resolveSpecValues(comp?.specTable, riderWeightKg);
         if (!resolved) return null;
         const summary = formatSpecSummary(resolved.row);
         if (!summary) return null;
         return {
             summary,
-            nearest: resolved.fallback,
+            nearest: resolved.nearest,
             row: resolved.row as SpecRow,
             source: (comp?.specSource as string | undefined) || undefined,
         };
@@ -675,7 +705,10 @@ export default function DialedInScreen() {
                         subtitle={t('dialed.create_first_setup')}
                     />
                 ) : (
-                    setups.map(setup => (
+                    setups.map(setup => {
+                        const setupForkComp: any = trackerBikes.find(b => b.id === setup.bikeId)?.components.find((c: any) => c.type === 'fork');
+                        const setupShockComp: any = trackerBikes.find(b => b.id === setup.bikeId)?.components.find((c: any) => c.type === 'shock');
+                        return (
                         <BPCard key={setup.id} accentColor={ACCENT} style={styles.setupCard} onPress={() => openEditSetup(setup)}>
                                 <View style={styles.cardHeader}>
                                     <View style={{ flex: 1 }}>
@@ -716,10 +749,10 @@ export default function DialedInScreen() {
                                             )}
                                         </Text>
                                         <Text style={styles.valueRow}>
-                                            <Text style={styles.valueSmall}>{reboundDisplay(setup.fork)}</Text>
+                                            <Text style={styles.valueSmall}>{reboundDisplay(setup.fork, setupForkComp?.reboundMode)}</Text>
                                         </Text>
                                         <Text style={styles.valueRow}>
-                                            <Text style={styles.valueSmall}>{compDisplay(setup.fork)}</Text>
+                                            <Text style={styles.valueSmall}>{compDisplay(setup.fork, setupForkComp?.compressionMode)}</Text>
                                         </Text>
                                     </View>
 
@@ -756,10 +789,10 @@ export default function DialedInScreen() {
                                             )}
                                         </Text>
                                         <Text style={styles.valueRow}>
-                                            <Text style={styles.valueSmall}>{reboundDisplay(setup.shock)}</Text>
+                                            <Text style={styles.valueSmall}>{reboundDisplay(setup.shock, setupShockComp?.reboundMode)}</Text>
                                         </Text>
                                         <Text style={styles.valueRow}>
-                                            <Text style={styles.valueSmall}>{compDisplay(setup.shock)}</Text>
+                                            <Text style={styles.valueSmall}>{compDisplay(setup.shock, setupShockComp?.compressionMode)}</Text>
                                         </Text>
                                     </View>
                                 </View>
@@ -793,7 +826,8 @@ export default function DialedInScreen() {
 
                                 {setup.notes ? <Text style={styles.cardNotes}>{setup.notes}</Text> : null}
                         </BPCard>
-                    ))
+                        );
+                    })
                 )}
             </ScrollView>
 
