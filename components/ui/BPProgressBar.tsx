@@ -52,7 +52,16 @@ export default function BPProgressBar({
                     )}
                 </View>
             )}
-            <View style={styles.track}>
+            <View
+                style={styles.track}
+                accessibilityRole="progressbar"
+                accessibilityValue={{
+                    min: 0,
+                    max: 100,
+                    now: Math.round(pct),
+                    text: label ? `${label}: ${Math.round(pct)}${unit}` : undefined,
+                }}
+            >
                 <View
                     style={[
                         styles.fill,

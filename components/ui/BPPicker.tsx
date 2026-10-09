@@ -51,6 +51,9 @@ export default function BPPicker({
                             ]}
                             onPress={() => onValueChange(option.value)}
                             activeOpacity={0.7}
+                            accessibilityRole="button"
+                            accessibilityLabel={option.label}
+                            accessibilityState={{ selected: active }}
                         >
                             <Text
                                 style={[

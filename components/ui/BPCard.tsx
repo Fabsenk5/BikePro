@@ -34,6 +34,7 @@ export default function BPCard({
         return (
             <Pressable
                 onPress={onPress}
+                accessibilityRole="button"
                 style={({ hovered, pressed }: { hovered?: boolean; pressed: boolean }) => [
                     styles.card,
                     !noPadding && styles.padded,

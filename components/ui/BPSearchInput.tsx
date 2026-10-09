@@ -4,6 +4,7 @@
  */
 import { theme } from '@/constants/Colors';
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
     StyleSheet,
     Text,
@@ -30,6 +31,7 @@ export default function BPSearchInput({
     accentColor = theme.colors.accent,
     containerStyle,
 }: BPSearchInputProps) {
+    const { t } = useTranslation();
     const [focused, setFocused] = useState(false);
 
     const handleClear = () => {
@@ -56,11 +58,15 @@ export default function BPSearchInput({
                 returnKeyType="search"
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
+                accessibilityRole="search"
+                accessibilityLabel={placeholder}
             />
             {value.length > 0 && (
                 <TouchableOpacity
                     onPress={handleClear}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('a11y.clear')}
                 >
                     <Text style={styles.clearIcon}>✕</Text>
                 </TouchableOpacity>

@@ -193,6 +193,8 @@ export default function ParkPickerScreen() {
                                     onPress={(e) => { e.stopPropagation?.(); toggleFavorite(park.id); }}
                                     style={styles.favBtn}
                                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={favorites.includes(park.id) ? t('a11y.favorite_remove') : t('a11y.favorite_add')}
                                 >
                                     <Text style={styles.favIcon}>
                                         {favorites.includes(park.id) ? '❤️' : '🤍'}

@@ -23,7 +23,7 @@ const surfaceBorder = '#2A2A3E';
 // Text
 const textPrimary = '#F0F0F5';
 const textSecondary = '#8888A0';
-const textMuted = '#55556A';
+const textMuted = '#7E7E99';
 
 export const theme = {
   colors: {

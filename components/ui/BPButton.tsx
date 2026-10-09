@@ -85,6 +85,9 @@ export default function BPButton({
             onPressOut={handlePressOut}
             activeOpacity={0.85}
             disabled={disabled || loading}
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            accessibilityState={{ disabled: disabled || loading, busy: loading }}
         >
             {loading ? (
                 <ActivityIndicator size="small" color={variantStyles.textColor} />

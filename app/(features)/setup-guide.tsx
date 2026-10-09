@@ -602,8 +602,8 @@ export default function SetupGuideScreen() {
                                     <Text style={styles.catCount}>{t('setup_guide.articles_count', { count })}</Text>
                                     {isAdmin && cat.id !== 'favorites' && (
                                         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 8 }}>
-                                            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveCategory(cat.id, -1); }} style={{ padding: 4, marginRight: 8 }}><Text>⬆️</Text></TouchableOpacity>
-                                            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveCategory(cat.id, 1); }} style={{ padding: 4 }}><Text>⬇️</Text></TouchableOpacity>
+                                            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveCategory(cat.id, -1); }} style={{ padding: 4, marginRight: 8 }} accessibilityRole="button" accessibilityLabel={t('a11y.move_up')}><Text>⬆️</Text></TouchableOpacity>
+                                            <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveCategory(cat.id, 1); }} style={{ padding: 4 }} accessibilityRole="button" accessibilityLabel={t('a11y.move_down')}><Text>⬇️</Text></TouchableOpacity>
                                         </View>
                                     )}
                                 </BPCard>
@@ -638,19 +638,23 @@ export default function SetupGuideScreen() {
                                             <Text style={styles.articleTitle}>{article.title}</Text>
                                             {isAdmin && (
                                                 <View style={{ flexDirection: 'row', gap: 12, marginLeft: 'auto' }}>
-                                                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveArticle(article.id, -1, article.category); }}><Text style={{ fontSize: 16 }}>⬆️</Text></TouchableOpacity>
-                                                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveArticle(article.id, 1, article.category); }}><Text style={{ fontSize: 16 }}>⬇️</Text></TouchableOpacity>
-                                                    <TouchableOpacity onPress={(e) => {
-                                                        e.stopPropagation?.();
-                                                        setIsEditing(article);
-                                                        setEditForm({
-                                                            title: article.title,
-                                                            summary: article.summary,
-                                                            content: article.content,
-                                                            values: article.values,
-                                                            tip: article.tip
-                                                        });
-                                                    }}>
+                                                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveArticle(article.id, -1, article.category); }} accessibilityRole="button" accessibilityLabel={t('a11y.move_up')}><Text style={{ fontSize: 16 }}>⬆️</Text></TouchableOpacity>
+                                                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); moveArticle(article.id, 1, article.category); }} accessibilityRole="button" accessibilityLabel={t('a11y.move_down')}><Text style={{ fontSize: 16 }}>⬇️</Text></TouchableOpacity>
+                                                    <TouchableOpacity
+                                                        onPress={(e) => {
+                                                            e.stopPropagation?.();
+                                                            setIsEditing(article);
+                                                            setEditForm({
+                                                                title: article.title,
+                                                                summary: article.summary,
+                                                                content: article.content,
+                                                                values: article.values,
+                                                                tip: article.tip
+                                                            });
+                                                        }}
+                                                        accessibilityRole="button"
+                                                        accessibilityLabel={t('a11y.edit')}
+                                                    >
                                                         <Text style={{ fontSize: 16 }}>✏️</Text>
                                                     </TouchableOpacity>
                                                 </View>
@@ -659,7 +663,12 @@ export default function SetupGuideScreen() {
                                         <Text style={styles.articleSummary}>{article.summary}</Text>
                                     </View>
                                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); toggleFavorite(article.id); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                        <TouchableOpacity
+                                            onPress={(e) => { e.stopPropagation?.(); toggleFavorite(article.id); }}
+                                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={favorites.includes(article.id) ? t('a11y.favorite_remove') : t('a11y.favorite_add')}
+                                        >
                                             <Text style={{ fontSize: 18 }}>{favorites.includes(article.id) ? '⭐' : '☆'}</Text>
                                         </TouchableOpacity>
                                         <Text style={styles.expandIcon}>{expanded ? '▼' : '▶'}</Text>

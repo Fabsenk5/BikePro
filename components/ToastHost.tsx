@@ -22,12 +22,13 @@ export default function ToastHost() {
     if (toasts.length === 0) return null;
 
     return (
-        <View style={styles.host} pointerEvents="box-none">
+        <View style={styles.host} pointerEvents="box-none" accessibilityLiveRegion="polite">
             {toasts.map((toast) => (
                 <Pressable
                     key={toast.id}
                     onPress={() => dismissToast(toast.id)}
                     style={[styles.toast, { borderLeftColor: typeAccent[toast.type] }]}
+                    accessibilityRole="alert"
                 >
                     {toast.title ? <Text style={styles.title}>{toast.title}</Text> : null}
                     <Text style={styles.message}>{toast.message}</Text>

@@ -28,6 +28,9 @@ export default function FeatureTile({ feature, onPress, index, dynamicSubtitle, 
     const { t } = useTranslation();
     const scale = useSharedValue(1);
 
+    const title = t(`features.${feature.id}.title`, { defaultValue: feature.title });
+    const subtitle = dynamicSubtitle || t(`features.${feature.id}.subtitle`, { defaultValue: feature.subtitle });
+
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],
     }));
@@ -47,6 +50,10 @@ export default function FeatureTile({ feature, onPress, index, dynamicSubtitle, 
             onPressIn={handlePressIn}
             onPressOut={handlePressOut}
             activeOpacity={0.9}
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            accessibilityHint={subtitle}
+            accessibilityState={{ disabled: !feature.ready }}
         >
             {/* Accent glow line at top */}
             <View
@@ -68,10 +75,10 @@ export default function FeatureTile({ feature, onPress, index, dynamicSubtitle, 
 
             {/* Title & subtitle */}
             <Text style={styles.title} numberOfLines={1}>
-                {t(`features.${feature.id}.title`, { defaultValue: feature.title })}
+                {title}
             </Text>
             <Text style={[styles.subtitle, { color: feature.accentColor }]} numberOfLines={1}>
-                {dynamicSubtitle || t(`features.${feature.id}.subtitle`, { defaultValue: feature.subtitle })}
+                {subtitle}
             </Text>
 
             {/* Custom Active Badge (e.g., Shred Check Warnings) */}

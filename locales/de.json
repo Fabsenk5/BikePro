@@ -4,6 +4,19 @@
         "profile": "Profil",
         "admin": "Admin"
     },
+    "a11y": {
+        "decrease": "Verringern",
+        "increase": "Erhöhen",
+        "close": "Schließen",
+        "clear": "Eingabe löschen",
+        "remove": "Löschen",
+        "edit": "Bearbeiten",
+        "share": "Teilen",
+        "favorite_add": "Zu Favoriten hinzufügen",
+        "favorite_remove": "Aus Favoriten entfernen",
+        "move_up": "Nach oben",
+        "move_down": "Nach unten"
+    },
     "features": {
         "dialed-in": {
             "title": "Dialed In",

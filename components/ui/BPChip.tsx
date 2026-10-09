@@ -36,6 +36,9 @@ export default function BPChip({
             onPress={onPress}
             activeOpacity={0.7}
             disabled={!onPress}
+            accessibilityRole={onPress ? 'button' : undefined}
+            accessibilityLabel={label}
+            accessibilityState={onPress ? { selected } : undefined}
         >
             <Text
                 style={[

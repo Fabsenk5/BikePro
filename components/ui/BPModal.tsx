@@ -4,8 +4,11 @@
  */
 import { theme } from '@/constants/Colors';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -34,6 +37,7 @@ export default function BPModal({
     variant = 'sheet',
     footer,
 }: BPModalProps) {
+    const { t } = useTranslation();
     const { height: screenHeight } = useWindowDimensions();
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
@@ -54,41 +58,51 @@ export default function BPModal({
             <TouchableWithoutFeedback onPress={onClose}>
                 <View style={[styles.overlay, isCenter && styles.overlayCenter]}>
                     <TouchableWithoutFeedback>
-                        <View
-                            style={[
-                                isCenter ? styles.centerCard : styles.sheet,
-                                { maxHeight: resolvedMaxHeight },
-                            ]}
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                            style={isCenter ? styles.kavCenter : styles.kavSheet}
                         >
-                            {/* Handle bar (sheet only) */}
-                            {!isCenter && (
-                                <View style={styles.handleWrap}>
-                                    <View style={styles.handle} />
-                                </View>
-                            )}
-
-                            {/* Header */}
-                            {title && (
-                                <View style={styles.header}>
-                                    <Text style={styles.title}>{title}</Text>
-                                    <TouchableOpacity onPress={onClose}>
-                                        <Text style={styles.closeBtn}>✕</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
-
-                            {/* Content */}
-                            <ScrollView
-                                style={styles.content}
-                                contentContainerStyle={styles.contentInner}
-                                showsVerticalScrollIndicator={false}
+                            <View
+                                style={[
+                                    isCenter ? styles.centerCard : styles.sheet,
+                                    { maxHeight: resolvedMaxHeight },
+                                ]}
+                                accessibilityViewIsModal
                             >
-                                {children}
-                            </ScrollView>
+                                {/* Handle bar (sheet only) */}
+                                {!isCenter && (
+                                    <View style={styles.handleWrap}>
+                                        <View style={styles.handle} />
+                                    </View>
+                                )}
 
-                            {/* Footer (action row) */}
-                            {footer && <View style={styles.footer}>{footer}</View>}
-                        </View>
+                                {/* Header */}
+                                {title && (
+                                    <View style={styles.header}>
+                                        <Text style={styles.title}>{title}</Text>
+                                        <TouchableOpacity
+                                            onPress={onClose}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={t('a11y.close')}
+                                        >
+                                            <Text style={styles.closeBtn}>✕</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {/* Content */}
+                                <ScrollView
+                                    style={styles.content}
+                                    contentContainerStyle={styles.contentInner}
+                                    showsVerticalScrollIndicator={false}
+                                >
+                                    {children}
+                                </ScrollView>
+
+                                {/* Footer (action row) */}
+                                {footer && <View style={styles.footer}>{footer}</View>}
+                            </View>
+                        </KeyboardAvoidingView>
                     </TouchableWithoutFeedback>
                 </View>
             </TouchableWithoutFeedback>
@@ -106,6 +120,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         padding: theme.spacing.lg,
+    },
+    kavSheet: {
+        width: '100%',
+    },
+    kavCenter: {
+        width: '100%',
+        alignItems: 'center',
     },
     sheet: {
         backgroundColor: theme.colors.surface,

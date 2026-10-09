@@ -36,6 +36,8 @@ export default function BPToggle({
                 onValueChange={onValueChange}
                 trackColor={{ false: theme.colors.border, true: accentColor }}
                 thumbColor={value ? onAccent : theme.colors.textMuted}
+                accessibilityLabel={label}
+                accessibilityState={{ checked: value }}
             />
         </View>
     );

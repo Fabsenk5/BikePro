@@ -618,13 +618,25 @@ export default function ComponentTrackerScreen() {
                                 </Text>
                             </View>
                             <View style={styles.bikeActions}>
-                                <TouchableOpacity onPress={handleShareBike}>
+                                <TouchableOpacity
+                                    onPress={handleShareBike}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('a11y.share')}
+                                >
                                     <Text style={styles.actionIcon}>📋</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => openEditBike(selectedBike)}>
+                                <TouchableOpacity
+                                    onPress={() => openEditBike(selectedBike)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('a11y.edit')}
+                                >
                                     <Text style={styles.actionIcon}>✏️</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity onPress={() => deleteBike(selectedBike.id)}>
+                                <TouchableOpacity
+                                    onPress={() => deleteBike(selectedBike.id)}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('a11y.remove')}
+                                >
                                     <Text style={styles.actionIcon}>🗑</Text>
                                 </TouchableOpacity>
                             </View>
@@ -688,7 +700,13 @@ export default function ComponentTrackerScreen() {
                                 )}
                             </View>
                         )}
-                        <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); deleteComp(comp.id); }} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} style={styles.compRowDelete}>
+                        <TouchableOpacity
+                            onPress={(e) => { e.stopPropagation?.(); deleteComp(comp.id); }}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            style={styles.compRowDelete}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('a11y.remove')}
+                        >
                             <Text style={{ fontSize: 18 }}>🗑</Text>
                         </TouchableOpacity>
                     </BPCard>

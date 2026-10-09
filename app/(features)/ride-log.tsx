@@ -678,6 +678,8 @@ export default function RideLogScreen() {
                                 <TouchableOpacity
                                     style={styles.deleteBtn}
                                     onPress={(e) => { e.stopPropagation?.(); confirmDelete(ride.id); }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('a11y.remove')}
                                 >
                                     <Text style={styles.deleteBtnText}>🗑</Text>
                                 </TouchableOpacity>

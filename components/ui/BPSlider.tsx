@@ -1,6 +1,7 @@
 import { theme } from '@/constants/Colors';
 import Slider from '@react-native-community/slider';
 import React, { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 interface BPSliderProps {
@@ -30,6 +31,7 @@ export default function BPSlider({
     containerStyle,
     disabled,
 }: BPSliderProps) {
+    const { t } = useTranslation();
     const display = (v: number) => (formatValue ? formatValue(v) : `${v}${unit}`);
 
     const handleIncrement = useCallback(() => {
@@ -71,6 +73,8 @@ export default function BPSlider({
                     activeOpacity={0.6}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     disabled={disabled}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('a11y.decrease')}
                 >
                     <Text style={styles.stepButtonText}>−</Text>
                 </TouchableOpacity>
@@ -87,6 +91,13 @@ export default function BPSlider({
                     maximumTrackTintColor={theme.colors.elevated}
                     thumbTintColor={accentColor}
                     disabled={disabled}
+                    accessibilityLabel={label}
+                    accessibilityValue={{
+                        min: Number(min),
+                        max: Number(max),
+                        now: Number(value) || 0,
+                        text: display(value),
+                    }}
                 />
 
                 {/* Plus button */}
@@ -96,6 +107,8 @@ export default function BPSlider({
                     activeOpacity={0.6}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     disabled={disabled}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('a11y.increase')}
                 >
                     <Text style={styles.stepButtonText}>+</Text>
                 </TouchableOpacity>

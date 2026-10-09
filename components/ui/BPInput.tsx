@@ -52,13 +52,14 @@ export default function BPInput({
                     ]}
                     placeholderTextColor={theme.colors.textMuted}
                     selectionColor={accentColor}
+                    accessibilityLabel={label}
                     {...inputProps}
                     onFocus={(e) => { setFocused(true); onFocus?.(e); }}
                     onBlur={(e) => { setFocused(false); onBlur?.(e); }}
                 />
                 {suffix && <Text style={styles.suffix}>{suffix}</Text>}
             </View>
-            {error && <Text style={styles.errorText}>{error}</Text>}
+            {error && <Text style={styles.errorText} accessibilityRole="alert">{error}</Text>}
         </View>
     );
 }

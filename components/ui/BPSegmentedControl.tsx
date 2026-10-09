@@ -42,6 +42,9 @@ export default function BPSegmentedControl({
                         ]}
                         onPress={() => onChange(option.value)}
                         activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={option.label}
+                        accessibilityState={{ selected: active }}
                     >
                         <Text
                             style={[

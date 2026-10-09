@@ -4,6 +4,19 @@
         "profile": "Profile",
         "admin": "Admin"
     },
+    "a11y": {
+        "decrease": "Decrease",
+        "increase": "Increase",
+        "close": "Close",
+        "clear": "Clear input",
+        "remove": "Delete",
+        "edit": "Edit",
+        "share": "Share",
+        "favorite_add": "Add to favorites",
+        "favorite_remove": "Remove from favorites",
+        "move_up": "Move up",
+        "move_down": "Move down"
+    },
     "features": {
         "dialed-in": {
             "title": "Dialed In",
