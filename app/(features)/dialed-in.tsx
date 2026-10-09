@@ -572,15 +572,22 @@ export default function DialedInScreen() {
         }
     };
 
-    // Apply the manufacturer row to the current form (ranges → midpoint)
+    // Apply the manufacturer row to the current form (ranges → midpoint,
+    // clamped to the slider ranges and the component's channel maxima)
     const applySpecRecommendation = () => {
         if (!activeSpecInfo || !activeSuspension) return;
         const row = activeSpecInfo.row;
-        const psi = midpoint(row.psi);
-        const lsr = midpoint(row.lsr);
-        const hsr = midpoint(row.hsr);
-        const lsc = midpoint(row.lsc);
-        const hsc = midpoint(row.hsc);
+        const isCoil = activeTab === 'shock' && (activeSuspension.mode ?? 'air') === 'coil';
+        const psiMin = activeTab === 'fork' ? 40 : 80;
+        const psiMax = activeTab === 'fork' ? 160 : 400;
+        const rawPsi = isCoil ? null : midpoint(row.psi);
+        const psi = rawPsi !== null ? Math.min(psiMax, Math.max(psiMin, rawPsi)) : null;
+        const clampChannel = (value: number | null, channel: ClickChannel) =>
+            value === null ? null : Math.min(value, getChannelMaxClicks(channel));
+        const lsr = clampChannel(midpoint(row.lsr), 'reboundLsr');
+        const hsr = clampChannel(midpoint(row.hsr), 'reboundHsr');
+        const lsc = clampChannel(midpoint(row.lsc), 'compressionLsc');
+        const hsc = clampChannel(midpoint(row.hsc), 'compressionHsc');
         setActiveSuspension((prev: SuspensionValues) => ({
             ...prev,
             ...(psi !== null ? { psi } : {}),
@@ -633,8 +640,15 @@ export default function DialedInScreen() {
         if (!resolved) return null;
         const summary = formatSpecSummary(resolved.row);
         if (!summary) return null;
-        return { summary, nearest: resolved.fallback, row: resolved.row as SpecRow };
+        return {
+            summary,
+            nearest: resolved.fallback,
+            row: resolved.row as SpecRow,
+            source: (comp?.specSource as string | undefined) || undefined,
+        };
     }, [bikeId, activeTab, trackerBikes, riderWeightKg]);
+
+    const activeComp = getActiveComponent();
 
     // Average setup rating from Ride-Log (rides with setupId + 1–5 setupRating)
     const ratingStats = useMemo(() => {
@@ -829,6 +843,7 @@ export default function DialedInScreen() {
                                 <Text style={styles.specBoxText}>
                                     {activeSpecInfo.summary}
                                     {activeSpecInfo.nearest ? ` (${t('setup_guide.sag_spec_nearest')})` : ''}
+                                    {activeSpecInfo.source ? ` · ${t('dialed.spec_source')}: ${activeSpecInfo.source}` : ''}
                                 </Text>
                                 <BPButton
                                     title={t('dialed.spec_apply')}
@@ -836,6 +851,32 @@ export default function DialedInScreen() {
                                     variant="secondary"
                                     color={theme.colors.accentCyan}
                                     size="sm"
+                                />
+                            </View>
+                        )}
+                        {bikeId && activeComp && (
+                            <View style={styles.toolRow}>
+                                <BPButton
+                                    title={`💨 ${t('dialed.open_pressure_bot')}`}
+                                    onPress={() => {
+                                        setModalVisible(false);
+                                        router.push({ pathname: '/(features)/pressure-bot', params: { bikeId } });
+                                    }}
+                                    variant="secondary"
+                                    color={theme.colors.accentCyan}
+                                    size="sm"
+                                    style={{ flex: 1 }}
+                                />
+                                <BPButton
+                                    title={`🔩 ${t('dialed.open_component')}`}
+                                    onPress={() => {
+                                        setModalVisible(false);
+                                        router.push({ pathname: '/(features)/component-tracker', params: { editComponent: activeComp.id } });
+                                    }}
+                                    variant="secondary"
+                                    color={ACCENT}
+                                    size="sm"
+                                    style={{ flex: 1 }}
                                 />
                             </View>
                         )}
@@ -858,7 +899,22 @@ export default function DialedInScreen() {
                         </View>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label="SAG" value={activeSuspension.sagPercent} min={10} max={45} step={1} unit="%" accentColor={ACCENT} onValueChange={v => updateSusValue('sagPercent', v)} />
+                                <BPSlider
+                                    label="SAG"
+                                    value={activeSuspension.sagPercent}
+                                    min={10}
+                                    max={45}
+                                    step={1}
+                                    unit="%"
+                                    accentColor={ACCENT}
+                                    formatValue={(v) => {
+                                        const base = (activeTab === 'shock' ? activeSuspension.stroke : activeSuspension.travel) ?? 0;
+                                        if (!base) return `${v} %`;
+                                        const mm = Math.round(base * v) / 100;
+                                        return `${v} % ≈ ${mm.toLocaleString(i18n.language, { maximumFractionDigits: 1 })} mm`;
+                                    }}
+                                    onValueChange={v => updateSusValue('sagPercent', v)}
+                                />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <BPSlider label={t('dialed.travel')} value={activeSuspension.travel} min={80} max={220} step={5} unit=" mm" accentColor={ACCENT} onValueChange={v => updateSusValue('travel', v)} />
@@ -1070,6 +1126,7 @@ const styles = StyleSheet.create({
     specBox: { marginBottom: theme.spacing.md, padding: theme.spacing.sm, backgroundColor: theme.colors.background, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.accentCyan + '40' },
     specBoxTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '800', marginBottom: 4 },
     specBoxText: { color: theme.colors.textSecondary, fontSize: 12, marginBottom: theme.spacing.sm },
+    toolRow: { flexDirection: 'row', gap: theme.spacing.sm, marginBottom: theme.spacing.md },
     emptyState: { alignItems: 'center', paddingVertical: theme.spacing.xxl * 2 },
     setupCard: { marginTop: theme.spacing.md, padding: theme.spacing.md },
     cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

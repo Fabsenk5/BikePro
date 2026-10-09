@@ -344,7 +344,9 @@
         "spec_hsc": "HSC (from closed)",
         "spec_add_row": "+ Add row",
         "spec_source_label": "Source (optional)",
-        "spec_source_placeholder": "e.g. Fox 36 GRIP2 manual 2024"
+        "spec_source_placeholder": "e.g. Fox 36 GRIP2 manual 2024",
+        "open_pressure_bot": "Pressure Bot",
+        "open_setup": "Setup"
     },
     "dialed": {
         "title": "⚙️ Dialed In",
@@ -442,7 +444,10 @@
         "wizard_open_guide": "📖 Open base setup guide",
         "spec_reco_title": "Manufacturer recommendation ({{weight}} kg)",
         "spec_reco_title_generic": "Manufacturer recommendation",
-        "spec_apply": "Apply"
+        "spec_apply": "Apply",
+        "open_pressure_bot": "Pressure Bot",
+        "open_component": "Edit component",
+        "spec_source": "Source"
     },
     "shred": {
         "title": "🔧 Shred Check",
@@ -933,7 +938,9 @@
         "sag_no_weight": "Add your rider weight in the profile to see the manufacturer recommendation here.",
         "sag_without_bike_text": "Without a bike we show percentages only: fork {{fork}} %, shock {{shock}} %. Add a bike for mm targets and manufacturer values.",
         "sag_create_bike": "🚲 Add bike",
-        "sag_to_pressure": "💨 To Pressure Bot"
+        "sag_to_pressure": "💨 To Pressure Bot",
+        "sag_add_spec": "Add manufacturer data now",
+        "sag_spec_source_label": "Source"
     },
     "trail_video": {
         "title": "🎬 Trail Video",

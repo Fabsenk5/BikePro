@@ -57,7 +57,7 @@ export default function SagCalculator() {
 
     const specLines = useMemo(() => {
         if (!bike || weightKg === null) return [];
-        const lines: { key: string; label: string; values: string; nearest: boolean }[] = [];
+        const lines: { key: string; label: string; values: string; nearest: boolean; source?: string }[] = [];
         for (const type of ['fork', 'shock'] as const) {
             const comp = bike.components.find(c => c.type === type);
             if (!comp?.specTable?.length) continue;
@@ -70,6 +70,7 @@ export default function SagCalculator() {
                 label: t(type === 'fork' ? 'setup_guide.sag_fork_label' : 'setup_guide.sag_shock_label'),
                 values: summary,
                 nearest: resolved.fallback,
+                source: comp.specSource || undefined,
             });
         }
         return lines;
@@ -77,6 +78,8 @@ export default function SagCalculator() {
 
     const hasSpecTable = !!bike?.components.some(c =>
         (c.type === 'fork' || c.type === 'shock') && (c.specTable?.length ?? 0) > 0);
+
+    const specTarget = bike?.components.find(c => c.type === 'fork') ?? bike?.components.find(c => c.type === 'shock');
 
     const fmtPctRange = (range: SagRange) =>
         range.min === range.max ? `${range.min}` : `${range.min}–${range.max}`;
@@ -142,6 +145,7 @@ export default function SagCalculator() {
                                 <Text key={line.key} style={styles.specLine}>
                                     {line.label}: {line.values}
                                     {line.nearest ? ` (${t('setup_guide.sag_spec_nearest')})` : ''}
+                                    {line.source ? ` · ${t('setup_guide.sag_spec_source_label')}: ${line.source}` : ''}
                                 </Text>
                             ))}
                         </View>
@@ -150,7 +154,19 @@ export default function SagCalculator() {
                         <Text style={styles.hint}>{t('setup_guide.sag_no_weight')}</Text>
                     )}
                     {!hasSpecTable && (
-                        <Text style={styles.hint}>{t('setup_guide.sag_no_spec')}</Text>
+                        <View>
+                            <Text style={styles.hint}>{t('setup_guide.sag_no_spec')}</Text>
+                            {specTarget && (
+                                <BPButton
+                                    title={t('setup_guide.sag_add_spec')}
+                                    onPress={() => router.push({ pathname: '/(features)/component-tracker', params: { editComponent: specTarget.id } })}
+                                    variant="secondary"
+                                    color={ACCENT}
+                                    size="sm"
+                                    style={{ marginTop: 4 }}
+                                />
+                            )}
+                        </View>
                     )}
                 </View>
             ) : (

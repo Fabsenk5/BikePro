@@ -13,7 +13,7 @@ import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteC
 import { ClickChannel, channelsForModes, sanitizeClickLimits } from '@/lib/clickLimits';
 import { sanitizeSpecTable } from '@/lib/specTable';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -317,7 +317,7 @@ export default function ComponentTrackerScreen() {
     };
 
     // Deep link from the sag widget: open the new-bike dialog directly
-    const params = useLocalSearchParams<{ newBike?: string }>();
+    const params = useLocalSearchParams<{ newBike?: string; editComponent?: string }>();
     const handledNewBike = useRef(false);
     useEffect(() => {
         if (!handledNewBike.current && params.newBike === '1') {
@@ -476,6 +476,22 @@ export default function ComponentTrackerScreen() {
         setCompMoveToBikeId('');
         setCompModalVisible(true);
     };
+
+    // Deep link from the sag widget / quick actions: open a component's edit dialog
+    const handledEditComponent = useRef(false);
+    useEffect(() => {
+        const compId = params.editComponent;
+        if (handledEditComponent.current || !compId || bikes.length === 0) return;
+        for (const bike of bikes) {
+            const comp = bike.components.find(c => c.id === compId);
+            if (comp) {
+                handledEditComponent.current = true;
+                setSelectedBikeId(bike.id);
+                openEditComp(comp);
+                break;
+            }
+        }
+    }, [params.editComponent, bikes]);
 
     const handleCompTypeChange = (newType: string) => {
         setCompType(newType);
@@ -761,7 +777,9 @@ export default function ComponentTrackerScreen() {
                                 <Text style={styles.compRowNotes} numberOfLines={2}>{comp.notes}</Text>
                             ) : null}
                         </View>
-                        {comp.setupValues.length > 0 && (
+                        {(comp.setupValues.length > 0
+                            || (['fork', 'shock', 'wheel_front', 'wheel_rear'].includes(comp.type)
+                                && setups.some(s => s.bikeId === selectedBike?.id))) && (
                             <View style={styles.compRowChips}>
                                 {comp.setupValues.slice(0, 3).map((sv, i) => (
                                     <BPChip key={i} small label={`${setupLabel(sv.key)} ${sv.value}${sv.unit}`} />
@@ -769,9 +787,29 @@ export default function ComponentTrackerScreen() {
                                 {comp.setupValues.length > 3 && (
                                     <BPChip small label={`+${comp.setupValues.length - 3}`} />
                                 )}
-                                {['fork', 'shock', 'wheel_front', 'wheel_rear'].includes(comp.type) && setups.filter(s => s.bikeId === selectedBike?.id).length > 0 && (
+                                {['fork', 'shock', 'wheel_front', 'wheel_rear'].includes(comp.type) && setups.some(s => s.bikeId === selectedBike?.id) && (
                                     <BPChip small selected color={ACCENT} label={`🎯 ${setups.filter(s => s.bikeId === selectedBike?.id).length} Setups`} />
                                 )}
+                            </View>
+                        )}
+                        {['fork', 'shock'].includes(comp.type) && selectedBike && (
+                            <View style={styles.quickActions}>
+                                <TouchableOpacity
+                                    style={styles.quickAction}
+                                    onPress={(e) => { e.stopPropagation?.(); router.push({ pathname: '/(features)/pressure-bot', params: { bikeId: selectedBike.id } }); }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('tracker.open_pressure_bot')}
+                                >
+                                    <Text style={styles.quickActionText}>💨 {t('tracker.open_pressure_bot')}</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.quickAction}
+                                    onPress={(e) => { e.stopPropagation?.(); router.push({ pathname: '/(features)/dialed-in', params: { bikeId: selectedBike.id, ts: String(Date.now()) } }); }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={t('tracker.open_setup')}
+                                >
+                                    <Text style={styles.quickActionText}>🎯 {t('tracker.open_setup')}</Text>
+                                </TouchableOpacity>
                             </View>
                         )}
                         <TouchableOpacity
@@ -1108,6 +1146,9 @@ const styles = StyleSheet.create({
     specHint: { color: theme.colors.textMuted, fontSize: 12, marginBottom: theme.spacing.sm },
     specRow: { backgroundColor: theme.colors.background, borderRadius: theme.radius.sm, borderWidth: 1, borderColor: theme.colors.border, padding: theme.spacing.sm, marginBottom: theme.spacing.sm },
     specRowDelete: { alignSelf: 'flex-end', padding: 4 },
+    quickActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+    quickAction: { backgroundColor: theme.colors.elevated, borderRadius: theme.radius.full, borderWidth: 1, borderColor: theme.colors.border, paddingVertical: 4, paddingHorizontal: 10 },
+    quickActionText: { color: theme.colors.textSecondary, fontSize: 11, fontWeight: '700' },
     moveSection: { marginTop: theme.spacing.md, padding: theme.spacing.sm, backgroundColor: theme.colors.elevated, borderRadius: theme.radius.md, borderWidth: 1, borderColor: ACCENT + '40' },
     moveSectionTitle: { color: ACCENT, fontSize: 14, fontWeight: '700', marginBottom: theme.spacing.sm },
 });

@@ -344,7 +344,9 @@
         "spec_hsc": "HSC (von geschlossen)",
         "spec_add_row": "+ Zeile hinzufügen",
         "spec_source_label": "Quelle (optional)",
-        "spec_source_placeholder": "z.B. Fox 36 GRIP2 Handbuch 2024"
+        "spec_source_placeholder": "z.B. Fox 36 GRIP2 Handbuch 2024",
+        "open_pressure_bot": "Druck-Bot",
+        "open_setup": "Setup"
     },
     "setup_guide": {
         "title": "📚 Setup Guide",
@@ -667,7 +669,9 @@
         "sag_no_weight": "Fahrergewicht im Profil hinterlegen, dann erscheint hier die Hersteller-Empfehlung.",
         "sag_without_bike_text": "Ohne Bike zeigen wir nur die Prozentwerte: Gabel {{fork}} %, Dämpfer {{shock}} %. Bike anlegen für mm-Ziele und Hersteller-Werte.",
         "sag_create_bike": "🚲 Bike anlegen",
-        "sag_to_pressure": "💨 Zum Druck-Bot"
+        "sag_to_pressure": "💨 Zum Druck-Bot",
+        "sag_add_spec": "Herstellerdaten jetzt hinterlegen",
+        "sag_spec_source_label": "Quelle"
     },
     "park_picker": {
         "title": "🏔️ Park Picker",
@@ -891,7 +895,10 @@
         "wizard_open_guide": "📖 Grundsetup-Guide öffnen",
         "spec_reco_title": "Hersteller-Empfehlung ({{weight}} kg)",
         "spec_reco_title_generic": "Hersteller-Empfehlung",
-        "spec_apply": "Übernehmen"
+        "spec_apply": "Übernehmen",
+        "open_pressure_bot": "Druck-Bot",
+        "open_component": "Bauteil bearbeiten",
+        "spec_source": "Quelle"
     },
     "shred": {
         "title": "🔧 Shred Check",
