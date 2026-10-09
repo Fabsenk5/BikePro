@@ -111,7 +111,8 @@
         "units": {
             "title": "Einheiten",
             "pressure": "Druckeinheit",
-            "weight": "Gewichtseinheit"
+            "weight": "Gewichtseinheit",
+            "standard_hint": "Reifendruck immer in bar, Fahrwerk (Gabel/Dämpfer) immer in PSI."
         },
         "save_error_title": "Fehler",
         "save_error_msg": "Profil konnte nicht in der Cloud gespeichert werden. Die Daten liegen lokal vor.",

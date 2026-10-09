@@ -9,7 +9,7 @@ import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPS
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
 import { setupLabelLocalized, wearLabelLocalized } from '@/lib/componentLabels';
-import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
+import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
 import { ClickChannel, channelsForModes, sanitizeClickLimits } from '@/lib/clickLimits';
 import { sanitizeSpecTable } from '@/lib/specTable';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -53,11 +53,6 @@ const CLICK_LABEL_KEYS: Record<ClickChannel, string> = {
 
 type Bike = SyncBike;
 
-interface UnitsPref {
-    pressure: 'bar' | 'psi';
-    weight: 'kg' | 'lb';
-}
-
 const BAR_TO_PSI = 14.5038;
 
 function convertPressure(value: number, from: string, to: string): number {
@@ -89,10 +84,7 @@ const bikeSizeOptions = [
 ];
 
 export default function ComponentTrackerScreen() {
-    const { t, i18n } = useTranslation();
-    const isGerman = i18n.language.startsWith('de');
-    const [unitsPref, setUnitsPref] = useState<UnitsPref>({ pressure: isGerman ? 'bar' : 'psi', weight: 'kg' });
-    const tirePressureUnit = unitsPref.pressure;
+    const { t } = useTranslation();
     const [bikes, setBikes] = useState<Bike[]>([]);
     const [setups, setSetups] = useState<any[]>([]);
     const [selectedBikeId, setSelectedBikeId] = useState<string | null>(null);
@@ -168,8 +160,8 @@ export default function ComponentTrackerScreen() {
         stem: [{ key: 'Länge', value: '', unit: 'mm' }, { key: 'Winkel', value: '', unit: '°' }, { key: 'Drehmoment Lenker', value: '', unit: 'Nm' }, { key: 'Drehmoment Steuerrohr', value: '', unit: 'Nm' }],
         fork: [{ key: 'travel', value: '', unit: 'mm' }, { key: 'Offset', value: '', unit: 'mm' }, { key: 'stroke', value: '', unit: 'mm' }],
         shock: [{ key: 'travel', value: '', unit: 'mm' }, { key: 'Einbaulänge', value: '', unit: 'mm' }, { key: 'stroke', value: '', unit: 'mm' }],
-        wheel_front: [{ key: 'size', value: '', unit: '"' }, { key: 'width', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'tire_type', value: '', unit: '' }, { key: 'casing', value: '', unit: '' }, { key: 'mount', value: '', unit: '' }, { key: 'pressure', value: '', unit: tirePressureUnit }],
-        wheel_rear: [{ key: 'size', value: '', unit: '"' }, { key: 'width', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'tire_type', value: '', unit: '' }, { key: 'casing', value: '', unit: '' }, { key: 'mount', value: '', unit: '' }, { key: 'pressure', value: '', unit: tirePressureUnit }],
+        wheel_front: [{ key: 'size', value: '', unit: '"' }, { key: 'width', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'tire_type', value: '', unit: '' }, { key: 'casing', value: '', unit: '' }, { key: 'mount', value: '', unit: '' }, { key: 'pressure', value: '', unit: 'bar' }],
+        wheel_rear: [{ key: 'size', value: '', unit: '"' }, { key: 'width', value: '', unit: '"' }, { key: 'Reifen', value: '', unit: '' }, { key: 'tire_type', value: '', unit: '' }, { key: 'casing', value: '', unit: '' }, { key: 'mount', value: '', unit: '' }, { key: 'pressure', value: '', unit: 'bar' }],
         chain: [{ key: 'Glieder', value: '', unit: '' }, { key: 'Typ', value: '', unit: '' }],
         cassette: [{ key: 'Abstufung', value: '', unit: '' }, { key: 'Zähne', value: '', unit: '' }],
         derailleur: [{ key: 'Max. Zähne', value: '', unit: '' }, { key: 'Kettenblatt', value: '', unit: 'T' }],
@@ -273,13 +265,6 @@ export default function ComponentTrackerScreen() {
         }
         const setupsData = await syncLoadTable('suspension_setups', '@bikepro_setups');
         setSetups(setupsData ?? []);
-        const units = await syncLoadPreference<UnitsPref>('units', '@bikepro_units');
-        if (units) {
-            setUnitsPref({
-                pressure: units.pressure ?? (isGerman ? 'bar' : 'psi'),
-                weight: units.weight ?? 'kg',
-            });
-        }
     };
 
     useFocusEffect(
@@ -966,15 +951,15 @@ export default function ComponentTrackerScreen() {
                                 return <BPPicker key={i} label={setupLabel(sv.key)} options={[{ label: t('tracker.select_placeholder'), value: '' }, ...setupMountOptions]} value={sv.value} onValueChange={(v) => updateSetupValue(i, v)} accentColor={ACCENT} />
                             }
                             if (sv.key === 'pressure') {
-                                const isBar = tirePressureUnit === 'bar';
-                                const min = isBar ? 1.0 : 14;
-                                const max = isBar ? 3.5 : 50;
-                                const fallback = isBar ? 1.8 : 26;
+                                // Tires are always shown and stored in bar (app standard);
+                                // legacy psi values are converted for display.
+                                const min = 1.0;
+                                const max = 3.5;
+                                const fallback = 1.8;
                                 const parsed = parseFloat(sv.value);
-                                // Convert stored values saved in the other unit for display
                                 const displayVal = isNaN(parsed)
                                     ? fallback
-                                    : Math.min(max, Math.max(min, convertPressure(parsed, sv.unit || tirePressureUnit, tirePressureUnit)));
+                                    : Math.min(max, Math.max(min, convertPressure(parsed, sv.unit || 'bar', 'bar')));
                                 return (
                                     <BPSlider
                                         key={i}
@@ -982,10 +967,10 @@ export default function ComponentTrackerScreen() {
                                         value={displayVal}
                                         min={min}
                                         max={max}
-                                        step={isBar ? 0.1 : 1}
+                                        step={0.1}
                                         accentColor={ACCENT}
-                                        formatValue={(v) => `${v.toFixed(isBar ? 1 : 0)} ${tirePressureUnit}`}
-                                        onValueChange={(val) => updateSetupValue(i, isBar ? val.toFixed(1) : val.toFixed(0), tirePressureUnit)}
+                                        formatValue={(v) => `${v.toFixed(1)} bar`}
+                                        onValueChange={(val) => updateSetupValue(i, val.toFixed(1), 'bar')}
                                     />
                                 )
                             }

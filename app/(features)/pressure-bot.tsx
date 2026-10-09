@@ -34,12 +34,10 @@ const getSetupValue = (values: any[] | undefined, key: string, legacyKey: string
 
 export default function PressureBotScreen() {
     const { t, i18n } = useTranslation();
-    const isGerman = i18n.language.startsWith('de');
     const [units, setUnits] = useState<{ pressure: 'bar' | 'psi'; weight: 'kg' | 'lb' }>({
-        pressure: isGerman ? 'bar' : 'psi',
+        pressure: 'bar',
         weight: 'kg',
     });
-    const tirePressureUnit = units.pressure;
 
     const [riderWeight, setRiderWeight] = useState(80);
     const [bikeWeight, setBikeWeight] = useState(15);
@@ -497,14 +495,9 @@ export default function PressureBotScreen() {
             if (b.id !== selectedBikeId) return b;
             const updatedComps = b.components.map(c => {
                 if (activeTab === 'tires') {
-                    // Persist dot-decimal values in the user's preferred unit;
-                    // result.front/rear are always bar internally, locale formatting is for rendering only.
-                    const fbStr = units.pressure === 'psi'
-                        ? `${(result.front * 14.5038).toFixed(2)} psi`
-                        : `${result.front.toFixed(2)} bar`;
-                    const rbStr = units.pressure === 'psi'
-                        ? `${(result.rear * 14.5038).toFixed(2)} psi`
-                        : `${result.rear.toFixed(2)} bar`;
+                    // Tires are always stored in bar (app standard); suspension stays PSI.
+                    const fbStr = `${result.front.toFixed(2)} bar`;
+                    const rbStr = `${result.rear.toFixed(2)} bar`;
                     if (c.type === 'wheel_front') {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
                         const dIdx = newSetup.findIndex((s: any) => s.key === 'pressure' || s.key === 'Druck');
@@ -522,9 +515,7 @@ export default function PressureBotScreen() {
                 } else if (activeTab === 'suspension') {
                     // Format pressures/spring rate in the user's preferred units
                     // (suspResult values are PSI / lbs-in internally)
-                    const fmtPsi = (psi: number) => units.pressure === 'bar'
-                        ? `${(psi / 14.5038).toFixed(2)} bar`
-                        : `${psi} PSI`;
+                    const fmtPsi = (psi: number) => `${psi} PSI`;
                     if (c.type === 'fork') {
                         const newSetup = Array.isArray(c.setupValues) ? [...c.setupValues] : [];
                         const dIdx = newSetup.findIndex((s: any) => s.key === 'pressure' || s.key === 'Druck');
@@ -599,27 +590,19 @@ export default function PressureBotScreen() {
                             <View style={styles.resultItem}>
                                 <Text style={styles.resultLabel}>{t('pressure_bot.front')}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                    {tirePressureUnit === 'bar'
-                                        ? result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                        : frontPSI}
+                                    {result.front.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </Text>
-                                <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
-                                <Text style={styles.resultPSI}>
-                                    {tirePressureUnit === 'bar' ? `${frontPSI} PSI` : `${result.front.toFixed(2)} bar`}
-                                </Text>
+                                <Text style={styles.resultUnit}>bar</Text>
+                                <Text style={styles.resultPSI}>{frontPSI} PSI</Text>
                             </View>
                             <View style={styles.resultDivider} />
                             <View style={styles.resultItem}>
                                 <Text style={styles.resultLabel}>{t('pressure_bot.rear')}</Text>
                                 <Text style={[styles.resultValue, { color: ACCENT }]}>
-                                    {tirePressureUnit === 'bar'
-                                        ? result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                                        : rearPSI}
+                                    {result.rear.toLocaleString(i18n.language, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </Text>
-                                <Text style={styles.resultUnit}>{tirePressureUnit}</Text>
-                                <Text style={styles.resultPSI}>
-                                    {tirePressureUnit === 'bar' ? `${rearPSI} PSI` : `${result.rear.toFixed(2)} bar`}
-                                </Text>
+                                <Text style={styles.resultUnit}>bar</Text>
+                                <Text style={styles.resultPSI}>{rearPSI} PSI</Text>
                             </View>
                         </View>
                         {result.notes.length > 0 && (

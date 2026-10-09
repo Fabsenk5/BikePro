@@ -63,7 +63,7 @@ export default function ProfileScreen() {
 
     // Units preference (pressure bar/psi, weight kg/lb); weight is stored internally in kg
     const [units, setUnits] = useState<UnitsPref>({
-        pressure: i18n.language.startsWith('de') ? 'bar' : 'psi',
+        pressure: 'bar',
         weight: 'kg',
     });
 
@@ -90,7 +90,7 @@ export default function ProfileScreen() {
         (async () => {
             const stored = await syncLoadPreference<UnitsPref>('units', UNITS_KEY).catch(() => null);
             const pref: UnitsPref = stored ?? {
-                pressure: i18n.language.startsWith('de') ? 'bar' : 'psi',
+                pressure: 'bar',
                 weight: 'kg',
             };
             setUnits(pref);
@@ -319,13 +319,7 @@ export default function ProfileScreen() {
                 {/* Units */}
                 <BPCard style={styles.infoCard}>
                     <Text style={styles.sectionTitle}>📏 {t('profile.units.title')}</Text>
-                    <BPPicker
-                        label={t('profile.units.pressure')}
-                        options={[{ label: 'bar', value: 'bar' }, { label: 'psi', value: 'psi' }]}
-                        value={units.pressure}
-                        onValueChange={(v) => handleUnitsChange({ pressure: v as UnitsPref['pressure'] })}
-                        accentColor={ACCENT}
-                    />
+                    <Text style={styles.unitHint}>{t('profile.units.standard_hint')}</Text>
                     <BPPicker
                         label={t('profile.units.weight')}
                         options={[{ label: 'kg', value: 'kg' }, { label: 'lb', value: 'lb' }]}
@@ -414,6 +408,7 @@ const styles = StyleSheet.create({
     statValue: { fontSize: 28, fontWeight: '900' },
     statLabel: { color: theme.colors.textMuted, fontSize: 11, fontWeight: '600', marginTop: 4, textTransform: 'uppercase', letterSpacing: 1 },
     infoCard: { padding: theme.spacing.md },
+    unitHint: { color: theme.colors.textMuted, fontSize: 12, marginBottom: theme.spacing.sm },
     infoRow: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
         paddingVertical: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: theme.colors.border,

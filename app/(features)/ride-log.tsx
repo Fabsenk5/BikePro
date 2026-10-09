@@ -772,7 +772,9 @@ export default function RideLogScreen() {
 
                 <BPPicker
                     label={t('ridelog.ride_setup')}
-                    options={[{ label: t('ridelog.ride_setup_none'), value: '' }, ...setups.filter(s => rideBikeId ? s.bikeId === rideBikeId : true).map(s => ({ label: s.name, value: s.id }))]}
+                    options={[{ label: t('ridelog.ride_setup_none'), value: '' }, ...setups
+                        .filter(s => rideBikeId ? s.bikeId === rideBikeId : true)
+                        .map(s => ({ label: !rideBikeId && s.bikeName ? `${s.name} (${s.bikeName})` : s.name, value: s.id }))]}
                     value={rideSetupId}
                     onValueChange={setRideSetupId}
                     accentColor={ACCENT}

@@ -13,7 +13,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { formatSpecSummary, midpoint, resolveSpecRow, SpecRow } from '@/lib/specTable';
-import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncLoadTable, syncSaveTable } from '@/lib/sync';
+import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadProfile, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -30,8 +30,6 @@ import {
 
 const ACCENT = featureColors['dialed-in'];
 const SETUPS_KEY = '@bikepro_setups';
-const UNITS_KEY = '@bikepro_units';
-const BAR_TO_PSI = 14.5038;
 
 // --- Types ---
 type ReboundMode = 'clicks' | 'hsls' | 'none';
@@ -157,7 +155,6 @@ export default function DialedInScreen() {
     const [editingSetup, setEditingSetup] = useState<Setup | null>(null);
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
     const [rides, setRides] = useState<any[]>([]);
-    const [pressureUnit, setPressureUnit] = useState<'bar' | 'psi'>('bar');
     const [riderWeightKg, setRiderWeightKg] = useState<number | null>(null);
 
     const [wizardVisible, setWizardVisible] = useState(false);
@@ -272,12 +269,12 @@ export default function DialedInScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides(), loadProfileWeight()]).finally(() => setLoading(false));
+            Promise.all([loadSetups(), loadBikes(), loadRides(), loadProfileWeight()]).finally(() => setLoading(false));
         }, [])
     );
 
     const refreshOnForeground = useCallback(() => {
-        Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides(), loadProfileWeight()]).catch(() => {});
+        Promise.all([loadSetups(), loadBikes(), loadRides(), loadProfileWeight()]).catch(() => {});
     }, []);
 
     // Pull newer cloud data when the app/tab becomes visible again
@@ -395,12 +392,6 @@ export default function DialedInScreen() {
         setTrackerBikes(bikes);
     };
 
-    const loadUnits = async () => {
-        const isGerman = i18n.language?.startsWith('de');
-        const pref = await syncLoadPreference<{ pressure: 'bar' | 'psi'; weight: 'kg' | 'lb' }>('units', UNITS_KEY);
-        setPressureUnit(pref?.pressure ?? (isGerman ? 'bar' : 'psi'));
-    };
-
     const loadProfileWeight = async () => {
         try {
             const profile = await syncLoadProfile();
@@ -436,12 +427,9 @@ export default function DialedInScreen() {
     const getBikeDisplayName = (setup: Setup): string =>
         (setup.bikeId && trackerBikes.find(b => b.id === setup.bikeId)?.name) || setup.bikeName || '';
 
-    // Tire pressure is stored in bar; convert only at display/input boundaries
-    const toDisplayPressure = (bar: number) => pressureUnit === 'psi' ? Math.round(bar * BAR_TO_PSI) : bar;
-    const fromDisplayPressure = (v: number) => pressureUnit === 'psi' ? Math.round((v / BAR_TO_PSI) * 100) / 100 : v;
+    // Tire pressure is stored and displayed in bar (app standard)
     const formatTirePressure = (bar?: number) => {
         if (bar == null) return '?';
-        if (pressureUnit === 'psi') return `${Math.round(bar * BAR_TO_PSI)} psi`;
         return `${bar.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} bar`;
     };
 
@@ -1002,7 +990,7 @@ export default function DialedInScreen() {
                         <Text style={styles.subSectionTitle}>{t('dialed.front_tire')}</Text>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label={t('dialed.pressure_front')} value={toDisplayPressure(tires.frontBar)} min={pressureUnit === 'psi' ? 12 : 0.8} max={pressureUnit === 'psi' ? 44 : 3.0} step={pressureUnit === 'psi' ? 1 : 0.05} unit={pressureUnit === 'psi' ? ' psi' : ' bar'} accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, frontBar: fromDisplayPressure(v) }))} />
+                                <BPSlider label={t('dialed.pressure_front')} value={tires.frontBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, frontBar: v }))} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <BPPicker label={t('dialed.width')} options={tireWidthOptions} value={tires.frontWidth} onValueChange={v => setTires(p => ({ ...p, frontWidth: v }))} accentColor={ACCENT} />
@@ -1013,7 +1001,7 @@ export default function DialedInScreen() {
                         <Text style={styles.subSectionTitle}>{t('dialed.rear_tire')}</Text>
                         <View style={styles.inputRow}>
                             <View style={{ flex: 1 }}>
-                                <BPSlider label={t('dialed.pressure_rear')} value={toDisplayPressure(tires.rearBar)} min={pressureUnit === 'psi' ? 12 : 0.8} max={pressureUnit === 'psi' ? 44 : 3.0} step={pressureUnit === 'psi' ? 1 : 0.05} unit={pressureUnit === 'psi' ? ' psi' : ' bar'} accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, rearBar: fromDisplayPressure(v) }))} />
+                                <BPSlider label={t('dialed.pressure_rear')} value={tires.rearBar} min={0.8} max={3.0} step={0.05} unit=" bar" accentColor={ACCENT} onValueChange={v => setTires(p => ({ ...p, rearBar: v }))} />
                             </View>
                             <View style={{ flex: 1 }}>
                                 <BPPicker label={t('dialed.width')} options={tireWidthOptions} value={tires.rearWidth} onValueChange={v => setTires(p => ({ ...p, rearWidth: v }))} accentColor={ACCENT} />
@@ -1110,6 +1098,9 @@ export default function DialedInScreen() {
                         <BPButton title={t('dialed.wizard_create')} onPress={() => {
                             setWizardVisible(false);
                             openNewSetup();
+                            // Keep the recommendation visible in the new setup
+                            if (selectedCategory) setName(selectedCategory.title);
+                            setNotes(wizardSolution);
                         }} color={ACCENT} fullWidth />
                         <BPButton title={t('common.back')} onPress={() => setWizardStep('issue')} variant="secondary" color={theme.colors.textMuted} fullWidth style={{ marginTop: 8 }} />
                     </>

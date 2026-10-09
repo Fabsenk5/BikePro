@@ -46,7 +46,7 @@ export function exportRidesCsv(rides: any[]): string {
     return buildCsv([RIDES_HEADER, ...rows]);
 }
 
-const COMPONENTS_HEADER = ['bike', 'bike_id', 'type', 'brand', 'model', 'weight_g', 'price', 'purchase_date', 'notes', 'setup_values', 'wear_items'];
+const COMPONENTS_HEADER = ['bike', 'bike_id', 'type', 'brand', 'model', 'weight_g', 'price', 'purchase_date', 'notes', 'setup_values', 'wear_items', 'click_limits', 'spec_table', 'spec_source'];
 
 export function exportComponentsCsv(bikes: SyncBike[]): string {
     const rows = bikes.flatMap(b =>
@@ -55,6 +55,9 @@ export function exportComponentsCsv(bikes: SyncBike[]): string {
             c.price ?? '', c.purchaseDate ?? '', c.notes ?? '',
             (c.setupValues ?? []).map(s => `${s.key}: ${s.value}${s.unit ?? ''}`).join(' | '),
             (c.wearItems ?? []).map(w => `${w.label} ${w.currentKm}/${w.serviceIntervalKm}km`).join(' | '),
+            c.clickLimits ? JSON.stringify(c.clickLimits) : '',
+            c.specTable ? JSON.stringify(c.specTable) : '',
+            c.specSource ?? '',
         ])
     );
     return buildCsv([COMPONENTS_HEADER, ...rows]);

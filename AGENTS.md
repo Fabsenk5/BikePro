@@ -37,7 +37,7 @@ MTB setup & riding companion. Expo (React Native) + expo-router + TypeScript, we
 ## DB Schema (Supabase/Postgres, RLS on all tables, `auth.uid() = user_id` policies)
 
 - `bikes` (id TEXT PK, name, type, model, year, size, weight)
-- `components` (→ bikes CASCADE; setup_values/wear_items JSONB; wear tracking: current_km, service_interval_km, max_clicks, rebound/compression_mode)
+- `components` (→ bikes CASCADE; setup_values/wear_items JSONB; wear tracking: current_km, service_interval_km, max_clicks, rebound/compression_mode; click_limits JSONB = Kanal-Maxima, spec_table/spec_source = Hersteller-Tabellen)
 - `suspension_setups` (Dialed-In; fork/shock/tires JSONB)
 - `rides` (Ride-Log; data JSONB overflow)
 - `user_preferences` (key/value JSONB, UNIQUE(user_id,key); favorites, tile order, shred-check, rider profile)

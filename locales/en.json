@@ -111,7 +111,8 @@
         "units": {
             "title": "Units",
             "pressure": "Pressure unit",
-            "weight": "Weight unit"
+            "weight": "Weight unit",
+            "standard_hint": "Tire pressure always in bar, suspension (fork/shock) always in PSI."
         },
         "save_error_title": "Error",
         "save_error_msg": "Profile could not be saved to the cloud. Data is stored locally.",
