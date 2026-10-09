@@ -12,8 +12,8 @@ import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { showAlert } from '@/lib/dialog';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
-import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ScrollView,
@@ -146,6 +146,18 @@ export default function PressureBotScreen() {
             setShockStroke(String(d.stroke));
         }
     };
+
+    // Deep link from the sag widget: preselect the bike once the list is loaded
+    const routeParams = useLocalSearchParams<{ bikeId?: string }>();
+    const handledBikeParam = useRef(false);
+    useEffect(() => {
+        const paramBikeId = typeof routeParams.bikeId === 'string' ? routeParams.bikeId : '';
+        if (handledBikeParam.current || !paramBikeId || trackerBikes.length === 0) return;
+        if (trackerBikes.some(b => b.id === paramBikeId)) {
+            handledBikeParam.current = true;
+            handleBikeChange(paramBikeId);
+        }
+    }, [routeParams.bikeId, trackerBikes]);
 
 
     const terrainOptions = [

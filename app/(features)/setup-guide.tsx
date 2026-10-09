@@ -7,6 +7,7 @@
  * Daten: Statische JSON-Struktur, lokal gebündelt
  */
 import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPSearchInput, screenContentStyle } from '@/components/ui';
+import SagCalculator from '@/components/SagCalculator';
 import { featureColors, theme } from '@/constants/Colors';
 import { syncLoadPreference, syncLoadWikiOverrides, syncSavePreference, syncSaveWikiOverride } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -36,6 +37,8 @@ interface WikiArticle {
     content: string; // multi-line detail
     values?: string; // recommended values
     tip?: string;
+    /** Optional interactive widget rendered inside the expanded article */
+    widget?: 'sag';
 }
 
 interface WikiCategory {
@@ -170,6 +173,7 @@ export default function SetupGuideScreen() {
             tags: ['gabel', 'dämpfer', 'setup', 'federweg', 'sag'],
             summary: t('setup_guide.art_sag_summary'), content: t('setup_guide.art_sag_content'),
             values: t('setup_guide.art_sag_values'), tip: t('setup_guide.art_sag_tip'),
+            widget: 'sag',
         },
         {
             id: 'rebound', title: t('setup_guide.art_rebound_title'), category: 'fahrwerk',
@@ -440,6 +444,7 @@ export default function SetupGuideScreen() {
             tags: ['reihenfolge', 'vorgehensweise', 'baseline', 'setup'],
             summary: t('setup_guide.art_base_procedure_summary'), content: t('setup_guide.art_base_procedure_content'),
             values: t('setup_guide.art_base_procedure_values'), tip: t('setup_guide.art_base_procedure_tip'),
+            widget: 'sag',
         },
         {
             id: 'base_sag', title: t('setup_guide.art_base_sag_title'), category: 'baseline',
@@ -731,6 +736,8 @@ export default function SetupGuideScreen() {
                                                 </Text>
                                             </View>
                                         )}
+
+                                        {article.widget === 'sag' && <SagCalculator />}
 
                                         <View style={styles.tagRow}>
                                             {article.tags.map((tag) => (

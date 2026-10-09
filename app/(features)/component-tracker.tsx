@@ -13,8 +13,8 @@ import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteC
 import { ClickChannel, channelsForModes, sanitizeClickLimits } from '@/lib/clickLimits';
 import { sanitizeSpecTable } from '@/lib/specTable';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
-import { Stack, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ActivityIndicator,
@@ -315,6 +315,16 @@ export default function ComponentTrackerScreen() {
         setBikeSize('L');
         setBikeModalVisible(true);
     };
+
+    // Deep link from the sag widget: open the new-bike dialog directly
+    const params = useLocalSearchParams<{ newBike?: string }>();
+    const handledNewBike = useRef(false);
+    useEffect(() => {
+        if (!handledNewBike.current && params.newBike === '1') {
+            handledNewBike.current = true;
+            openNewBike();
+        }
+    }, [params.newBike]);
 
     const openEditBike = (bike: Bike) => {
         setEditingBike(bike);
