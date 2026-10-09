@@ -81,8 +81,10 @@ export default function SagCalculator() {
 
     const specTarget = bike?.components.find(c => c.type === 'fork') ?? bike?.components.find(c => c.type === 'shock');
 
+    const fmtPct = (v: number) => v.toLocaleString(i18n.language, { maximumFractionDigits: 1 });
+
     const fmtPctRange = (range: SagRange) =>
-        range.min === range.max ? `${range.min}` : `${range.min}–${range.max}`;
+        range.min === range.max ? fmtPct(range.min) : `${fmtPct(range.min)}–${fmtPct(range.max)}`;
 
     const fmtMm = (v: number) =>
         v.toLocaleString(i18n.language, { minimumFractionDigits: 1, maximumFractionDigits: 1 });

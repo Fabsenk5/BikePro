@@ -24,11 +24,11 @@ export interface SagRange {
     max: number;
 }
 
-/** Target sag in % per character (firm/balanced/comfortable). */
+/** Target sag in % per character — canonical BikePro table (hart/mitte/weich). */
 export const SAG_TARGETS: Record<SagCharacter, { fork: SagRange; shock: SagRange }> = {
-    firm: { fork: { min: 15, max: 18 }, shock: { min: 23, max: 25 } },
-    balanced: { fork: { min: 20, max: 20 }, shock: { min: 27, max: 27 } },
-    comfortable: { fork: { min: 22, max: 25 }, shock: { min: 30, max: 33 } },
+    firm: { fork: { min: 15, max: 15 }, shock: { min: 25, max: 25 } },
+    balanced: { fork: { min: 17.5, max: 17.5 }, shock: { min: 27.5, max: 27.5 } },
+    comfortable: { fork: { min: 20, max: 20 }, shock: { min: 30, max: 30 } },
 };
 
 /** Convert a sag-% range into millimetres for the given travel/stroke. */
