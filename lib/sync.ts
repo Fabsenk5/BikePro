@@ -29,6 +29,7 @@
  * not overwrite local data — otherwise deleted rows would be pulled back in.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ClickLimits, sanitizeClickLimits } from './clickLimits';
 import { getSupabase, isSupabaseConfigured } from './supabase';
 
 // ─── Generic Helpers ───
@@ -239,6 +240,7 @@ export interface SyncComponent {
     installedDate?: string;
     wearItems?: WearItem[];
     maxClicks?: string;
+    clickLimits?: ClickLimits;
     reboundMode?: string;
     compressionMode?: string;
 }
@@ -307,6 +309,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         installedDate: c.installed_date ?? new Date().toISOString().split('T')[0],
                         wearItems: c.wear_items ?? [],
                         maxClicks: c.max_clicks ?? undefined,
+                        clickLimits: sanitizeClickLimits(c.click_limits),
                         reboundMode: c.rebound_mode ?? undefined,
                         compressionMode: c.compression_mode ?? undefined,
                         price: c.price,
@@ -407,6 +410,7 @@ function componentToRow(bikeId: string, c: SyncComponent, userId: string): any {
         installed_date: first?.installedDate ?? c.installedDate,
         wear_items: c.wearItems ?? [],
         max_clicks: c.maxClicks,
+        click_limits: c.clickLimits ?? null,
         rebound_mode: c.reboundMode,
         compression_mode: c.compressionMode,
         price: c.price,
