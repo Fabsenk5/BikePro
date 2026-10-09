@@ -401,7 +401,11 @@ export default function ComponentTrackerScreen() {
 
         // Merge saved values with defaults so new fields show up
         const defaults = defaultSetupKeys[comp.type] ?? [];
-        const saved = comp.setupValues ?? [];
+        // Self-heal: older loads persisted handlebar width under the tire key
+        // 'width' — treat it as the bar-width field 'Breite' again.
+        const saved = (comp.setupValues ?? []).map(s =>
+            comp.type === 'handlebar' && s.key === 'width' ? { ...s, key: 'Breite' } : s
+        );
         const merged = defaults.map(d => {
             const existing = saved.find(s => s.key === d.key);
             return existing ? { ...existing } : { ...d };

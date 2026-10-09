@@ -284,13 +284,15 @@ export const SETUP_KEY_MIGRATION: Record<string, string> = {
     'Federhärte': 'spring_rate',
 };
 
-function migrateSetupValues(values: SetupValue[]): SetupValue[] {
+function migrateSetupValues(values: SetupValue[], componentType?: string): SetupValue[] {
     if (!Array.isArray(values)) return [];
-    return values.map(v =>
-        v && typeof v.key === 'string' && SETUP_KEY_MIGRATION[v.key]
-            ? { ...v, key: SETUP_KEY_MIGRATION[v.key] }
-            : v
-    );
+    return values.map(v => {
+        if (!v || typeof v.key !== 'string') return v;
+        // On handlebars 'Breite' is the bar width in mm — mapping it to the
+        // semantic tire key 'width' would render the tire-width picker instead.
+        if (componentType === 'handlebar' && v.key === 'Breite') return v;
+        return SETUP_KEY_MIGRATION[v.key] ? { ...v, key: SETUP_KEY_MIGRATION[v.key] } : v;
+    });
 }
 
 export async function syncLoadBikes(): Promise<SyncBike[]> {
@@ -319,7 +321,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                     .map(c => ({
                         id: c.id, type: c.type, brand: c.brand, model: c.model,
                         weight: c.weight, purchaseDate: c.purchase_date,
-                        setupValues: migrateSetupValues(c.setup_values ?? []), notes: c.notes,
+                        setupValues: migrateSetupValues(c.setup_values ?? [], c.type), notes: c.notes,
                         isWearTracked: c.is_wear_tracked ?? false,
                         currentKm: c.current_km ?? 0,
                         serviceIntervalKm: c.service_interval_km ?? 500,
@@ -350,7 +352,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
             ...b,
             components: (b.components ?? []).map(c => ({
                 ...c,
-                setupValues: migrateSetupValues(c.setupValues),
+                setupValues: migrateSetupValues(c.setupValues, c.type),
             })),
         }));
     } catch { return []; }
