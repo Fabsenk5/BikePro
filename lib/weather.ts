@@ -50,6 +50,27 @@ async function readCache(): Promise<CacheEntry> {
     }
 }
 
+/** Pure network fetch — callers are responsible for caching. */
+async function fetchParkWeatherNetwork(lat: number, lon: number): Promise<ParkWeather | null> {
+    if (!hasWeatherKey) return null;
+    try {
+        const url = `${API_URL}?lat=${lat}&lon=${lon}&appid=${process.env.EXPO_PUBLIC_OPENWEATHER_KEY}&units=metric`;
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return {
+            temp: Math.round(data.main?.temp ?? 0),
+            code: data.weather?.[0]?.id ?? 800,
+            wind: data.wind?.speed ? Math.round(data.wind.speed * 3.6) : 0,
+            rain: Math.round((data.rain?.['1h'] ?? 0) * 10) / 10,
+            fetchedAt: Date.now(),
+        };
+    } catch (e) {
+        console.warn('[weather] Fetch failed:', e);
+        return null;
+    }
+}
+
 /**
  * Current weather for a park. Returns cached data when fresh, fetches
  * otherwise. Returns null when no API key is configured or the request fails.
@@ -63,25 +84,14 @@ export async function fetchParkWeather(parkId: string, lat: number, lon: number,
         return cached;
     }
 
-    try {
-        const url = `${API_URL}?lat=${lat}&lon=${lon}&appid=${process.env.EXPO_PUBLIC_OPENWEATHER_KEY}&units=metric`;
-        const res = await fetch(url);
-        if (!res.ok) return cached ?? null;
-        const data = await res.json();
-        const weather: ParkWeather = {
-            temp: Math.round(data.main?.temp ?? 0),
-            code: data.weather?.[0]?.id ?? 800,
-            wind: data.wind?.speed ? Math.round(data.wind.speed * 3.6) : 0,
-            rain: Math.round((data.rain?.['1h'] ?? 0) * 10) / 10,
-            fetchedAt: Date.now(),
-        };
-        cache[parkId] = weather;
-        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-        return weather;
-    } catch (e) {
-        console.warn(`[weather] Fetch failed for ${parkId}:`, e);
-        return cached ?? null;
-    }
+    const weather = await fetchParkWeatherNetwork(lat, lon);
+    if (!weather) return cached ?? null;
+
+    // Re-read before writing: concurrent fetches must not drop each other's entries
+    const latest = await readCache();
+    latest[parkId] = weather;
+    await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(latest));
+    return weather;
 }
 
 /** Loads weather for all parks with minimal concurrency, returns a map. */
@@ -89,8 +99,10 @@ export async function fetchWeatherForParks(
     parks: { id: string; lat: number; lon: number }[],
     force = false,
 ): Promise<Record<string, ParkWeather>> {
-    const result: Record<string, ParkWeather> = {};
+    if (!hasWeatherKey) return {};
+
     const cache = await readCache();
+    const result: Record<string, ParkWeather> = {};
     const todo: { id: string; lat: number; lon: number }[] = [];
 
     for (const p of parks) {
@@ -102,13 +114,23 @@ export async function fetchWeatherForParks(
         }
     }
 
+    const fresh: CacheEntry = {};
     const BATCH = 5;
     for (let i = 0; i < todo.length; i += BATCH) {
         const batch = todo.slice(i, i + BATCH);
         await Promise.all(batch.map(async p => {
-            const w = await fetchParkWeather(p.id, p.lat, p.lon, force);
-            if (w) result[p.id] = w;
+            const w = await fetchParkWeatherNetwork(p.lat, p.lon);
+            if (w) {
+                result[p.id] = w;
+                fresh[p.id] = w;
+            }
         }));
+    }
+
+    // Single cache write after all batches — parallel writes would race
+    if (Object.keys(fresh).length > 0) {
+        const latest = await readCache();
+        await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ ...latest, ...fresh }));
     }
     return result;
 }

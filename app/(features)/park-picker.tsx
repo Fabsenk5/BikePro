@@ -9,6 +9,7 @@ import { BPCard, BPChip, BPPicker, screenContentStyle } from '@/components/ui';
 import { bikeparks, Bikepark } from '@/constants/bikeparks';
 import { featureColors, theme } from '@/constants/Colors';
 import { syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
+import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { fetchWeatherForParks, hasWeatherKey, ParkWeather, weatherInfo } from '@/lib/weather';
 import { Stack } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -61,7 +62,7 @@ export default function ParkPickerScreen() {
     const [rides, setRides] = useState<any[]>([]);
     const [weatherByPark, setWeatherByPark] = useState<Record<string, ParkWeather>>({});
 
-    useEffect(() => {
+    const refreshOnForeground = useCallback(() => {
         syncLoadPreference<string[]>('park_favorites', FAVORITES_KEY).then(data => {
             if (data) setFavorites(data);
         });
@@ -70,6 +71,11 @@ export default function ParkPickerScreen() {
             fetchWeatherForParks(bikeparks, false).then(setWeatherByPark);
         }
     }, []);
+
+    useEffect(refreshOnForeground, [refreshOnForeground]);
+
+    // Pull newer cloud data when the app/tab becomes visible again
+    useRefreshOnForeground(refreshOnForeground);
 
     // parkId → ride count (ride-log integration: "dort gewesen")
     const rideCountByPark = useMemo(() => {

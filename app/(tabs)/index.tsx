@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { loadFromStorage } from '@/lib/supabase';
 import { SyncBike, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSavePreference } from '@/lib/sync';
 import { computeBikePaceKmPerDay, dueWeeks, formatForecast } from '@/lib/wearForecast';
+import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import React, { useCallback, useState } from 'react';
@@ -33,6 +34,7 @@ interface HomeData {
   primaryBikeId: string | null;
   parkFavorites: string[] | null;
   offline: boolean;
+  userId: string | null;
   ts: number;
 }
 
@@ -47,9 +49,10 @@ async function loadLocalPref<T>(key: string): Promise<T | null> {
   } catch { return null; }
 }
 
-async function loadHomeData(isAuthed: boolean): Promise<HomeData> {
-  // Reuse cache when fresh (TTL) or when offline (no cloud reload per focus)
-  if (homeCache && homeCache.offline === !isAuthed) {
+async function loadHomeData(isAuthed: boolean, userId: string | null): Promise<HomeData> {
+  // Reuse cache when fresh (TTL) or when offline (no cloud reload per focus);
+  // never reuse across different users.
+  if (homeCache && homeCache.offline === !isAuthed && homeCache.userId === userId) {
     if (Date.now() - homeCache.ts < CACHE_TTL_MS || homeCache.offline) return homeCache;
   }
 
@@ -73,7 +76,7 @@ async function loadHomeData(isAuthed: boolean): Promise<HomeData> {
         loadLocalPref<string[]>('@bikepro_park_favorites'),
       ]);
 
-  homeCache = { tileOrder, rides, bikes, setups, primaryBikeId, parkFavorites, offline: !isAuthed, ts: Date.now() };
+  homeCache = { tileOrder, rides, bikes, setups, primaryBikeId, parkFavorites, offline: !isAuthed, userId, ts: Date.now() };
   return homeCache;
 }
 
@@ -191,13 +194,20 @@ export default function HomeScreen() {
       : null);
   }, [t, i18n]);
 
+  const refreshHome = useCallback(() => {
+    loadHomeData(!!user, user?.id ?? null).then(d => applyData(d)).catch(() => {});
+  }, [user, applyData]);
+
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      loadHomeData(!!user).then(d => { if (active) applyData(d); });
+      loadHomeData(!!user, user?.id ?? null).then(d => { if (active) applyData(d); });
       return () => { active = false; };
     }, [user, applyData])
   );
+
+  // Pull newer cloud data when the app/tab becomes visible again
+  useRefreshOnForeground(refreshHome);
 
   const saveOrder = useCallback(async (features: Feature[]) => {
     const order = features.map((f) => f.id);

@@ -9,9 +9,10 @@
 import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPSearchInput, screenContentStyle } from '@/components/ui';
 import { featureColors, theme } from '@/constants/Colors';
 import { syncLoadPreference, syncLoadWikiOverrides, syncSavePreference, syncSaveWikiOverride } from '@/lib/sync';
+import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { showAlert } from '@/lib/dialog';
 import { Stack } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ScrollView,
@@ -62,13 +63,18 @@ export default function SetupGuideScreen() {
     const [categoryOrder, setCategoryOrder] = useState<string[]>([]);
     const [articleOrder, setArticleOrder] = useState<string[]>([]);
 
-    useEffect(() => {
+    const refreshOnForeground = useCallback(() => {
         syncLoadPreference<string[]>('setup_favorites', '@bikepro_favorites').then(res => setFavorites(res ?? []));
         syncLoadPreference<Record<string, boolean>>('setup_checklists', '@bikepro_checklists').then(res => setChecklistState(res ?? {}));
         syncLoadPreference<string[]>('wiki_category_order', '@bikepro_category_order').then(res => setCategoryOrder(res ?? []));
         syncLoadPreference<string[]>('wiki_article_order', '@bikepro_article_order').then(res => setArticleOrder(res ?? []));
         fetchOverrides();
     }, [i18n.language]);
+
+    useEffect(refreshOnForeground, [refreshOnForeground]);
+
+    // Pull newer cloud data when the app/tab becomes visible again
+    useRefreshOnForeground(refreshOnForeground);
 
     const fetchOverrides = async () => {
         const overrideMap = await syncLoadWikiOverrides(i18n.language);

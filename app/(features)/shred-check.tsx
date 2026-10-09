@@ -12,6 +12,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
 import { wearLabelLocalized } from '@/lib/componentLabels';
 import { SyncBike, SyncComponent, syncLoadBikes, syncLoadTable, syncUpdateComponent, syncUpdateComponents, WearItem } from '@/lib/sync';
+import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { computeBikePaceKmPerDay, dueWeeks, formatForecast } from '@/lib/wearForecast';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -72,12 +73,20 @@ export default function ShredCheckScreen() {
         setRides(data ?? []);
     };
 
+    const refreshOnForeground = useCallback(() => {
+        loadBikes();
+        loadRides();
+    }, []);
+
     useFocusEffect(
         useCallback(() => {
             loadBikes();
             loadRides();
         }, [])
     );
+
+    // Pull newer cloud data when the app/tab becomes visible again
+    useRefreshOnForeground(refreshOnForeground);
 
     const updateComponentInBikes = async (compId: string, updateFn: (comp: SyncComponent) => SyncComponent) => {
         const bike = bikes.find(b => b.components.some(c => c.id === compId));
@@ -206,14 +215,15 @@ export default function ShredCheckScreen() {
 
     // Sort by worst wear item percentage
     const sorted = [...allTrackedComps].sort((a, b) => {
-        const maxPctA = Math.max(...(a.wearItems?.map(w => w.currentKm / w.serviceIntervalKm) || [0]), 0);
-        const maxPctB = Math.max(...(b.wearItems?.map(w => w.currentKm / w.serviceIntervalKm) || [0]), 0);
+        const pct = (w: WearItem) => w.serviceIntervalKm > 0 ? w.currentKm / w.serviceIntervalKm : 0;
+        const maxPctA = Math.max(...(a.wearItems?.map(pct) || [0]), 0);
+        const maxPctB = Math.max(...(b.wearItems?.map(pct) || [0]), 0);
         return maxPctB - maxPctA;
     });
 
     // Count how many individual items need service across all components
     const needsService = sorted.reduce((count, comp) => {
-        return count + (comp.wearItems || []).filter(w => (w.currentKm / w.serviceIntervalKm) >= 0.8).length;
+        return count + (comp.wearItems || []).filter(w => w.serviceIntervalKm > 0 && (w.currentKm / w.serviceIntervalKm) >= 0.8).length;
     }, 0);
 
     return (

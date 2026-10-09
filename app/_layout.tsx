@@ -3,6 +3,8 @@ import { useFonts } from 'expo-font';
 import { Stack, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import { theme } from '@/constants/Colors';
@@ -61,6 +63,15 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
+  const { i18n } = useTranslation();
+
+  // Keep the document language in sync with the active UI language (web only).
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.documentElement.lang = i18n.language;
+    }
+  }, [i18n.language]);
+
   return (
     <AuthProvider>
       <ThemeProvider value={BikeProTheme}>

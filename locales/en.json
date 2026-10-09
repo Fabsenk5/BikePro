@@ -1,4 +1,9 @@
 {
+    "tabs": {
+        "home": "Home",
+        "profile": "Profile",
+        "admin": "Admin"
+    },
     "features": {
         "dialed-in": {
             "title": "Dialed In",
@@ -311,6 +316,7 @@
     },
     "dialed": {
         "title": "⚙️ Dialed In",
+        "pressure_bot_name": "Pressure Bot Recommendation",
         "add_setup": "+ New Setup",
         "no_setups": "No setups yet",
         "create_first_setup": "Create your first suspension setup!",

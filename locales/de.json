@@ -1,4 +1,9 @@
 {
+    "tabs": {
+        "home": "Home",
+        "profile": "Profil",
+        "admin": "Admin"
+    },
     "features": {
         "dialed-in": {
             "title": "Dialed In",
@@ -743,6 +748,7 @@
     },
     "dialed": {
         "title": "⚙️ Dialed In",
+        "pressure_bot_name": "Pressure Bot Empfehlung",
         "add_setup": "+ Neues Setup",
         "no_setups": "Noch keine Setups",
         "create_first_setup": "Erstelle dein erstes Fahrwerks-Setup!",

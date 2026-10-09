@@ -69,9 +69,9 @@ async function migrate() {
         console.log('Tables:', res.rows.map(r => r.table_name).join(', '));
     } catch (err) {
         console.error('Error:', err.message);
+        process.exitCode = 1;
     } finally {
         await client.end();
-        process.exit(0);
     }
 }
 

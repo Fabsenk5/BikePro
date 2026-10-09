@@ -10,6 +10,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
 import { setupLabelLocalized, wearLabelLocalized } from '@/lib/componentLabels';
 import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
+import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -259,6 +260,9 @@ export default function ComponentTrackerScreen() {
             loadData().finally(() => setLoading(false));
         }, [])
     );
+
+    // Pull newer cloud data when the app/tab becomes visible again
+    useRefreshOnForeground(loadData);
 
     // Structural changes (bike add/rename/delete, component move/delete) rewrite the
     // whole bikes table. The mutation is applied to a FRESH copy so km updates made

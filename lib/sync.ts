@@ -921,11 +921,15 @@ async function runMigration(): Promise<void> {
     console.log('[sync] Migrating local data to cloud...');
 
     try {
+        // All saves return false when the cloud write failed (dirty flags keep the
+        // affected entities safe) — only mark the migration done when everything synced.
+        let cloudOk = true;
+
         // Migrate bikes
         const bikesData = await AsyncStorage.getItem(BIKES_KEY);
         if (bikesData) {
             const bikes: SyncBike[] = JSON.parse(bikesData);
-            if (bikes.length > 0) await syncSaveBikes(bikes);
+            if (bikes.length > 0) cloudOk = (await syncSaveBikes(bikes)) && cloudOk;
         }
 
         // Migrate setups
@@ -933,7 +937,7 @@ async function runMigration(): Promise<void> {
         if (setupsData) {
             const setups = JSON.parse(setupsData);
             if (setups.length > 0) {
-                await syncSaveTable('suspension_setups', '@bikepro_setups', setups);
+                cloudOk = (await syncSaveTable('suspension_setups', '@bikepro_setups', setups)) && cloudOk;
             }
         }
 
@@ -942,19 +946,24 @@ async function runMigration(): Promise<void> {
         if (ridesData) {
             const rides = JSON.parse(ridesData);
             if (rides.length > 0) {
-                await syncSaveTable('rides', '@bikepro_rides', rides);
+                cloudOk = (await syncSaveTable('rides', '@bikepro_rides', rides)) && cloudOk;
             }
         }
 
         // Migrate preferences
         const favData = await AsyncStorage.getItem('@bikepro_park_favorites');
         if (favData) {
-            await syncSavePreference('park_favorites', '@bikepro_park_favorites', JSON.parse(favData));
+            cloudOk = (await syncSavePreference('park_favorites', '@bikepro_park_favorites', JSON.parse(favData))) && cloudOk;
         }
 
         const tileData = await AsyncStorage.getItem('@bikepro_tile_order');
         if (tileData) {
-            await syncSavePreference('tile_order', '@bikepro_tile_order', JSON.parse(tileData));
+            cloudOk = (await syncSavePreference('tile_order', '@bikepro_tile_order', JSON.parse(tileData))) && cloudOk;
+        }
+
+        if (!cloudOk) {
+            console.warn('[sync] Migration incomplete, will retry next login');
+            return;
         }
 
         await AsyncStorage.setItem(migrationKey, 'true');

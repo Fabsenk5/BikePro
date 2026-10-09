@@ -6,7 +6,10 @@ import { Share } from 'react-native';
 import { SyncBike } from './sync';
 
 export function csvEscape(value: unknown): string {
-    const s = value === null || value === undefined ? '' : String(value);
+    let s = value === null || value === undefined ? '' : String(value);
+    // Neutralize spreadsheet formula injection (OWASP): prefix values that
+    // Excel/Sheets would evaluate as formulas.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return `"${s.replace(/"/g, '""')}"`;
 }
 

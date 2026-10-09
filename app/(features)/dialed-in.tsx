@@ -12,6 +12,7 @@ import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPS
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPreference, syncLoadTable, syncSaveTable } from '@/lib/sync';
+import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -257,6 +258,13 @@ export default function DialedInScreen() {
         }, [])
     );
 
+    const refreshOnForeground = useCallback(() => {
+        Promise.all([loadSetups(), loadBikes(), loadUnits(), loadRides()]).catch(() => {});
+    }, []);
+
+    // Pull newer cloud data when the app/tab becomes visible again
+    useRefreshOnForeground(refreshOnForeground);
+
     useEffect(() => {
         if (params.ts && typeof params.ts === 'string' && params.ts !== lastHandledTs && trackerBikes.length > 0) {
             setLastHandledTs(params.ts);
@@ -301,7 +309,7 @@ export default function DialedInScreen() {
             // Apply Pressure Bot Overrides
             if (params.forkPsi) {
                 parsedFork.psi = parseInt(params.forkPsi as string, 10) || parsedFork.psi;
-                setName('Pressure Bot Empfehlung');
+                setName(t('dialed.pressure_bot_name'));
             }
             if (params.forkClicks) {
                 const c = parseInt(params.forkClicks as string, 10) || parsedFork.reboundClicks;

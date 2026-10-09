@@ -11,8 +11,9 @@ import { bikeparks } from '@/constants/bikeparks';
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
 import { SyncBike, SyncComponent, newId, syncDeleteFromTable, syncLoadBikes, syncLoadTable, syncSaveTable, syncUpdateComponents } from '@/lib/sync';
+import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ScrollView,
@@ -216,11 +217,16 @@ export default function RideLogScreen() {
     const maxChartKm = chartData.reduce((m, c) => Math.max(m, c.km), 0);
     const hasFilters = search.trim() !== '' || filterBikeId !== '' || filterTerrain !== '' || filterPeriod !== '';
 
-    useEffect(() => {
+    const reload = useCallback(() => {
         syncLoadTable<Ride>('rides', STORAGE_KEY).then(setRides);
         syncLoadBikes().then(setBikes);
         syncLoadTable('suspension_setups', '@bikepro_setups').then(setSetups);
     }, []);
+
+    useEffect(reload, [reload]);
+
+    // Pull newer cloud data when the app/tab becomes visible again
+    useRefreshOnForeground(reload);
 
     const persist = async (updated: Ride[]): Promise<boolean> => {
         const ok = await syncSaveTable('rides', STORAGE_KEY, updated);
