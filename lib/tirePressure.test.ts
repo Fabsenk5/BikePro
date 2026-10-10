@@ -34,6 +34,15 @@ describe('calculateTirePressure', () => {
         expect(r.notes).not.toContain('pressure_bot.note_support');
     });
 
+    it('keeps technical damp conditions supportive for heavy riders', () => {
+        // Reported screenshot: roots+rocks, damp, normal style — must not drop below ~1.4 bar
+        const r = calculateTirePressure({ ...dhBase, terrain: 'roots_rocks', weather: 'damp', ridingStyle: 'normal' });
+        expect(r.front).toBeGreaterThanOrEqual(1.4);
+        expect(r.front).toBeLessThanOrEqual(1.55);
+        expect(r.rear).toBeGreaterThanOrEqual(1.6);
+        expect(r.rear).toBeLessThanOrEqual(1.75);
+    });
+
     it('flow trails get support too (between technical and bikepark)', () => {
         const technical = calculateTirePressure({ ...dhBase, terrain: 'roots_rocks' });
         const flow = calculateTirePressure({ ...dhBase, terrain: 'flow' });

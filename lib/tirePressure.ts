@@ -5,10 +5,13 @@
  * The model starts from system weight and adjusts for tire width, wheel size,
  * mounting, tire type, casing, riding style, terrain and weather.
  *
- * Tuned against real-world guidance (e.g. 85 kg rider, 2.5" DH casing,
- * tubeless): bikepark/jump lines ~1.65/1.95 bar, technical natural terrain
- * ~1.45/1.65 bar. Casing/type bonuses for stability no longer double-dip into
- * unrealistically low pressures — support-oriented terrain adds pressure.
+ * Calibration anchors (85 kg rider, 2.5" DH casing, tubeless, mullet):
+ * - bikepark/jump lines, aggressive: ~1.70/2.00 bar
+ * - street/tricks, aggressive:        ~1.75/2.05 bar
+ * - technical roots+rocks, damp:      ~1.45/1.65 bar (never below ~1.4 bar
+ *   with a heavy system — burping/casing risk)
+ * Support-oriented terrain adds pressure; technical/weather deductions are
+ * capped in magnitude so they cannot stack into unsafe lows.
  */
 
 export interface TirePressureParams {
@@ -33,7 +36,7 @@ export interface TirePressureResult {
 
 const WIDTH_FACTOR: Record<string, number> = {
     '2.0': 0.15, '2.2': 0.08, '2.3': 0.04, '2.35': 0.02,
-    '2.4': 0, '2.5': -0.05, '2.6': -0.1, '2.8': -0.2,
+    '2.4': 0, '2.5': -0.03, '2.6': -0.08, '2.8': -0.15,
 };
 
 const SETUP_ADJ: Record<string, number> = {
@@ -58,21 +61,21 @@ const STYLE_ADJ: Record<string, number> = {
 // technical natural terrain a little less for mechanical grip.
 const TERRAIN_ADJ: Record<string, { f: number; r: number }> = {
     hardpack: { f: 0.05, r: 0.05 },
-    roots: { f: -0.05, r: -0.05 },
-    roots_rocks: { f: -0.08, r: -0.05 },
-    mud: { f: -0.1, r: -0.1 },
+    roots: { f: -0.02, r: -0.02 },
+    roots_rocks: { f: -0.04, r: -0.03 },
+    mud: { f: -0.08, r: -0.08 },
     alpine: { f: 0.05, r: 0.05 },
-    bikepark: { f: 0.15, r: 0.25 },
-    flow: { f: 0.1, r: 0.15 },
+    bikepark: { f: 0.1, r: 0.2 },
+    flow: { f: 0.05, r: 0.1 },
     // Street/trick sessions: hard surface, high side loads, missed landings —
     // the highest support for pop, stable landings and casing protection.
-    street: { f: 0.2, r: 0.3 },
-    rocky: { f: -0.08, r: -0.08 },
-    loose: { f: -0.05, r: -0.05 },
+    street: { f: 0.15, r: 0.25 },
+    rocky: { f: -0.05, r: -0.05 },
+    loose: { f: -0.03, r: -0.03 },
 };
 
 const WEATHER_ADJ: Record<string, number> = {
-    dry: 0, damp: -0.05, wet: -0.1, cold: 0.05, hot: -0.03,
+    dry: 0, damp: -0.03, wet: -0.07, cold: 0.05, hot: -0.03,
 };
 
 /** Rear carries more load than the front. */
@@ -84,7 +87,7 @@ export function calculateTirePressure(params: TirePressureParams): TirePressureR
     const totalWeight = params.riderWeight + params.bikeWeight;
     const notes: string[] = [];
 
-    let baseFront = 1.1 + (totalWeight - 60) * 0.0085;
+    let baseFront = 1.15 + (totalWeight - 60) * 0.009;
     let baseRear = baseFront + REAR_OFFSET;
 
     const wAdj = WIDTH_FACTOR[params.tireWidth] ?? 0;
