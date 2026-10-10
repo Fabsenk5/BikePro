@@ -1032,7 +1032,8 @@
         "travel_mm": "Travel (mm)",
         "stroke_mm": "Shock stroke (mm)",
         "click_note": "Important: All clicks are counted from fully closed (clockwise / +) toward open (counter-clockwise / -)!",
-        "spec_label": "Manufacturer"
+        "spec_label": "Manufacturer",
+        "note_support": "Jump lines/bike park: focus on support — add 0.1 bar if you bottom out, drop 0.1 bar if grip is lacking."
     },
     "pending": {
         "title": "Account pending",

@@ -12,6 +12,7 @@ import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { formatRange, midpoint, resolveSpecValues, SpecRow } from '@/lib/specTable';
 import { showAlert } from '@/lib/dialog';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
+import { calculateTirePressure } from '@/lib/tirePressure';
 import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -256,109 +257,13 @@ export default function PressureBotScreen() {
         { label: t('pressure_bot.style_race'), value: 'race' },
     ];
 
-    const calculatePressure = (params: {
-        riderWeight: number;
-        bikeWeight: number;
-        wheelSize: string;
-        tireWidth: string;
-        setup: string;
-        terrain: string;
-        weather: string;
-        tireType: string;
-        casing: string;
-        ridingStyle: string;
-    }): { front: number; rear: number; notes: string[] } => {
-        const totalWeight = params.riderWeight + params.bikeWeight;
-        const notes: string[] = [];
-
-        let baseFront = 1.1 + (totalWeight - 60) * 0.0085;
-        let baseRear = baseFront + 0.18;
-
-        const widthFactor: Record<string, number> = {
-            '2.0': 0.15, '2.2': 0.08, '2.3': 0.04, '2.35': 0.02,
-            '2.4': 0, '2.5': -0.05, '2.6': -0.1, '2.8': -0.2,
-        };
-        const wAdj = widthFactor[params.tireWidth] ?? 0;
-        baseFront += wAdj;
-        baseRear += wAdj;
-
-        if (params.wheelSize === '29') {
-            baseFront += 0.03; baseRear += 0.03;
-        } else if (params.wheelSize === '26') {
-            baseFront -= 0.03; baseRear -= 0.03;
-        } else if (params.wheelSize === 'mullet') {
-            baseFront += 0.03; baseRear -= 0.02;
-            notes.push(t('pressure_bot.note_mullet'));
-        }
-
-        const setupAdj: Record<string, number> = {
-            tubeless: 0, tube_butyl: 0.15, tube_latex: 0.1, insert: -0.1,
-        };
-        baseFront += setupAdj[params.setup] ?? 0;
-        baseRear += setupAdj[params.setup] ?? 0;
-        if (params.setup === 'insert') {
-            notes.push(t('pressure_bot.note_insert'));
-        }
-
-        const typeAdj: Record<string, number> = {
-            xc: 0.1, trail: 0.03, enduro: 0, dh: -0.05, mud: -0.08,
-        };
-        baseFront += typeAdj[params.tireType] ?? 0;
-        baseRear += typeAdj[params.tireType] ?? 0;
-
-        const casingAdj: Record<string, number> = {
-            light: 0.08, standard: 0, reinforced: -0.03, dh: -0.08, doubledown: -0.1,
-        };
-        baseFront += casingAdj[params.casing] ?? 0;
-        baseRear += casingAdj[params.casing] ?? 0;
-        if (params.casing === 'dh' || params.casing === 'doubledown') {
-            notes.push(t('pressure_bot.note_casing_dh'));
-        }
-
-        const styleAdj: Record<string, number> = {
-            chill: -0.08, normal: 0, aggressive: 0.05, race: 0.1,
-        };
-        baseFront += styleAdj[params.ridingStyle] ?? 0;
-        baseRear += styleAdj[params.ridingStyle] ?? 0;
-
-        const terrainAdj: Record<string, { f: number; r: number }> = {
-            hardpack: { f: 0.1, r: 0.1 }, roots: { f: -0.05, r: -0.03 },
-            roots_rocks: { f: -0.08, r: -0.05 }, mud: { f: -0.1, r: -0.08 },
-            alpine: { f: 0.05, r: 0.05 }, bikepark: { f: 0, r: 0.02 },
-            flow: { f: 0.05, r: 0.05 }, rocky: { f: -0.1, r: -0.08 },
-            loose: { f: -0.05, r: -0.03 },
-        };
-        const tAdj = terrainAdj[params.terrain] ?? { f: 0, r: 0 };
-        baseFront += tAdj.f;
-        baseRear += tAdj.r;
-
-        const weatherAdj: Record<string, number> = {
-            dry: 0, damp: -0.05, wet: -0.1, cold: 0.05, hot: -0.03,
-        };
-        baseFront += weatherAdj[params.weather] ?? 0;
-        baseRear += weatherAdj[params.weather] ?? 0;
-
-        if (params.weather === 'wet') {
-            notes.push(t('pressure_bot.note_wet'));
-        }
-        if (params.weather === 'cold') {
-            notes.push(t('pressure_bot.note_cold'));
-        }
-
-        const front = Math.max(0.8, Math.min(3.5, Math.round(baseFront * 20) / 20));
-        const rear = Math.max(0.8, Math.min(3.5, Math.round(baseRear * 20) / 20));
-
-        return { front, rear, notes };
-    };
-
-    const result = useMemo(
-        () =>
-            calculatePressure({
-                riderWeight, bikeWeight, wheelSize, tireWidth,
-                setup, terrain, weather, tireType, casing, ridingStyle,
-            }),
-        [riderWeight, bikeWeight, wheelSize, tireWidth, setup, terrain, weather, tireType, casing, ridingStyle]
-    );
+    const result = useMemo(() => {
+        const r = calculateTirePressure({
+            riderWeight, bikeWeight, wheelSize, tireWidth,
+            setup, terrain, weather, tireType, casing, ridingStyle,
+        });
+        return { front: r.front, rear: r.rear, notes: r.notes.map(key => t(key)) };
+    }, [riderWeight, bikeWeight, wheelSize, tireWidth, setup, terrain, weather, tireType, casing, ridingStyle, t]);
 
     const suspResult = useMemo(() => {
         const selectedBike = trackerBikes.find(b => b.id === selectedBikeId);

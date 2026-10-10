@@ -798,7 +798,8 @@
         "travel_mm": "Federweg (mm)",
         "stroke_mm": "Dämpferhub (mm)",
         "click_note": "Wichtig: Alle Klicks werden von komplett geschlossen (im Uhrzeigersinn / +) in Richtung offen (gegen den Uhrzeigersinn / -) gezählt!",
-        "spec_label": "Hersteller"
+        "spec_label": "Hersteller",
+        "note_support": "Jumplines/Bikepark: Fokus auf Support — bei Durchschlägen 0,1 bar mehr, bei fehlendem Grip 0,1 bar weniger."
     },
     "dialed": {
         "title": "⚙️ Dialed In",
