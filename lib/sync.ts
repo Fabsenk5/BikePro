@@ -708,6 +708,15 @@ export async function syncSavePreference<T>(key: string, storageKey: string, val
     }
 }
 
+// ─── PRIMARY BIKE ───
+
+export const PRIMARY_BIKE_KEY = '@bikepro_primary_bike';
+
+/** Primary bike preference (set on the home screen), or null when unset. */
+export async function syncLoadPrimaryBikeId(): Promise<string | null> {
+    return syncLoadPreference<string>('primary_bike', PRIMARY_BIKE_KEY);
+}
+
 // ─── WIKI OVERRIDES (Setup Guide admin content) ───
 
 export interface WikiOverride {

@@ -9,7 +9,7 @@ import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPModal, BPPicker, BPS
 import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog, showAlert } from '@/lib/dialog';
 import { setupLabelLocalized, wearLabelLocalized } from '@/lib/componentLabels';
-import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
+import { newId, SetupValue, SyncBike, SyncComponent, syncDeleteBike, syncDeleteComponent, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadTable, syncSaveBikes, syncSaveTable, syncUpdateComponent, WearItem } from '@/lib/sync';
 import { ClickChannel, channelsForModes, sanitizeClickLimits } from '@/lib/clickLimits';
 import { sanitizeSpecTable } from '@/lib/specTable';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -88,6 +88,8 @@ export default function ComponentTrackerScreen() {
     const [bikes, setBikes] = useState<Bike[]>([]);
     const [setups, setSetups] = useState<any[]>([]);
     const [selectedBikeId, setSelectedBikeId] = useState<string | null>(null);
+    // True once the user picked a bike here — keeps that choice over the primary default
+    const userPickedBikeRef = useRef(false);
     const [loading, setLoading] = useState(true);
     const [bikeModalVisible, setBikeModalVisible] = useState(false);
     const [compModalVisible, setCompModalVisible] = useState(false);
@@ -260,9 +262,14 @@ export default function ComponentTrackerScreen() {
     const loadData = async () => {
         const data = await syncLoadBikes();
         setBikes(data);
-        if (data.length > 0 && !selectedBikeId) {
-            setSelectedBikeId(data[0].id);
-        }
+        // Default to the primary bike from the home screen; keep an explicit
+        // in-screen selection (and follow the primary when it changed elsewhere).
+        const primaryId = await syncLoadPrimaryBikeId();
+        const preferred = (primaryId && data.some(b => b.id === primaryId)) ? primaryId : (data[0]?.id ?? null);
+        setSelectedBikeId(prev => {
+            if (userPickedBikeRef.current && prev && data.some(b => b.id === prev)) return prev;
+            return preferred;
+        });
         const setupsData = await syncLoadTable('suspension_setups', '@bikepro_setups');
         setSetups(setupsData ?? []);
     };
@@ -341,7 +348,10 @@ export default function ComponentTrackerScreen() {
                 ? fresh.map((b) => (b.id === editingBike.id ? { ...bikeData, components: b.components } : b))
                 : [...fresh, bikeData]
         );
-        if (!editingBike) setSelectedBikeId(bikeData.id);
+        if (!editingBike) {
+            userPickedBikeRef.current = true;
+            setSelectedBikeId(bikeData.id);
+        }
 
         // Propagate renames to linked suspension setups
         if (editingBike && editingBike.name !== bikeData.name && setups.some(s => s.bikeId === editingBike.id)) {
@@ -471,6 +481,7 @@ export default function ComponentTrackerScreen() {
             const comp = bike.components.find(c => c.id === compId);
             if (comp) {
                 handledEditComponent.current = true;
+                userPickedBikeRef.current = true;
                 setSelectedBikeId(bike.id);
                 openEditComp(comp);
                 break;
@@ -657,7 +668,7 @@ export default function ComponentTrackerScreen() {
                             value: b.id,
                         }))}
                         value={selectedBikeId ?? ''}
-                        onValueChange={setSelectedBikeId}
+                        onValueChange={(id) => { userPickedBikeRef.current = true; setSelectedBikeId(id); }}
                         accentColor={ACCENT}
                     />
                 )}

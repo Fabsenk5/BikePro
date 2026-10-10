@@ -13,7 +13,7 @@ import { featureColors, theme } from '@/constants/Colors';
 import { confirmDialog } from '@/lib/dialog';
 import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { formatSpecSummary, midpoint, resolveSpecValues, SpecRow } from '@/lib/specTable';
-import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadProfile, syncLoadTable, syncSaveTable } from '@/lib/sync';
+import { newId, syncDeleteFromTable, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile, syncLoadTable, syncSaveTable } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -156,6 +156,7 @@ export default function DialedInScreen() {
     const [trackerBikes, setTrackerBikes] = useState<TrackerBike[]>([]);
     const [rides, setRides] = useState<any[]>([]);
     const [riderWeightKg, setRiderWeightKg] = useState<number | null>(null);
+    const [primaryBikeId, setPrimaryBikeId] = useState<string | null>(null);
 
     const [wizardVisible, setWizardVisible] = useState(false);
     const [wizardStep, setWizardStep] = useState<'category' | 'issue' | 'solution'>('category');
@@ -273,12 +274,12 @@ export default function DialedInScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            Promise.all([loadSetups(), loadBikes(), loadRides(), loadProfileWeight()]).finally(() => setLoading(false));
+            Promise.all([loadSetups(), loadBikes(), loadRides(), loadProfileWeight(), loadPrimaryBike()]).finally(() => setLoading(false));
         }, [])
     );
 
     const refreshOnForeground = useCallback(() => {
-        Promise.all([loadSetups(), loadBikes(), loadRides(), loadProfileWeight()]).catch(() => {});
+        Promise.all([loadSetups(), loadBikes(), loadRides(), loadProfileWeight(), loadPrimaryBike()]).catch(() => {});
     }, []);
 
     // Pull newer cloud data when the app/tab becomes visible again
@@ -406,6 +407,10 @@ export default function DialedInScreen() {
         } catch { /* profile is optional */ }
     };
 
+    const loadPrimaryBike = async () => {
+        setPrimaryBikeId(await syncLoadPrimaryBikeId());
+    };
+
     const loadRides = async () => {
         const data = await syncLoadTable<any>('rides', '@bikepro_rides');
         setRides(data ?? []);
@@ -505,9 +510,11 @@ export default function DialedInScreen() {
         let resetShock = { ...defaultShock, config: { ...defaultConfig } };
 
         if (trackerBikes.length > 0) {
-            const defaultId = trackerBikes[0].id;
+            const defaultId = (primaryBikeId && trackerBikes.some(b => b.id === primaryBikeId))
+                ? primaryBikeId
+                : trackerBikes[0].id;
             setBikeId(defaultId);
-            const bike = trackerBikes[0];
+            const bike = trackerBikes.find(b => b.id === defaultId) ?? trackerBikes[0];
 
             const forkComp = bike.components.find((c: any) => c.type === 'fork');
             if (forkComp && forkComp.setupValues) {

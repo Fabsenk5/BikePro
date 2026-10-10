@@ -12,7 +12,7 @@ import { ClickChannel, resolveMaxClicks } from '@/lib/clickLimits';
 import { formatRange, midpoint, resolveSpecValues, SpecRow } from '@/lib/specTable';
 import { showAlert } from '@/lib/dialog';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
-import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
+import { SyncBike, newId, syncLoadBikes, syncLoadPreference, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -146,16 +146,25 @@ export default function PressureBotScreen() {
         }
     };
 
-    // Deep link from the sag widget: preselect the bike once the list is loaded
+    // Preselect the bike once the list is loaded: deep link wins, then the
+    // primary bike from the home screen, then the first bike.
     const routeParams = useLocalSearchParams<{ bikeId?: string }>();
     const handledBikeParam = useRef(false);
     useEffect(() => {
+        if (handledBikeParam.current || trackerBikes.length === 0) return;
         const paramBikeId = typeof routeParams.bikeId === 'string' ? routeParams.bikeId : '';
-        if (handledBikeParam.current || !paramBikeId || trackerBikes.length === 0) return;
-        if (trackerBikes.some(b => b.id === paramBikeId)) {
-            handledBikeParam.current = true;
-            handleBikeChange(paramBikeId);
-        }
+        const applyDefault = async () => {
+            let target = paramBikeId && trackerBikes.some(b => b.id === paramBikeId) ? paramBikeId : '';
+            if (!target) {
+                const primaryId = await syncLoadPrimaryBikeId();
+                target = trackerBikes.find(b => b.id === primaryId)?.id ?? trackerBikes[0].id;
+            }
+            if (target) {
+                handledBikeParam.current = true;
+                handleBikeChange(target);
+            }
+        };
+        applyDefault();
     }, [routeParams.bikeId, trackerBikes]);
 
 

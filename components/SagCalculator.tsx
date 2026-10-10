@@ -7,7 +7,7 @@ import { BPButton, BPCard, BPPicker, BPSegmentedControl } from '@/components/ui'
 import { theme } from '@/constants/Colors';
 import { formatSpecSummary, resolveSpecValues } from '@/lib/specTable';
 import { sagRangeMm, SagCharacter, SagRange, SAG_TARGETS, travelStrokeDefaults } from '@/lib/suspensionDefaults';
-import { SyncBike, syncLoadBikes, syncLoadPreference, syncLoadProfile } from '@/lib/sync';
+import { SyncBike, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile } from '@/lib/sync';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,7 +15,6 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
 const ACCENT = theme.colors.accentCyan;
-const PRIMARY_BIKE_KEY = '@bikepro_primary_bike';
 
 export default function SagCalculator() {
     const { t, i18n } = useTranslation();
@@ -27,7 +26,7 @@ export default function SagCalculator() {
     const load = useCallback(() => {
         Promise.all([
             syncLoadBikes(),
-            syncLoadPreference<string>('primary_bike', PRIMARY_BIKE_KEY),
+            syncLoadPrimaryBikeId(),
             syncLoadProfile(),
         ]).then(([bikesData, primaryId, profile]) => {
             setBikes(bikesData ?? []);
