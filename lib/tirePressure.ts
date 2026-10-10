@@ -44,7 +44,7 @@ const SETUP_ADJ: Record<string, number> = {
 };
 
 const TYPE_ADJ: Record<string, number> = {
-    xc: 0.08, trail: 0.03, enduro: 0, dh: 0, mud: -0.05,
+    xc: 0.05, trail: 0.03, enduro: 0, dh: 0, mud: -0.05,
 };
 
 // Stable casings allow a touch less pressure for grip, but the effect is small —
@@ -60,7 +60,7 @@ const STYLE_ADJ: Record<string, number> = {
 // Support-oriented terrain (jumps, berms, landings) needs MORE pressure,
 // technical natural terrain a little less for mechanical grip.
 const TERRAIN_ADJ: Record<string, { f: number; r: number }> = {
-    hardpack: { f: 0.05, r: 0.05 },
+    hardpack: { f: 0.03, r: 0.03 },
     roots: { f: -0.02, r: -0.02 },
     roots_rocks: { f: -0.04, r: -0.03 },
     mud: { f: -0.08, r: -0.08 },
