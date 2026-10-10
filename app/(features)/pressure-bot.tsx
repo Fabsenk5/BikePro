@@ -179,6 +179,7 @@ export default function PressureBotScreen() {
         { label: t('pressure_bot.terrain_flow'), value: 'flow' },
         { label: t('pressure_bot.terrain_rocky'), value: 'rocky' },
         { label: t('pressure_bot.terrain_loose'), value: 'loose' },
+        { label: t('pressure_bot.terrain_street'), value: 'street' },
     ];
 
     const weatherOptions = [

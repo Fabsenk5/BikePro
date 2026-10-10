@@ -42,6 +42,17 @@ describe('calculateTirePressure', () => {
         expect(park.rear).toBeGreaterThanOrEqual(flow.rear);
     });
 
+    it('street/trick sessions get the highest support', () => {
+        const r = calculateTirePressure({ ...dhBase, terrain: 'street' });
+        expect(r.front).toBeGreaterThanOrEqual(1.65);
+        expect(r.front).toBeLessThanOrEqual(1.85);
+        expect(r.rear).toBeGreaterThanOrEqual(1.9);
+        expect(r.rear).toBeLessThanOrEqual(2.15);
+        expect(r.notes).toContain('pressure_bot.note_street');
+        const park = calculateTirePressure(dhBase);
+        expect(r.rear).toBeGreaterThan(park.rear);
+    });
+
     it('scales with weight and riding style', () => {
         const light = calculateTirePressure({ ...dhBase, riderWeight: 65, ridingStyle: 'chill', terrain: 'roots' });
         const heavy = calculateTirePressure({ ...dhBase, riderWeight: 95, ridingStyle: 'race' });

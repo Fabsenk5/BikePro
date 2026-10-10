@@ -64,6 +64,9 @@ const TERRAIN_ADJ: Record<string, { f: number; r: number }> = {
     alpine: { f: 0.05, r: 0.05 },
     bikepark: { f: 0.15, r: 0.25 },
     flow: { f: 0.1, r: 0.15 },
+    // Street/trick sessions: hard surface, high side loads, missed landings —
+    // the highest support for pop, stable landings and casing protection.
+    street: { f: 0.2, r: 0.3 },
     rocky: { f: -0.08, r: -0.08 },
     loose: { f: -0.05, r: -0.05 },
 };
@@ -135,6 +138,9 @@ export function calculateTirePressure(params: TirePressureParams): TirePressureR
     }
     if (params.terrain === 'bikepark' || params.terrain === 'flow') {
         notes.push('pressure_bot.note_support');
+    }
+    if (params.terrain === 'street') {
+        notes.push('pressure_bot.note_street');
     }
 
     return { front: clamp(baseFront), rear: clamp(baseRear), notes };

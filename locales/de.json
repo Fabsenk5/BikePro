@@ -799,7 +799,9 @@
         "stroke_mm": "Dämpferhub (mm)",
         "click_note": "Wichtig: Alle Klicks werden von komplett geschlossen (im Uhrzeigersinn / +) in Richtung offen (gegen den Uhrzeigersinn / -) gezählt!",
         "spec_label": "Hersteller",
-        "note_support": "Jumplines/Bikepark: Fokus auf Support — bei Durchschlägen 0,1 bar mehr, bei fehlendem Grip 0,1 bar weniger."
+        "note_support": "Jumplines/Bikepark: Fokus auf Support — bei Durchschlägen 0,1 bar mehr, bei fehlendem Grip 0,1 bar weniger.",
+        "terrain_street": "Straße / Street & Tricks",
+        "note_street": "Street/Tricks: höherer Druck für Pop und stabile Landungen — zu hart? In 0,1-bar-Schritten runter testen."
     },
     "dialed": {
         "title": "⚙️ Dialed In",
