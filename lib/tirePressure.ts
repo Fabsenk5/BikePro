@@ -8,10 +8,14 @@
  * Calibration anchors (85 kg rider, 2.5" DH casing, tubeless, mullet):
  * - bikepark/jump lines, aggressive: ~1.70/2.00 bar
  * - street/tricks, aggressive:        ~1.75/2.05 bar
- * - technical roots+rocks, damp:      ~1.45/1.65 bar (never below ~1.4 bar
- *   with a heavy system — burping/casing risk)
- * Support-oriented terrain adds pressure; technical/weather deductions are
- * capped in magnitude so they cannot stack into unsafe lows.
+ * - technical roots+rocks, damp:      ~1.45/1.65 bar
+ *
+ * Safety floors for heavy systems (>= 90 kg total, no insert):
+ * - tubeless: front 1.25 / rear 1.50 bar (burping / rim strike protection)
+ * - tubes:    front 1.40 / rear 1.65 bar (snakebite protection, plus +0.25 bar
+ *   general tube buffer)
+ * Insert setups may run below the floors. Support-oriented terrain adds
+ * pressure; technical/weather deductions are capped in magnitude.
  */
 
 export interface TirePressureParams {
@@ -40,7 +44,7 @@ const WIDTH_FACTOR: Record<string, number> = {
 };
 
 const SETUP_ADJ: Record<string, number> = {
-    tubeless: 0, tube_butyl: 0.15, tube_latex: 0.1, insert: -0.1,
+    tubeless: 0, tube_butyl: 0.25, tube_latex: 0.15, insert: -0.1,
 };
 
 const TYPE_ADJ: Record<string, number> = {
@@ -80,6 +84,11 @@ const WEATHER_ADJ: Record<string, number> = {
 
 /** Rear carries more load than the front. */
 const REAR_OFFSET = 0.24;
+
+/** Setup-aware safety floors for heavy systems (no insert). */
+const HEAVY_SYSTEM_KG = 90;
+const FLOOR_TUBELESS = { front: 1.25, rear: 1.5 };
+const FLOOR_TUBE = { front: 1.4, rear: 1.65 };
 
 const clamp = (value: number) => Math.max(0.8, Math.min(3.5, Math.round(value * 20) / 20));
 
@@ -146,5 +155,22 @@ export function calculateTirePressure(params: TirePressureParams): TirePressureR
         notes.push('pressure_bot.note_street');
     }
 
-    return { front: clamp(baseFront), rear: clamp(baseRear), notes };
+    // Setup-aware safety floors for heavy systems: inserts are exempt
+    let frontFloor = 0.8;
+    let rearFloor = 0.8;
+    if (totalWeight >= HEAVY_SYSTEM_KG) {
+        if (params.setup === 'tubeless') {
+            frontFloor = FLOOR_TUBELESS.front;
+            rearFloor = FLOOR_TUBELESS.rear;
+        } else if (params.setup === 'tube_butyl' || params.setup === 'tube_latex') {
+            frontFloor = FLOOR_TUBE.front;
+            rearFloor = FLOOR_TUBE.rear;
+        }
+    }
+
+    return {
+        front: Math.max(frontFloor, clamp(baseFront)),
+        rear: Math.max(rearFloor, clamp(baseRear)),
+        notes,
+    };
 }

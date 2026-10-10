@@ -44,7 +44,7 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'Mud/Wet Enduro · 80 kg · 27.5" · 2.5 · DH casing · normal',
         params: { riderWeight: 80, bikeWeight: 15, wheelSize: '27.5', tireWidth: '2.5', setup: 'tubeless', terrain: 'mud', weather: 'wet', tireType: 'enduro', casing: 'dh', ridingStyle: 'normal' },
-        front: [1.15, 1.4], rear: [1.4, 1.65],
+        front: [1.25, 1.4], rear: [1.5, 1.65],
     },
     {
         name: 'E-Bike Trail · 90 kg + 24 kg · 29" · 2.6 · flow',
@@ -64,7 +64,7 @@ const SCENARIOS: Scenario[] = [
     {
         name: 'Bikepark Einsteiger · 70 kg · 27.5" · 2.4 · Schlauch (Butyl)',
         params: { riderWeight: 70, bikeWeight: 16, wheelSize: '27.5', tireWidth: '2.4', setup: 'tube_butyl', terrain: 'hardpack', weather: 'dry', tireType: 'enduro', casing: 'standard', ridingStyle: 'normal' },
-        front: [1.45, 1.65], rear: [1.65, 1.85],
+        front: [1.6, 1.8], rear: [1.85, 2.1],
     },
 ];
 
