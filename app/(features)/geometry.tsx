@@ -65,6 +65,12 @@ const toNum = (value: string): number | undefined => {
 const str = (value: number | string | undefined): string =>
     value === undefined || value === null ? '' : String(value);
 
+/** Format a number for input fields using the locale decimal separator (63,5 in DE). */
+const numStr = (value: number, language: string): string => {
+    const s = String(value);
+    return language.startsWith('de') ? s.replace('.', ',') : s;
+};
+
 /** First non-empty setup value for one of the given keys. */
 const setupVal = (comp: any, keys: string[]): string | undefined => {
     for (const key of keys) {
@@ -121,7 +127,8 @@ export default function GeometryScreen() {
         const geo = bike?.geometry;
         const f: GeometryForm = { ...EMPTY_FORM };
         const set = (key: keyof GeometryForm, value?: number | string) => {
-            if (value !== undefined && value !== null) (f as any)[key] = String(value);
+            if (value === undefined || value === null) return;
+            (f as any)[key] = typeof value === 'number' ? numStr(value, i18n.language) : String(value);
         };
 
         if (geo?.frame) {
@@ -162,7 +169,7 @@ export default function GeometryScreen() {
         if (!f.wheelSize) set('wheelSize', setupVal(wheel, ['size']));
 
         setForm(f);
-    }, []);
+    }, [i18n.language]);
 
     const load = useCallback(async () => {
         const [bikesData, primaryId, profile] = await Promise.all([
@@ -269,13 +276,13 @@ export default function GeometryScreen() {
     const field = (
         key: keyof GeometryForm,
         labelKey: string,
-        options?: { suffix?: string; placeholder?: string; numeric?: boolean },
+        options?: { suffix?: string; placeholder?: string; numeric?: boolean; decimal?: boolean },
     ) => (
         <BPInput
             label={t(labelKey)}
             value={form[key]}
             onChangeText={(v) => update(key, v)}
-            keyboardType={options?.numeric === false ? 'default' : 'numeric'}
+            keyboardType={options?.numeric === false ? 'default' : options?.decimal ? 'decimal-pad' : 'numeric'}
             suffix={options?.suffix ?? 'mm'}
             placeholder={options?.placeholder ?? '—'}
             accentColor={ACCENT}
@@ -414,13 +421,14 @@ export default function GeometryScreen() {
                 {tab === 'frame' && (
                     <BPCard style={styles.card}>
                         <Text style={styles.cardTitle}>📐 {t('geometry.frame_title')}</Text>
+                        <Text style={styles.hint}>{t('geometry.frame_hint')}</Text>
                         <View style={styles.inputRow}>
                             {field('stack', 'geometry.field_stack')}
                             {field('reach', 'geometry.field_reach')}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('headAngle', 'geometry.field_head_angle', { suffix: '°' })}
-                            {field('seatAngle', 'geometry.field_seat_angle', { suffix: '°' })}
+                            {field('headAngle', 'geometry.field_head_angle', { suffix: '°', decimal: true })}
+                            {field('seatAngle', 'geometry.field_seat_angle', { suffix: '°', decimal: true })}
                         </View>
                         <View style={styles.inputRow}>
                             {field('chainstay', 'geometry.field_chainstay')}
@@ -430,10 +438,19 @@ export default function GeometryScreen() {
                             {field('bbDrop', 'geometry.field_bb_drop')}
                             {field('seatTube', 'geometry.field_seat_tube')}
                         </View>
-                        <View style={styles.inputRow}>
-                            {field('size', 'geometry.field_size', { suffix: '', placeholder: 'L', numeric: false })}
-                            {field('wheelSize', 'geometry.field_wheel_size', { suffix: '', placeholder: '29 / mullet', numeric: false })}
-                        </View>
+                        {field('size', 'geometry.field_size', { suffix: '', placeholder: 'L', numeric: false })}
+                        <BPPicker
+                            label={t('geometry.field_wheel_size')}
+                            options={[
+                                { label: '29"', value: '29' },
+                                { label: '27.5"', value: '27.5' },
+                                { label: '26"', value: '26' },
+                                { label: 'Mullet (29/27.5)', value: 'mullet' },
+                            ]}
+                            value={form.wheelSize}
+                            onValueChange={(v) => update('wheelSize', v)}
+                            accentColor={ACCENT}
+                        />
                         {field('source', 'geometry.source_label', { suffix: '', placeholder: t('geometry.source_placeholder'), numeric: false })}
                     </BPCard>
                 )}
@@ -444,15 +461,15 @@ export default function GeometryScreen() {
                         <Text style={styles.hint}>{t('geometry.tracker_hint')}</Text>
                         <View style={styles.inputRow}>
                             {field('barRise', 'geometry.field_bar_rise')}
-                            {field('backsweep', 'geometry.field_backsweep', { suffix: '°' })}
-                            {field('upsweep', 'geometry.field_upsweep', { suffix: '°' })}
+                            {field('backsweep', 'geometry.field_backsweep', { suffix: '°', decimal: true })}
+                            {field('upsweep', 'geometry.field_upsweep', { suffix: '°', decimal: true })}
                         </View>
                         <View style={styles.inputRow}>
                             {field('barWidth', 'geometry.field_bar_width')}
                             {field('stemLength', 'geometry.field_stem_length')}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('stemAngle', 'geometry.field_stem_angle', { suffix: '°' })}
+                            {field('stemAngle', 'geometry.field_stem_angle', { suffix: '°', decimal: true })}
                             {field('spacers', 'geometry.field_spacers')}
                             {field('crankLength', 'geometry.field_crank_length')}
                         </View>

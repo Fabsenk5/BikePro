@@ -1085,7 +1085,7 @@
         "metric_rad": "RAD (BB→Griff)",
         "metric_drop": "Sattel→Lenker",
         "metric_seatedReach": "Sitz-Reach",
-        "metric_barY": "Lenkerhöhe über BB",
+        "metric_barY": "Lenkerhöhe über Tretlager",
         "discipline_label": "Referenz-Disziplin",
         "discipline_tour": "Tour/XC",
         "discipline_trail": "Trail",
@@ -1126,11 +1126,11 @@
         "field_stack": "Stack",
         "field_reach": "Reach",
         "field_head_angle": "Lenkwinkel",
-        "field_seat_angle": "Sitzwinkel",
+        "field_seat_angle": "Sitzwinkel (effektiv)",
         "field_chainstay": "Kettenstrebe",
         "field_wheelbase": "Radstand",
-        "field_bb_drop": "Tretlager-Absenkung",
-        "field_seat_tube": "Sitzrohr",
+        "field_bb_drop": "Tretlager-Absenkung (BB-Drop)",
+        "field_seat_tube": "Sitzrohr / Rahmenhöhe",
         "field_size": "Rahmengröße",
         "field_wheel_size": "Laufradgröße",
         "source_label": "Quelle/Notiz",
@@ -1149,8 +1149,8 @@
         "field_saddle_setback": "Sattel-Setback",
         "measured_title": "Messwerte (Zollstock)",
         "measured_hint": "Statisch, unbeladen messen. Alle Felder optional — sie überschreiben die berechneten Werte.",
-        "field_measured_bary": "Lenkerhöhe über BB (gemessen)",
-        "field_measured_barx": "Lenker vor BB (gemessen)",
+        "field_measured_bary": "Lenkerhöhe über Tretlager (gemessen)",
+        "field_measured_barx": "Lenker vor Tretlager (gemessen)",
         "field_measured_seated_reach": "Sitz-Reach (Sattelspitze→Griff)",
         "field_measured_drop": "Sattel→Lenker (gemessen)",
         "field_measured_bb_height": "Tretlagerhöhe über Boden",
@@ -1173,6 +1173,7 @@
         "save_btn": "Geometrie speichern",
         "saving": "Speichern…",
         "saved": "Geometrie gespeichert ✅",
-        "save_error": "Speichern fehlgeschlagen — offline? Wird beim nächsten Speichern erneut versucht."
+        "save_error": "Speichern fehlgeschlagen — offline? Wird beim nächsten Speichern erneut versucht.",
+        "frame_hint": "Tipp: den „effektiven\" Sitzwinkel verwenden (beschreibt die tatsächliche Sitzposition). Tretlager-Absenkung ≠ Tretlagerhöhe — die Höhe trägst du unter Messwerte ein."
     }
 }

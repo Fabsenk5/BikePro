@@ -1126,11 +1126,11 @@
         "field_stack": "Stack",
         "field_reach": "Reach",
         "field_head_angle": "Head angle",
-        "field_seat_angle": "Seat angle",
+        "field_seat_angle": "Seat angle (effective)",
         "field_chainstay": "Chainstay",
         "field_wheelbase": "Wheelbase",
         "field_bb_drop": "BB drop",
-        "field_seat_tube": "Seat tube",
+        "field_seat_tube": "Seat tube / frame height",
         "field_size": "Frame size",
         "field_wheel_size": "Wheel size",
         "source_label": "Source/note",
@@ -1173,6 +1173,7 @@
         "save_btn": "Save geometry",
         "saving": "Saving…",
         "saved": "Geometry saved ✅",
-        "save_error": "Saving failed — offline? Will retry on next save."
+        "save_error": "Saving failed — offline? Will retry on next save.",
+        "frame_hint": "Tip: use the “effective” seat angle (describes the actual seated position). BB drop ≠ BB height — enter the height under Measured."
     }
 }
