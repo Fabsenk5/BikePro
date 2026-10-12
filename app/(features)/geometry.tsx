@@ -231,7 +231,16 @@ export default function GeometryScreen() {
     };
 
     const geometry = useMemo(() => buildGeometryFromForm(form), [form]);
-    const derived = useMemo(() => computeContactGeometry(geometry), [geometry]);
+
+    // Assumed saddle height (0.883 × inseam) when none is entered yet, so the
+    // model and sketches work before the tape measurement exists.
+    const assumedSaddleHeight = rider.inseam ? saddleHeightTarget(rider.inseam) : null;
+    const displayGeometry = useMemo(() => {
+        if (geometry.fit?.saddleHeight != null || assumedSaddleHeight == null) return geometry;
+        return { ...geometry, fit: { ...geometry.fit, saddleHeight: assumedSaddleHeight } };
+    }, [geometry, assumedSaddleHeight]);
+
+    const derived = useMemo(() => computeContactGeometry(displayGeometry), [displayGeometry]);
     // Grip span = bar width minus the hand inset (40 mm per side)
     const gripSpan = toNum(form.barWidth) != null ? toNum(form.barWidth)! - 80 : null;
 
@@ -402,7 +411,7 @@ export default function GeometryScreen() {
                             />
                             {viewMode === 'side' ? (
                                 <BikeSideView
-                                    geometry={geometry}
+                                    geometry={displayGeometry}
                                     derived={derived}
                                     sagPercent={sag}
                                     forkTravel={forkTravel}
@@ -412,7 +421,7 @@ export default function GeometryScreen() {
                                 />
                             ) : (
                                 <BikeFrontView
-                                    geometry={geometry}
+                                    geometry={displayGeometry}
                                     derived={derived}
                                     shoulderWidth={rider.shoulderWidth}
                                     sagPercent={sag}
@@ -452,6 +461,11 @@ export default function GeometryScreen() {
 
                         <BPCard style={styles.card}>
                             <Text style={styles.cardTitle}>📊 {t('geometry.metrics_title')}</Text>
+                            {geometry.fit?.saddleHeight == null && assumedSaddleHeight != null && (
+                                <Text style={styles.hint}>
+                                    {t('geometry.metrics_assumed_saddle', { mm: assumedSaddleHeight })}
+                                </Text>
+                            )}
                             <View style={styles.metricGrid}>
                                 {([
                                     ['reach', geometry.frame?.reach, 0],
@@ -550,6 +564,9 @@ export default function GeometryScreen() {
                             {field('bbDrop', 'geometry.field_bb_drop')}
                             {field('seatTube', 'geometry.field_seat_tube')}
                         </View>
+                        {toNum(form.bbDrop) != null && toNum(form.bbDrop)! > 100 && (
+                            <Text style={styles.warning}>{t('geometry.bbdrop_warning')}</Text>
+                        )}
                         {field('size', 'geometry.field_size', { suffix: '', placeholder: 'L', numeric: false })}
                         <BPPicker
                             label={t('geometry.field_wheel_size')}
@@ -698,6 +715,7 @@ const styles = StyleSheet.create({
     card: { padding: theme.spacing.md, marginBottom: theme.spacing.md },
     cardTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '700', marginBottom: theme.spacing.md },
     hint: { color: theme.colors.textMuted, fontSize: 12, marginBottom: theme.spacing.sm, lineHeight: 17 },
+    warning: { color: theme.colors.accentOrange, fontSize: 12, marginBottom: theme.spacing.sm, lineHeight: 17 },
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
     metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
     metricCell: {

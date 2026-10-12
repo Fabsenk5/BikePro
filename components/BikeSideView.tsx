@@ -46,7 +46,7 @@ export default function BikeSideView({
     const pad = 16;
     const minX = sketch.rearAxle.x - sketch.wheelRadiusRear;
     const maxX = sketch.frontAxle.x + sketch.wheelRadiusFront;
-    const minY = -20;
+    const minY = sketch.groundY - 20;
     const maxY = Math.max(
         sketch.wheelRadiusRear * 2,
         sketch.saddle.y + 200,
@@ -71,7 +71,7 @@ export default function BikeSideView({
         <View>
             <Svg width={width} height={height}>
                 {/* ground */}
-                <Line x1={pad} y1={ty(0)} x2={width - pad} y2={ty(0)} stroke={theme.colors.border} strokeWidth={1} />
+                <Line x1={pad} y1={ty(sketch.groundY)} x2={width - pad} y2={ty(sketch.groundY)} stroke={theme.colors.border} strokeWidth={1} />
                 {/* wheels */}
                 <Circle cx={tx(sketch.rearAxle.x)} cy={ty(sketch.rearAxle.y)} r={sketch.wheelRadiusRear * scale} stroke={wheelColor} strokeWidth={2} fill="none" />
                 <Circle cx={tx(sketch.frontAxle.x)} cy={ty(sketch.frontAxle.y)} r={sketch.wheelRadiusFront * scale} stroke={wheelColor} strokeWidth={2} fill="none" />

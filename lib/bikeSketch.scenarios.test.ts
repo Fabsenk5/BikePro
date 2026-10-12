@@ -18,8 +18,12 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             // axles and frame anchors come straight from the specs
             expect(sketch!.rearAxle.x).toBe(-frame.chainstay!);
             expect(sketch!.frontAxle.x).toBeCloseTo(frame.wheelbase! - frame.chainstay!, 6);
-            expect(sketch!.rearAxle.y).toBe(frame.bbDrop);
-            expect(sketch!.frontAxle.y).toBe(frame.bbDrop);
+            // both wheels rest on the ground; the front drop matches the chart value
+            const radiiCheck = wheelRadii(frame.wheelSize);
+            expect(sketch!.frontAxle.y).toBe(frame.bbDrop!);
+            expect(sketch!.rearAxle.y).toBeCloseTo(frame.bbDrop! + (radiiCheck.rear - radiiCheck.front), 6);
+            expect(sketch!.rearAxle.y - radiiCheck.rear).toBeCloseTo(sketch!.groundY, 6);
+            expect(sketch!.frontAxle.y - radiiCheck.front).toBeCloseTo(sketch!.groundY, 6);
             expect(sketch!.headTop.x).toBe(frame.reach);
             expect(sketch!.headTop.y).toBe(frame.stack);
 

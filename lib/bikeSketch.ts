@@ -17,6 +17,8 @@ export interface BikeSketch {
     bb: SketchPoint;
     rearAxle: SketchPoint;
     frontAxle: SketchPoint;
+    /** ground line height (BB-relative, negative) — wheel bottoms rest here */
+    groundY: number;
     headTop: SketchPoint;
     headBottom: SketchPoint;
     seatCluster: SketchPoint;
@@ -75,8 +77,9 @@ export function buildFrontSketch(
 
     const bbDrop = frame.bbDrop ?? 30;
     const radii = wheelRadii(frame.wheelSize);
+    const bbHeight = geo.measured?.bbHeight ?? (radii.front - bbDrop);
     const sagFork = Math.max(0, (opts.forkTravel * opts.sagPercent) / 100);
-    const barGroundY = radii.front - bbDrop + derived.barY - sagFork;
+    const barGroundY = bbHeight + derived.barY - sagFork;
     const gripHalfSpan = Math.max(0, cockpit.barWidth / 2 - GRIP_INSET_MM);
     const shoulderHalfWidth = opts.shoulderWidth != null && opts.shoulderWidth > 0
         ? opts.shoulderWidth / 2
@@ -110,9 +113,15 @@ export function buildBikeSketch(
     const seatAngle = frame.seatAngle ?? 75;
     const seatTube = frame.seatTube ?? 440;
 
+    const radii = wheelRadii(frame.wheelSize);
+    // BB height above ground: measured value wins, else derived from the front
+    // wheel — matches manufacturer charts (front radius − BB drop).
+    const bbHeight = geo.measured?.bbHeight ?? (radii.front - bbDrop);
+
     const bb: SketchPoint = { x: 0, y: 0 };
-    const rearAxle: SketchPoint = { x: -chainstay, y: bbDrop };
-    const frontAxle: SketchPoint = { x: wheelbase - chainstay, y: bbDrop };
+    // Both wheels stand on the ground: axle height = wheel radius − BB height
+    const rearAxle: SketchPoint = { x: -chainstay, y: radii.rear - bbHeight };
+    const frontAxle: SketchPoint = { x: wheelbase - chainstay, y: radii.front - bbHeight };
 
     const headTop: SketchPoint = { x: reach, y: stack };
     const headRad = (headAngle * Math.PI) / 180;
@@ -159,12 +168,11 @@ export function buildBikeSketch(
         return { x: p.x, y: p.y - d };
     };
 
-    const radii = wheelRadii(frame.wheelSize);
-
     return {
         bb: drop(bb),
         rearAxle,
         frontAxle,
+        groundY: -bbHeight,
         headTop: drop(headTop),
         headBottom: drop(headBottom),
         seatCluster: drop(seatCluster),

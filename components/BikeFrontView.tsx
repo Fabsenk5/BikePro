@@ -65,9 +65,11 @@ export default function BikeFrontView({
                 <Line x1={pad} y1={ty(0)} x2={width - pad} y2={ty(0)} stroke={theme.colors.border} strokeWidth={1} />
                 {/* front wheel */}
                 <Circle cx={tx(0)} cy={ty(sketch.wheelRadius)} r={sketch.wheelRadius * scale} stroke={wheelColor} strokeWidth={2} fill="none" />
-                {/* fork legs */}
-                {line(-30, sketch.wheelRadius, -40, sketch.barGroundY - 120, frameColor, 3)}
-                {line(30, sketch.wheelRadius, 40, sketch.barGroundY - 120, frameColor, 3)}
+                {/* fork legs + crown + steerer */}
+                {line(-30, sketch.wheelRadius, -20, sketch.barGroundY - 110, frameColor, 3)}
+                {line(30, sketch.wheelRadius, 20, sketch.barGroundY - 110, frameColor, 3)}
+                {line(-26, sketch.barGroundY - 110, 26, sketch.barGroundY - 110, frameColor, 4)}
+                {line(0, sketch.barGroundY - 110, 0, sketch.barGroundY, frameColor, 3)}
                 {/* bar + grips */}
                 {line(-sketch.barWidth / 2, sketch.barGroundY, sketch.barWidth / 2, sketch.barGroundY, frameColor, 4)}
                 <Circle cx={tx(-sketch.gripHalfSpan)} cy={ty(sketch.barGroundY)} r={22 * scale} fill={ACCENT} />

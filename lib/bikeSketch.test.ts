@@ -23,13 +23,24 @@ describe('wheelRadii', () => {
 describe('buildBikeSketch', () => {
     it('places axles, head tube, bar and saddle correctly', () => {
         const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
-        expect(s.rearAxle).toEqual({ x: -445, y: 23 });
+        // mullet: BB height = front radius − drop = 351; both wheels touch the ground
+        expect(s.groundY).toBeCloseTo(-351, 6);
+        expect(s.rearAxle).toEqual({ x: -445, y: 4 });
         expect(s.frontAxle.x).toBeCloseTo(1284 - 445, 6);
+        expect(s.frontAxle.y).toBeCloseTo(23, 6);
         expect(s.headTop).toEqual({ x: 480, y: 630 });
         expect(s.bar.x).toBeCloseTo(520, 6);
         expect(s.bar.y).toBeCloseTo(675, 6);
         expect(s.saddle.y).toBeCloseTo(741, 6);
         expect(s.riderHead.y).toBeGreaterThan(s.riderShoulder.y);
+    });
+
+    it('uses a measured BB height for the stance', () => {
+        const geo2 = { ...geo, measured: { bbHeight: 352 } };
+        const s = buildBikeSketch(geo2, computeContactGeometry(geo2), { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s.groundY).toBeCloseTo(-352, 6);
+        expect(s.frontAxle.y).toBeCloseTo(374 - 352, 6);
+        expect(s.rearAxle.y).toBeCloseTo(355 - 352, 6);
     });
 
     it('sag lowers frame and rider but keeps wheels on the ground', () => {
