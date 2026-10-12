@@ -55,10 +55,14 @@ export default function ProfileScreen() {
     const [weight, setWeight] = useState('');
     const [height, setHeight] = useState('');
     const [inseam, setInseam] = useState('');
+    const [armLength, setArmLength] = useState('');
+    const [torsoLength, setTorsoLength] = useState('');
     const [savingProfile, setSavingProfile] = useState(false);
     const [weightError, setWeightError] = useState('');
     const [heightError, setHeightError] = useState('');
     const [inseamError, setInseamError] = useState('');
+    const [armError, setArmError] = useState('');
+    const [torsoError, setTorsoError] = useState('');
     const [exporting, setExporting] = useState<'rides' | 'components' | 'setups' | null>(null);
 
     // Units preference (pressure bar/psi, weight kg/lb); weight is stored internally in kg
@@ -99,6 +103,8 @@ export default function ProfileScreen() {
                 setWeight(p.weight ? formatWeightForUnit(p.weight, pref.weight) : '');
                 setHeight(p.height ?? '');
                 setInseam(p.inseam ?? '');
+                setArmLength(p.armLength ?? '');
+                setTorsoLength(p.torsoLength ?? '');
             } catch {}
         })();
     }, [user]);
@@ -122,6 +128,8 @@ export default function ProfileScreen() {
         const wInput = weight.trim() ? parseFloat(weight.replace(',', '.')) : null;
         const h = height.trim() ? parseFloat(height.replace(',', '.')) : null;
         const i = inseam.trim() ? parseFloat(inseam.replace(',', '.')) : null;
+        const arm = armLength.trim() ? parseFloat(armLength.replace(',', '.')) : null;
+        const torso = torsoLength.trim() ? parseFloat(torsoLength.replace(',', '.')) : null;
 
         // Weight input is in the selected unit; validate and store internally in kg
         const wKg = wInput !== null && !isNaN(wInput) ? weightInputToKg(wInput, units.weight) : wInput;
@@ -129,14 +137,24 @@ export default function ProfileScreen() {
         const wErr = wKg !== null && (isNaN(wKg) || wKg < 20 || wKg > 300) ? t('profile.error_weight') : '';
         const hErr = h !== null && (isNaN(h) || h < 50 || h > 250) ? t('profile.error_height') : '';
         const iErr = i !== null && (isNaN(i) || i < 30 || i > 120) ? t('profile.error_inseam') : '';
+        const armErr = arm !== null && (isNaN(arm) || arm < 40 || arm > 90) ? t('profile.error_arm') : '';
+        const torsoErr = torso !== null && (isNaN(torso) || torso < 40 || torso > 90) ? t('profile.error_torso') : '';
         setWeightError(wErr);
         setHeightError(hErr);
         setInseamError(iErr);
-        if (wErr || hErr || iErr) return;
+        setArmError(armErr);
+        setTorsoError(torsoErr);
+        if (wErr || hErr || iErr || armErr || torsoErr) return;
 
         setSavingProfile(true);
         const weightKg = wKg !== null && !isNaN(wKg) ? String(Math.round(wKg * 10) / 10) : '';
-        const ok = await syncSaveProfile({ weight: weightKg, height, inseam });
+        const ok = await syncSaveProfile({
+            weight: weightKg,
+            height,
+            inseam,
+            armLength: armLength.trim(),
+            torsoLength: torsoLength.trim(),
+        });
         setSavingProfile(false);
         if (!ok) {
             showAlert(t('profile.save_error_title'), t('profile.save_error_msg'));
@@ -296,6 +314,10 @@ export default function ProfileScreen() {
                     <View style={styles.inputRow}>
                         <BPInput label={t('profile.height_label')} placeholder="z.B. 182" value={height} onChangeText={setHeight} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} error={heightError} />
                         <BPInput label={t('profile.inseam_label')} placeholder="z.B. 86" value={inseam} onChangeText={setInseam} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} error={inseamError} />
+                    </View>
+                    <View style={styles.inputRow}>
+                        <BPInput label={t('profile.arm_label')} placeholder="z.B. 62" value={armLength} onChangeText={setArmLength} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} error={armError} />
+                        <BPInput label={t('profile.torso_label')} placeholder="z.B. 60" value={torsoLength} onChangeText={setTorsoLength} suffix="cm" keyboardType="numeric" accentColor={theme.colors.accentCyan} containerStyle={{ flex: 1 }} error={torsoError} />
                     </View>
                     <View style={{ marginTop: theme.spacing.md }}>
                         <BPButton title={savingProfile ? t('profile.saving') : t('profile.save_data')} onPress={handleSaveProfile} color={theme.colors.accentCyan} size="md" variant={savingProfile ? 'secondary' : 'primary'} />

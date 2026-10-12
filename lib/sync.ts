@@ -30,6 +30,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClickLimits, sanitizeClickLimits } from './clickLimits';
+import { BikeGeometry, sanitizeGeometry } from './geometry';
 import { SpecRow, sanitizeSpecTable } from './specTable';
 import { getSupabase, isSupabaseConfigured } from './supabase';
 
@@ -203,6 +204,8 @@ export interface SyncBike {
     year: string;
     size: string;
     weight?: number;
+    /** Geometry & Fit data (frame specs, cockpit, fit, measurements) */
+    geometry?: BikeGeometry;
     components: SyncComponent[];
 }
 
@@ -301,6 +304,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                 id: b.id, name: b.name, type: b.type,
                 model: b.model, year: b.year, size: b.size ?? '',
                 weight: b.weight ?? undefined,
+                geometry: sanitizeGeometry(b.geometry),
                 components: (comps ?? [])
                     .filter(c => c.bike_id === b.id)
                     .map(c => ({
@@ -361,6 +365,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<boolean> {
         const bikeRows = bikes.map(b => ({
             id: b.id, user_id: userId, name: b.name, type: b.type,
             model: b.model, year: b.year, size: b.size, weight: b.weight ?? null,
+            geometry: b.geometry ?? null,
         }));
 
         if (bikeRows.length > 0) {
@@ -798,6 +803,9 @@ export interface SyncProfile {
     weight?: string;
     height?: string;
     inseam?: string;
+    /** optional body measurements for fit math (cm) */
+    armLength?: string;
+    torsoLength?: string;
 }
 
 const PROFILE_KEY = '@bikepro_rider_profile';

@@ -140,7 +140,11 @@
         "height_label": "Körpergröße",
         "inseam_label": "Schrittinnenlänge",
         "saving": "Speichere...",
-        "save_data": "Daten speichern"
+        "save_data": "Daten speichern",
+        "arm_label": "Armlänge (Schulter–Handgelenk)",
+        "torso_label": "Oberkörper (Sitzknochen–Schulter)",
+        "error_arm": "Bitte 40–90 cm angeben",
+        "error_torso": "Bitte 40–90 cm angeben"
     },
     "admin": {
         "title": "Admin Dashboard",

@@ -140,7 +140,11 @@
         "height_label": "Height",
         "inseam_label": "Inseam",
         "saving": "Saving...",
-        "save_data": "Save data"
+        "save_data": "Save data",
+        "arm_label": "Arm length (shoulder–wrist)",
+        "torso_label": "Torso (sit bones–shoulder)",
+        "error_arm": "Please enter 40–90 cm",
+        "error_torso": "Please enter 40–90 cm"
     },
     "admin": {
         "title": "Admin Dashboard",
