@@ -270,6 +270,8 @@ export interface RiderBody {
     inseam?: number | null;
     armLength?: number | null;
     torsoLength?: number | null;
+    /** shoulder width in mm (for the front-view bar-width comparison) */
+    shoulderWidth?: number | null;
 }
 
 /** LeMond-style saddle height target (vertical BB → saddle top). */

@@ -148,7 +148,9 @@
         "arm_label": "Armlänge (Schulter–Handgelenk)",
         "torso_label": "Oberkörper (Sitzknochen–Schulter)",
         "error_arm": "Bitte 40–90 cm angeben",
-        "error_torso": "Bitte 40–90 cm angeben"
+        "error_torso": "Bitte 40–90 cm angeben",
+        "shoulder_label": "Schulterbreite",
+        "error_shoulder": "Bitte 30–60 cm angeben"
     },
     "admin": {
         "title": "Admin Dashboard",
@@ -1178,6 +1180,11 @@
         "view_title": "🖼️ Seitenansicht",
         "view_sag_label": "Sag-Annahme",
         "view_hint": "Technische Skizze (vereinfacht): Der Sag senkt Rahmen und Fahrer zwischen den Achsen ab — die Räder bleiben am Boden.",
-        "view_no_data": "Trage Rahmen- und Cockpitwerte ein — dann erscheint die Skizze."
+        "view_no_data": "Trage Rahmen- und Cockpitwerte ein — dann erscheint die Skizze.",
+        "view_mode_side": "Seite",
+        "view_mode_front": "Vorne",
+        "view_front_caption": "Griffweite {grip} mm · Schultern {shoulder} mm · Δ {delta} mm",
+        "view_front_no_shoulder": "Schulterbreite im Profil ergänzen — dann vergleichen wir sie mit der Griffweite.",
+        "view_front_hint": "Richtwert: Griffe etwa auf Schulterbreite bis +40 mm — breiter = mehr Kontrolle, schmaler = effizienter."
     }
 }

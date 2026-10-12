@@ -7,6 +7,7 @@
  */
 import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPPicker, BPSegmentedControl, BPSlider, screenContentStyle } from '@/components/ui';
 import BikeSideView from '@/components/BikeSideView';
+import BikeFrontView from '@/components/BikeFrontView';
 import { theme } from '@/constants/Colors';
 import { showAlert } from '@/lib/dialog';
 import {
@@ -122,6 +123,7 @@ export default function GeometryScreen() {
     const [form, setForm] = useState<GeometryForm>(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
     const [sag, setSag] = useState(20);
+    const [viewMode, setViewMode] = useState<'side' | 'front'>('side');
     const { width: windowWidth } = useWindowDimensions();
     const viewWidth = Math.max(260, Math.min(windowWidth, 960) - 2 * 24 - 2 * 16);
 
@@ -227,6 +229,8 @@ export default function GeometryScreen() {
 
     const geometry = useMemo(() => buildGeometryFromForm(form), [form]);
     const derived = useMemo(() => computeContactGeometry(geometry), [geometry]);
+    // Grip span = bar width minus the hand inset (40 mm per side)
+    const gripSpan = toNum(form.barWidth) != null ? toNum(form.barWidth)! - 80 : null;
     const reference = DISCIPLINE_REFERENCES[discipline];
     const checks = useMemo(() => evaluateFit(geometry, derived, reference, rider), [geometry, derived, reference, rider]);
     const advice = useMemo(() => recommendForSymptoms(symptoms, geometry, derived, rider), [symptoms, geometry, derived, rider]);
@@ -359,15 +363,36 @@ export default function GeometryScreen() {
                     <>
                         <BPCard style={styles.card}>
                             <Text style={styles.cardTitle}>🖼️ {t('geometry.view_title')}</Text>
-                            <BikeSideView
-                                geometry={geometry}
-                                derived={derived}
-                                sagPercent={sag}
-                                forkTravel={forkTravel}
-                                shockStroke={shockStroke}
-                                torsoLength={rider.torsoLength}
-                                width={viewWidth}
+                            <BPSegmentedControl
+                                options={[
+                                    { label: t('geometry.view_mode_side'), value: 'side' },
+                                    { label: t('geometry.view_mode_front'), value: 'front' },
+                                ]}
+                                value={viewMode}
+                                onChange={(v) => setViewMode(v as 'side' | 'front')}
+                                accentColor={ACCENT}
+                                containerStyle={{ marginBottom: theme.spacing.md }}
                             />
+                            {viewMode === 'side' ? (
+                                <BikeSideView
+                                    geometry={geometry}
+                                    derived={derived}
+                                    sagPercent={sag}
+                                    forkTravel={forkTravel}
+                                    shockStroke={shockStroke}
+                                    torsoLength={rider.torsoLength}
+                                    width={viewWidth}
+                                />
+                            ) : (
+                                <BikeFrontView
+                                    geometry={geometry}
+                                    derived={derived}
+                                    shoulderWidth={rider.shoulderWidth}
+                                    sagPercent={sag}
+                                    forkTravel={forkTravel}
+                                    width={viewWidth}
+                                />
+                            )}
                             <BPSlider
                                 label={t('geometry.view_sag_label')}
                                 value={sag}
@@ -378,7 +403,24 @@ export default function GeometryScreen() {
                                 accentColor={ACCENT}
                                 onValueChange={setSag}
                             />
-                            <Text style={styles.hint}>{t('geometry.view_hint')}</Text>
+                            {viewMode === 'side' ? (
+                                <Text style={styles.hint}>{t('geometry.view_hint')}</Text>
+                            ) : (
+                                <>
+                                    {gripSpan != null && rider.shoulderWidth ? (
+                                        <Text style={styles.hint}>
+                                            {t('geometry.view_front_caption', {
+                                                grip: Math.round(gripSpan),
+                                                shoulder: Math.round(rider.shoulderWidth),
+                                                delta: Math.round(gripSpan - rider.shoulderWidth),
+                                            })}
+                                        </Text>
+                                    ) : (
+                                        <Text style={styles.hint}>{t('geometry.view_front_no_shoulder')}</Text>
+                                    )}
+                                    <Text style={styles.hint}>{t('geometry.view_front_hint')}</Text>
+                                </>
+                            )}
                         </BPCard>
 
                         <BPCard style={styles.card}>

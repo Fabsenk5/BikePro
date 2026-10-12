@@ -148,7 +148,9 @@
         "arm_label": "Arm length (shoulder–wrist)",
         "torso_label": "Torso (sit bones–shoulder)",
         "error_arm": "Please enter 40–90 cm",
-        "error_torso": "Please enter 40–90 cm"
+        "error_torso": "Please enter 40–90 cm",
+        "shoulder_label": "Shoulder width",
+        "error_shoulder": "Please enter 30–60 cm"
     },
     "admin": {
         "title": "Admin Dashboard",
@@ -1178,6 +1180,11 @@
         "view_title": "🖼️ Side view",
         "view_sag_label": "Assumed sag",
         "view_hint": "Technical sketch (simplified): sag lowers frame and rider between the axles — the wheels stay on the ground.",
-        "view_no_data": "Enter frame and cockpit values — the sketch will appear."
+        "view_no_data": "Enter frame and cockpit values — the sketch will appear.",
+        "view_mode_side": "Side",
+        "view_mode_front": "Front",
+        "view_front_caption": "Grip span {grip} mm · shoulders {shoulder} mm · Δ {delta} mm",
+        "view_front_no_shoulder": "Add shoulder width in the profile — then we compare it with the grip span.",
+        "view_front_hint": "Guideline: grips around shoulder width up to +40 mm — wider = more control, narrower = more efficient."
     }
 }

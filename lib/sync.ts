@@ -806,6 +806,7 @@ export interface SyncProfile {
     /** optional body measurements for fit math (cm) */
     armLength?: string;
     torsoLength?: string;
+    shoulderWidth?: string;
 }
 
 const PROFILE_KEY = '@bikepro_rider_profile';

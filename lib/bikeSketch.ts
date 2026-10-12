@@ -6,7 +6,7 @@
  * between the rear and front axle — the wheels stay on the ground, so the
  * fork/shock visually compress.
  */
-import { BikeGeometry, ContactGeometry } from './geometry';
+import { BikeGeometry, ContactGeometry, GRIP_INSET_MM } from './geometry';
 
 export interface SketchPoint {
     x: number;
@@ -43,6 +43,57 @@ export function wheelRadii(wheelSize?: string): { front: number; rear: number } 
     if (wheelSize === 'mullet') return { front: TIRE_RADIUS['29'], rear: TIRE_RADIUS['27.5'] };
     const radius = TIRE_RADIUS[wheelSize ?? ''] ?? TIRE_RADIUS['29'];
     return { front: radius, rear: radius };
+}
+
+// ─── Front view (grip span vs shoulder width) ───
+
+export interface FrontSketch {
+    wheelRadius: number;
+    barWidth: number;
+    /** half distance between grip centres (bar width minus the hand inset) */
+    gripHalfSpan: number;
+    shoulderHalfWidth: number | null;
+    /** bar centre height above the ground (front sag applied) */
+    barGroundY: number;
+    shoulderY: number;
+    hipY: number;
+    headCenter: SketchPoint;
+    headRadius: number;
+}
+
+/** Approximate shoulder rise above the bar in attack position (mm). */
+const SHOULDER_RISE_ABOVE_BAR = 250;
+
+export function buildFrontSketch(
+    geo: BikeGeometry,
+    derived: ContactGeometry,
+    opts: { shoulderWidth?: number | null; sagPercent: number; forkTravel: number },
+): FrontSketch | null {
+    const frame = geo.frame ?? {};
+    const cockpit = geo.cockpit ?? {};
+    if (cockpit.barWidth == null || derived.barY == null) return null;
+
+    const bbDrop = frame.bbDrop ?? 30;
+    const radii = wheelRadii(frame.wheelSize);
+    const sagFork = Math.max(0, (opts.forkTravel * opts.sagPercent) / 100);
+    const barGroundY = radii.front - bbDrop + derived.barY - sagFork;
+    const gripHalfSpan = Math.max(0, cockpit.barWidth / 2 - GRIP_INSET_MM);
+    const shoulderHalfWidth = opts.shoulderWidth != null && opts.shoulderWidth > 0
+        ? opts.shoulderWidth / 2
+        : null;
+    const shoulderY = barGroundY + SHOULDER_RISE_ABOVE_BAR;
+
+    return {
+        wheelRadius: radii.front,
+        barWidth: cockpit.barWidth,
+        gripHalfSpan,
+        shoulderHalfWidth,
+        barGroundY,
+        shoulderY,
+        hipY: barGroundY - 100,
+        headCenter: { x: 0, y: shoulderY + 90 },
+        headRadius: 60,
+    };
 }
 
 export function buildBikeSketch(
