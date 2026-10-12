@@ -350,6 +350,18 @@ export default function SetupGuideScreen() {
             values: t('setup_guide.art_seatangle_values'), tip: t('setup_guide.art_seatangle_tip'),
         },
         {
+            id: 'geo_measure', title: t('setup_guide.art_geo_measure_title'), category: 'geometrie',
+            tags: ['geometrie', 'messen', 'zollstock', 'sattelhöhe', 'sitz-reach', 'rad'],
+            summary: t('setup_guide.art_geo_measure_summary'), content: t('setup_guide.art_geo_measure_content'),
+            values: t('setup_guide.art_geo_measure_values'), tip: t('setup_guide.art_geo_measure_tip'),
+        },
+        {
+            id: 'geo_seatposition', title: t('setup_guide.art_geo_seatposition_title'), category: 'geometrie',
+            tags: ['geometrie', 'sitzposition', 'drop', 'vorbau', 'rise', 'sattelhöhe'],
+            summary: t('setup_guide.art_geo_seatposition_summary'), content: t('setup_guide.art_geo_seatposition_content'),
+            values: t('setup_guide.art_geo_seatposition_values'), tip: t('setup_guide.art_geo_seatposition_tip'),
+        },
+        {
             id: 'sattelhoehe', title: t('setup_guide.art_sattelhoehe_title'), category: 'ergonomie',
             tags: ['sattel', 'höhe', 'dropper', 'saddle'],
             summary: t('setup_guide.art_sattelhoehe_summary'), content: t('setup_guide.art_sattelhoehe_content'),

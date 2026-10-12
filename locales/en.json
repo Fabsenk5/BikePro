@@ -949,7 +949,17 @@
         "sag_create_bike": "🚲 Add bike",
         "sag_to_pressure": "💨 To Pressure Bot",
         "sag_add_spec": "Add manufacturer data now",
-        "sag_spec_source_label": "Source"
+        "sag_spec_source_label": "Source",
+        "art_geo_measure_title": "Measuring your bike with a tape",
+        "art_geo_measure_summary": "The 6 key measurements for geometry comparison — static and reproducible.",
+        "art_geo_measure_content": "How to stay comparable: bike upright, tire pressure as ridden — but ALWAYS measure statically (without rider). You need: tape measure, spirit level or plumb line (string with weight), masking tape to mark.\n- [ ] 1. Saddle height: from BB centre vertically to the saddle top (use plumb/level). Result in mm.\n- [ ] 2. Saddle setback: plumb line from the saddle nose — horizontal distance to the BB centre (nose behind BB = positive).\n- [ ] 3. Bar height above BB: BB centre vertically to bar centre (same height as the grips).\n- [ ] 4. Bar ahead of BB: horizontal distance BB centre → bar centre.\n- [ ] 5. Seated reach: saddle nose → grip centre, measured horizontally.\n- [ ] 6. BB height (optional): ground → BB centre.\nEnter all values in mm in the Geometry tool — they override the computed values and count as \"measured\".",
+        "art_geo_measure_values": "Check: saddle height ≈ 0.883 × inseam (e.g. 840 mm × 0.883 ≈ 742 mm).",
+        "art_geo_measure_tip": "Measure twice, take the average — and re-measure after changes (stem, spacers, saddle).",
+        "art_geo_seatposition_title": "Setting your seated position (tour to downhill)",
+        "art_geo_seatposition_summary": "Saddle height, saddle→bar drop and cockpit per discipline — with target values.",
+        "art_geo_seatposition_content": "Order: 1) saddle height, 2) saddle setback, 3) bar height/drop, 4) stem length/width — change only ONE thing per test ride.\n- [ ] Saddle height: 0.883 × inseam (e.g. 840 mm → ~742 mm, vertical BB→saddle). Test in 5 mm steps.\n- [ ] Saddle→bar drop (positive = bars lower): tour 0–40 mm · trail 10–70 mm · enduro 20–90 mm · DH 20–80 mm.\n- [ ] Stem length: tour 50–90 mm · trail 40–60 mm · enduro 35–50 mm · DH 30–45 mm.\n- [ ] Bar rise: tour 10–30 mm · trail 20–35 mm · enduro 25–40 mm · DH 25–50 mm. Bar width 740–820 mm per discipline.\n- [ ] RAD (BB→grip) relative to inseam: tour ~0.95–1.05 · trail 0.98–1.08 · enduro 1.0–1.1 · DH 0.98–1.08.\nThen fine-tune on the trail (Dialed-In Wizard) — verify everything in the Geometry tool.",
+        "art_geo_seatposition_values": "Saddle height 0.883 × inseam · drop/stem/rise per discipline: see the Geometry tool (fit check).",
+        "art_geo_seatposition_tip": "Set the saddle first, then the cockpit — otherwise you keep chasing adjustments."
     },
     "trail_video": {
         "title": "🎬 Trail Video",
