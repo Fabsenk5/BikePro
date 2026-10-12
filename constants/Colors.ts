@@ -79,4 +79,5 @@ export const featureColors: Record<string, string> = {
   'gps-tracker': accentBlue,
   'component-tracker': '#26A69A',
   'setup-guide': '#7C4DFF',
+  'geometry': '#00BFA5',
 };

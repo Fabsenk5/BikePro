@@ -104,4 +104,13 @@ export const features: Feature[] = [
         accentColor: '#7C4DFF',
         ready: true,
     },
+    {
+        id: 'geometry',
+        title: 'Geometrie',
+        subtitle: 'Fit & Geo Lab',
+        icon: '📐',
+        route: '/(features)/geometry',
+        accentColor: '#00BFA5',
+        ready: true,
+    },
 ];
