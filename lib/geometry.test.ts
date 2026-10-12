@@ -7,6 +7,7 @@ import {
     recommendForSymptoms,
     saddleHeightTarget,
     sanitizeGeometry,
+    stripComputedMeasured,
 } from './geometry';
 
 const sample: BikeGeometry = {
@@ -114,5 +115,19 @@ describe('recommendForSymptoms', () => {
         const d = computeContactGeometry(sample);
         const advice = recommendForSymptoms(['no_pop'], sample, d, { inseam: 840 });
         expect(advice.no_pop.some(a => a.key === 'geometry.advice.check_rad')).toBe(true);
+    });
+});
+
+describe('stripComputedMeasured', () => {
+    it('drops measured values that match the computed model', () => {
+        const measured = { barY: 675, barX: 520, seatedReach: 560, bbHeight: 351 };
+        const auto = { barY: 675, barX: 520.4, seatedReach: 525, bbHeight: 351 };
+        expect(stripComputedMeasured(measured, auto)).toEqual({ seatedReach: 560 });
+    });
+
+    it('keeps real deviations and returns undefined when everything matches', () => {
+        expect(stripComputedMeasured({ barY: 680 }, { barY: 675 })).toEqual({ barY: 680 });
+        expect(stripComputedMeasured({ barY: 675 }, { barY: 675 })).toBeUndefined();
+        expect(stripComputedMeasured(undefined, { barY: 675 })).toBeUndefined();
     });
 });

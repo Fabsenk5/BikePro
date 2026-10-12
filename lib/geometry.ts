@@ -206,6 +206,34 @@ export function computeContactGeometry(geo: BikeGeometry): ContactGeometry {
     };
 }
 
+/**
+ * Remove measured values that match the computed model (within tolerance) so
+ * the model keeps tracking frame/cockpit changes. Only real tape deviations
+ * persist as overrides.
+ */
+export function stripComputedMeasured(
+    measured: GeometryMeasured | undefined,
+    auto: {
+        barX?: number | null;
+        barY?: number | null;
+        seatedReach?: number | null;
+        saddleToBarDrop?: number | null;
+        bbHeight?: number | null;
+    },
+    tolerance = 1,
+): GeometryMeasured | undefined {
+    if (!measured) return undefined;
+    const out: GeometryMeasured = { ...measured };
+    const same = (value: number | undefined, reference: number | null | undefined) =>
+        value != null && reference != null && Math.abs(value - reference) <= tolerance;
+    if (same(out.barX, auto.barX)) delete out.barX;
+    if (same(out.barY, auto.barY)) delete out.barY;
+    if (same(out.seatedReach, auto.seatedReach)) delete out.seatedReach;
+    if (same(out.saddleToBarDrop, auto.saddleToBarDrop)) delete out.saddleToBarDrop;
+    if (same(out.bbHeight, auto.bbHeight)) delete out.bbHeight;
+    return Object.keys(out).length > 0 ? out : undefined;
+}
+
 // ─── Discipline references (heuristic bands, test-guarded) ───
 
 export type Discipline = 'tour' | 'trail' | 'enduro' | 'dh';

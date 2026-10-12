@@ -1150,7 +1150,7 @@
         "field_saddle_height": "Sattelhöhe (BB→Sattel)",
         "field_saddle_setback": "Sattel-Setback",
         "measured_title": "Messwerte (Zollstock)",
-        "measured_hint": "Statisch, unbeladen messen. Alle Felder optional — sie überschreiben die berechneten Werte.",
+        "measured_hint": "Statisch, unbeladen messen. Leere Felder nutzen den grauen, berechneten Wert aus Rahmen/Cockpit — eigene Messwerte überschreiben ihn.",
         "field_measured_bary": "Lenkerhöhe über Tretlager (gemessen)",
         "field_measured_barx": "Lenker vor Tretlager (gemessen)",
         "field_measured_seated_reach": "Sitz-Reach (Sattelspitze→Griff)",
@@ -1185,6 +1185,7 @@
         "view_mode_front": "Vorne",
         "view_front_caption": "Griffweite {grip} mm · Schultern {shoulder} mm · Δ {delta} mm",
         "view_front_no_shoulder": "Schulterbreite im Profil ergänzen — dann vergleichen wir sie mit der Griffweite.",
-        "view_front_hint": "Richtwert: Griffe etwa auf Schulterbreite bis +40 mm — breiter = mehr Kontrolle, schmaler = effizienter."
+        "view_front_hint": "Richtwert: Griffe etwa auf Schulterbreite bis +40 mm — breiter = mehr Kontrolle, schmaler = effizienter.",
+        "measured_apply": "Berechnete Werte in die Felder übernehmen"
     }
 }

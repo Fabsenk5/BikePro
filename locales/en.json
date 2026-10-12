@@ -1150,7 +1150,7 @@
         "field_saddle_height": "Saddle height (BB→saddle)",
         "field_saddle_setback": "Saddle setback",
         "measured_title": "Measured values (tape)",
-        "measured_hint": "Measure statically, unloaded. All fields optional — they override the computed values.",
+        "measured_hint": "Measure statically, unloaded. Empty fields use the gray computed value from frame/cockpit — your own measurements override it.",
         "field_measured_bary": "Bar height above BB (measured)",
         "field_measured_barx": "Bar ahead of BB (measured)",
         "field_measured_seated_reach": "Seated reach (nose→grip)",
@@ -1185,6 +1185,7 @@
         "view_mode_front": "Front",
         "view_front_caption": "Grip span {grip} mm · shoulders {shoulder} mm · Δ {delta} mm",
         "view_front_no_shoulder": "Add shoulder width in the profile — then we compare it with the grip span.",
-        "view_front_hint": "Guideline: grips around shoulder width up to +40 mm — wider = more control, narrower = more efficient."
+        "view_front_hint": "Guideline: grips around shoulder width up to +40 mm — wider = more control, narrower = more efficient.",
+        "measured_apply": "Apply computed values to the fields"
     }
 }

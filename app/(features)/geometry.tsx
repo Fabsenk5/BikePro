@@ -19,10 +19,13 @@ import {
     FitCheck,
     recommendForSymptoms,
     RiderBody,
+    saddleHeightTarget,
     sanitizeGeometry,
+    stripComputedMeasured,
     SymptomId,
     SYMPTOMS,
 } from '@/lib/geometry';
+import { wheelRadii } from '@/lib/bikeSketch';
 import { SyncBike, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -231,6 +234,23 @@ export default function GeometryScreen() {
     const derived = useMemo(() => computeContactGeometry(geometry), [geometry]);
     // Grip span = bar width minus the hand inset (40 mm per side)
     const gripSpan = toNum(form.barWidth) != null ? toNum(form.barWidth)! - 80 : null;
+
+    // Model values for the measured fields: computed from frame + cockpit + fit.
+    // Shown as gray placeholders and used by the model while the field is empty.
+    const autoMeasured = useMemo(() => {
+        const frontRadius = wheelRadii(geometry.frame?.wheelSize).front;
+        const bbDrop = geometry.frame?.bbDrop ?? 30;
+        return {
+            barX: derived.barX,
+            barY: derived.barY,
+            seatedReach: derived.seatedReach,
+            saddleToBarDrop: derived.saddleToBarDrop,
+            bbHeight: frontRadius - bbDrop,
+        };
+    }, [geometry, derived]);
+
+    const autoStr = (value: number | null | undefined) =>
+        value == null ? undefined : String(Math.round(value));
     const reference = DISCIPLINE_REFERENCES[discipline];
     const checks = useMemo(() => evaluateFit(geometry, derived, reference, rider), [geometry, derived, reference, rider]);
     const advice = useMemo(() => recommendForSymptoms(symptoms, geometry, derived, rider), [symptoms, geometry, derived, rider]);
@@ -282,6 +302,13 @@ export default function GeometryScreen() {
         try {
             const fresh = await syncLoadBikes();
             const cleaned = sanitizeGeometry(buildGeometryFromForm(form));
+            // Keep the model live: measured values that equal the computed model
+            // are not persisted (only real tape deviations override it).
+            if (cleaned) {
+                const stripped = stripComputedMeasured(cleaned.measured, autoMeasured);
+                if (stripped) cleaned.measured = stripped;
+                else delete cleaned.measured;
+            }
             const updated = fresh.map(b => (b.id === selectedBikeId ? { ...b, geometry: cleaned } : b));
             const ok = await syncSaveBikes(updated);
             setBikes(updated);
@@ -559,7 +586,7 @@ export default function GeometryScreen() {
                             {field('crankLength', 'geometry.field_crank_length')}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('saddleHeight', 'geometry.field_saddle_height')}
+                            {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: rider.inseam ? String(saddleHeightTarget(rider.inseam)) : '—' })}
                             {field('saddleSetback', 'geometry.field_saddle_setback')}
                         </View>
                     </BPCard>
@@ -570,16 +597,31 @@ export default function GeometryScreen() {
                         <Text style={styles.cardTitle}>📏 {t('geometry.measured_title')}</Text>
                         <Text style={styles.hint}>{t('geometry.measured_hint')}</Text>
                         <View style={styles.inputRow}>
-                            {field('mBarY', 'geometry.field_measured_bary')}
-                            {field('mBarX', 'geometry.field_measured_barx')}
+                            {field('mBarY', 'geometry.field_measured_bary', { placeholder: autoStr(autoMeasured.barY) })}
+                            {field('mBarX', 'geometry.field_measured_barx', { placeholder: autoStr(autoMeasured.barX) })}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('mSeatedReach', 'geometry.field_measured_seated_reach')}
-                            {field('mDrop', 'geometry.field_measured_drop')}
+                            {field('mSeatedReach', 'geometry.field_measured_seated_reach', { placeholder: autoStr(autoMeasured.seatedReach) })}
+                            {field('mDrop', 'geometry.field_measured_drop', { placeholder: autoStr(autoMeasured.saddleToBarDrop) })}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('mBbHeight', 'geometry.field_measured_bb_height')}
+                            {field('mBbHeight', 'geometry.field_measured_bb_height', { placeholder: autoStr(autoMeasured.bbHeight) })}
                         </View>
+                        <BPButton
+                            title={t('geometry.measured_apply')}
+                            onPress={() => setForm(prev => ({
+                                ...prev,
+                                mBarY: autoStr(autoMeasured.barY) ?? '',
+                                mBarX: autoStr(autoMeasured.barX) ?? '',
+                                mSeatedReach: autoStr(autoMeasured.seatedReach) ?? '',
+                                mDrop: autoStr(autoMeasured.saddleToBarDrop) ?? '',
+                                mBbHeight: autoStr(autoMeasured.bbHeight) ?? '',
+                            }))}
+                            variant="secondary"
+                            color={ACCENT}
+                            size="sm"
+                            style={{ marginTop: theme.spacing.sm }}
+                        />
                         <BPButton
                             title={t('geometry.wiki_measure_link')}
                             onPress={() => router.push({ pathname: '/(features)/setup-guide', params: { article: 'geo_measure', category: 'geometrie' } })}
