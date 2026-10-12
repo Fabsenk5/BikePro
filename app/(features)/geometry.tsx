@@ -5,7 +5,8 @@
  * vorbefüllt aus dem Component Tracker (Lenker/Vorbau/Sattel) und dem Profil
  * (Körpermaße). Rechenlogik, Zielbänder und Symptom-Engine in lib/geometry.ts.
  */
-import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPPicker, BPSegmentedControl, screenContentStyle } from '@/components/ui';
+import { BPButton, BPCard, BPChip, BPEmptyState, BPInput, BPPicker, BPSegmentedControl, BPSlider, screenContentStyle } from '@/components/ui';
+import BikeSideView from '@/components/BikeSideView';
 import { theme } from '@/constants/Colors';
 import { showAlert } from '@/lib/dialog';
 import {
@@ -22,11 +23,12 @@ import {
     SYMPTOMS,
 } from '@/lib/geometry';
 import { SyncBike, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
+import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
 import { router, Stack } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StatusBar, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 const ACCENT = '#00BFA5';
 
@@ -119,6 +121,23 @@ export default function GeometryScreen() {
     const [rider, setRider] = useState<RiderBody>({});
     const [form, setForm] = useState<GeometryForm>(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
+    const [sag, setSag] = useState(20);
+    const { width: windowWidth } = useWindowDimensions();
+    const viewWidth = Math.max(260, Math.min(windowWidth, 960) - 2 * 24 - 2 * 16);
+
+    const selectedBike = bikes.find(b => b.id === selectedBikeId);
+
+    const forkTravel = useMemo(() => {
+        const fork = selectedBike?.components.find(c => c.type === 'fork');
+        const value = parseFloat(fork?.setupValues?.find(s => s.key === 'travel')?.value ?? '');
+        return Number.isFinite(value) && value > 0 ? value : travelStrokeDefaults(selectedBike?.type).travel;
+    }, [selectedBike]);
+
+    const shockStroke = useMemo(() => {
+        const shock = selectedBike?.components.find(c => c.type === 'shock');
+        const value = parseFloat(shock?.setupValues?.find(s => s.key === 'stroke')?.value ?? '');
+        return Number.isFinite(value) && value > 0 ? value : travelStrokeDefaults(selectedBike?.type).stroke;
+    }, [selectedBike]);
 
     const update = (key: keyof GeometryForm, value: string) =>
         setForm(prev => ({ ...prev, [key]: value }));
@@ -338,6 +357,30 @@ export default function GeometryScreen() {
 
                 {tab === 'analysis' && (
                     <>
+                        <BPCard style={styles.card}>
+                            <Text style={styles.cardTitle}>🖼️ {t('geometry.view_title')}</Text>
+                            <BikeSideView
+                                geometry={geometry}
+                                derived={derived}
+                                sagPercent={sag}
+                                forkTravel={forkTravel}
+                                shockStroke={shockStroke}
+                                torsoLength={rider.torsoLength}
+                                width={viewWidth}
+                            />
+                            <BPSlider
+                                label={t('geometry.view_sag_label')}
+                                value={sag}
+                                min={0}
+                                max={35}
+                                step={1}
+                                unit="%"
+                                accentColor={ACCENT}
+                                onValueChange={setSag}
+                            />
+                            <Text style={styles.hint}>{t('geometry.view_hint')}</Text>
+                        </BPCard>
+
                         <BPCard style={styles.card}>
                             <Text style={styles.cardTitle}>📊 {t('geometry.metrics_title')}</Text>
                             <View style={styles.metricGrid}>

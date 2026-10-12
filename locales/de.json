@@ -1174,6 +1174,10 @@
         "saving": "Speichern…",
         "saved": "Geometrie gespeichert ✅",
         "save_error": "Speichern fehlgeschlagen — offline? Wird beim nächsten Speichern erneut versucht.",
-        "frame_hint": "Tipp: den „effektiven\" Sitzwinkel verwenden (beschreibt die tatsächliche Sitzposition). Tretlager-Absenkung ≠ Tretlagerhöhe — die Höhe trägst du unter Messwerte ein."
+        "frame_hint": "Tipp: den „effektiven\" Sitzwinkel verwenden (beschreibt die tatsächliche Sitzposition). Tretlager-Absenkung ≠ Tretlagerhöhe — die Höhe trägst du unter Messwerte ein.",
+        "view_title": "🖼️ Seitenansicht",
+        "view_sag_label": "Sag-Annahme",
+        "view_hint": "Technische Skizze (vereinfacht): Der Sag senkt Rahmen und Fahrer zwischen den Achsen ab — die Räder bleiben am Boden.",
+        "view_no_data": "Trage Rahmen- und Cockpitwerte ein — dann erscheint die Skizze."
     }
 }

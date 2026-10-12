@@ -1174,6 +1174,10 @@
         "saving": "Saving…",
         "saved": "Geometry saved ✅",
         "save_error": "Saving failed — offline? Will retry on next save.",
-        "frame_hint": "Tip: use the “effective” seat angle (describes the actual seated position). BB drop ≠ BB height — enter the height under Measured."
+        "frame_hint": "Tip: use the “effective” seat angle (describes the actual seated position). BB drop ≠ BB height — enter the height under Measured.",
+        "view_title": "🖼️ Side view",
+        "view_sag_label": "Assumed sag",
+        "view_hint": "Technical sketch (simplified): sag lowers frame and rider between the axles — the wheels stay on the ground.",
+        "view_no_data": "Enter frame and cockpit values — the sketch will appear."
     }
 }
