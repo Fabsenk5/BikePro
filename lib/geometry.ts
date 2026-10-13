@@ -45,9 +45,12 @@ export interface GeometryCockpit {
 }
 
 export interface GeometryFit {
-    /** vertical BB centre → saddle top */
+    /**
+     * BB centre → saddle top, measured DIRECTLY along the seat tube (mm) —
+     * the easy tape measurement; the model projects it to the vertical.
+     */
     saddleHeight?: number;
-    /** saddle nose behind the BB, positive = setback */
+    /** saddle nose behind the vertical through the BB, positive = setback */
     saddleSetback?: number;
 }
 
@@ -55,6 +58,8 @@ export interface GeometryMeasured {
     barX?: number;
     barY?: number;
     seatedReach?: number;
+    /** saddle nose → grip centre, measured directly (point to point) */
+    saddleToHand?: number;
     saddleToBarDrop?: number;
     bbHeight?: number;
     /** optional: measured with rider on the bike (sagged) */
@@ -81,7 +86,7 @@ const COCKPIT_NUMBERS: (keyof GeometryCockpit)[] = [
 ];
 const FIT_NUMBERS: (keyof GeometryFit)[] = ['saddleHeight', 'saddleSetback'];
 const MEASURED_NUMBERS: (keyof GeometryMeasured)[] = [
-    'barX', 'barY', 'seatedReach', 'saddleToBarDrop', 'bbHeight', 'riderBarY', 'riderSaddleHeight',
+    'barX', 'barY', 'seatedReach', 'saddleToHand', 'saddleToBarDrop', 'bbHeight', 'riderBarY', 'riderSaddleHeight',
 ];
 
 const toNumber = (value: unknown): number | undefined => {
@@ -186,7 +191,9 @@ export function computeContactGeometry(geo: BikeGeometry): ContactGeometry {
     const handX = barX != null ? barX - sweepSpan * Math.sin(deg(cockpit.backsweep ?? 0)) : null;
     const handY = barY != null ? barY + sweepSpan * Math.sin(deg(cockpit.upsweep ?? 0)) : null;
 
-    const saddleY = fit.saddleHeight ?? null;
+    // Saddle height is measured along the seat tube → project to vertical
+    const seatAngle = frame.seatAngle ?? 75;
+    const saddleY = fit.saddleHeight != null ? fit.saddleHeight * Math.sin(deg(seatAngle)) : null;
     const saddleX = fit.saddleSetback != null ? -fit.saddleSetback : null;
 
     const computedDrop = saddleY != null && barY != null ? saddleY - barY : null;
@@ -195,9 +202,10 @@ export function computeContactGeometry(geo: BikeGeometry): ContactGeometry {
     const computedSeatedReach = handX != null && saddleX != null ? handX - saddleX : null;
     const seatedReach = measured.seatedReach ?? computedSeatedReach;
 
-    const saddleToHand = handX != null && handY != null && saddleX != null && saddleY != null
+    const computedSaddleToHand = handX != null && handY != null && saddleX != null && saddleY != null
         ? Math.hypot(handX - saddleX, handY - saddleY)
         : null;
+    const saddleToHand = measured.saddleToHand ?? computedSaddleToHand;
 
     return {
         barX,
@@ -224,6 +232,7 @@ export function stripComputedMeasured(
         barX?: number | null;
         barY?: number | null;
         seatedReach?: number | null;
+        saddleToHand?: number | null;
         saddleToBarDrop?: number | null;
         bbHeight?: number | null;
     },
@@ -236,6 +245,7 @@ export function stripComputedMeasured(
     if (same(out.barX, auto.barX)) delete out.barX;
     if (same(out.barY, auto.barY)) delete out.barY;
     if (same(out.seatedReach, auto.seatedReach)) delete out.seatedReach;
+    if (same(out.saddleToHand, auto.saddleToHand)) delete out.saddleToHand;
     if (same(out.saddleToBarDrop, auto.saddleToBarDrop)) delete out.saddleToBarDrop;
     if (same(out.bbHeight, auto.bbHeight)) delete out.bbHeight;
     return Object.keys(out).length > 0 ? out : undefined;
@@ -319,8 +329,9 @@ const SADDLE_NOSE_OFFSET = 110;
 
 /**
  * Assumed saddle setback (nose behind the BB) when the rider has not measured
- * it: seat-tube geometry minus a typical saddle nose offset, clamped to a
- * realistic band. Used as a gray placeholder + apply option in the cockpit tab.
+ * it: `saddleHeight` is the along-the-seat-tube value (field convention), the
+ * horizontal distance to the saddle top is its cosine projection minus a
+ * typical saddle nose offset, clamped to a realistic band.
  */
 export function assumedSaddleSetback(saddleHeight: number, seatAngle: number): number {
     const alongTube = saddleHeight * Math.cos((seatAngle * Math.PI) / 180);
@@ -364,10 +375,10 @@ export function cockpitDefaults(bikeType?: string): CockpitDefaults {    switch 
 const SADDLE_STACK = 40;
 
 /**
- * Saddle height (vertical) derived from the seatpost hardware: seat tube +
- * exposed post (collar/pull-out) + dropper hub + saddle stack, projected from
- * the seat-tube axis to the vertical. Used as an assumption when the rider has
- * not measured the saddle height yet.
+ * Saddle height derived from the seatpost hardware: seat tube + exposed post
+ * (collar/pull-out) + dropper hub + saddle stack, measured along the seat tube
+ * — same convention as the saddle-height field. Used as an assumption when the
+ * rider has not measured it yet.
  */
 export function seatpostSaddleHeight(
     seatTube: number | null | undefined,
@@ -376,8 +387,8 @@ export function seatpostSaddleHeight(
     seatAngle: number,
 ): number | null {
     if (seatTube == null || exposed == null || hub == null) return null;
-    const alongTube = seatTube + exposed + hub + SADDLE_STACK;
-    return Math.round(alongTube * Math.sin((seatAngle * Math.PI) / 180));
+    void seatAngle;
+    return Math.round(seatTube + exposed + hub + SADDLE_STACK);
 }
 
 const bandStatus = (value: number | null | undefined, band: ReferenceBand): CheckStatus => {

@@ -68,7 +68,8 @@ export const GEOMETRY_SCENARIOS: GeometryScenario[] = [
         },
         rider: { height: 1680, inseam: 780, shoulderWidth: 430 },
         discipline: 'enduro',
-        expected: { radRatio: 'ok', saddleHeight: 'ok', saddleToBarDrop: 'ok', stemLength: 'ok', barRise: 'ok', barWidth: 'ok' },
+        // bar sits near saddle height (high stack + rise) → below the enduro band
+        expected: { radRatio: 'ok', saddleHeight: 'ok', saddleToBarDrop: 'low', stemLength: 'ok', barRise: 'ok', barWidth: 'ok' },
     },
     {
         name: 'E-Bike Trail · 182 cm · 86 cm inseam',

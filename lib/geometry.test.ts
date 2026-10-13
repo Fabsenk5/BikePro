@@ -51,9 +51,10 @@ describe('computeContactGeometry', () => {
         expect(d.handX).toBeCloseTo(465.25, 1);
         expect(d.handY).toBeCloseTo(705.5, 1);
         expect(d.rad).toBeCloseTo(845.1, 1);
-        expect(d.saddleToBarDrop).toBeCloseTo(66, 6);
+        // saddle height is measured along the seat tube (741 × sin 75° ≈ 715.7) → drop ≈ 40.8
+        expect(d.saddleToBarDrop).toBeCloseTo(40.8, 1);
         expect(d.seatedReach).toBeCloseTo(525.25, 1);
-        expect(d.saddleToHand).toBeCloseTo(526.4, 1);
+        expect(d.saddleToHand).toBeCloseTo(525.3, 1);
     });
 
     it('lets measured values override computed ones', () => {
@@ -112,8 +113,8 @@ describe('evaluateFit', () => {
 
     it('derives the saddle height from the seatpost hardware', () => {
         // 450 seat tube + 80 exposed + 210 hub + 40 stack = 780 along the tube
-        // → vertical with 78° seat angle ≈ 763 mm
-        expect(seatpostSaddleHeight(450, 80, 210, 78)).toBe(763);
+        // (same convention as the saddle-height field)
+        expect(seatpostSaddleHeight(450, 80, 210, 78)).toBe(780);
         // incomplete hardware → no estimate
         expect(seatpostSaddleHeight(450, null, 210, 78)).toBeNull();
         expect(seatpostSaddleHeight(null, 80, 210, 78)).toBeNull();

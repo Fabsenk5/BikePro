@@ -31,7 +31,7 @@ describe('buildBikeSketch', () => {
         expect(s.headTop).toEqual({ x: 480, y: 630 });
         expect(s.bar.x).toBeCloseTo(520, 6);
         expect(s.bar.y).toBeCloseTo(675, 6);
-        expect(s.saddle.y).toBeCloseTo(741, 6);
+        expect(s.saddle.y).toBeCloseTo(741 * Math.sin((78 * Math.PI) / 180), 3);
         expect(s.riderHead.y).toBeGreaterThan(s.riderShoulder.y);
     });
 
@@ -125,13 +125,13 @@ describe('rider mode and springs', () => {
     it('seated keeps the dropper extended, standing compresses it', () => {
         const seated = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'seated' })!;
         const standing = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'standing', dropperTravel: 170 })!;
-        // seated: saddle at the fit height, hip above the rail clamp
-        expect(seated.saddle.y).toBeCloseTo(741, 6);
-        expect(seated.riderHip.y).toBeCloseTo(741 + 60, 6);
+        // seated: saddle at the fit height (along the seat tube → vertical), hip above the rail clamp
+        expect(seated.saddle.y).toBeCloseTo(741 * Math.sin((78 * Math.PI) / 180), 3);
+        expect(seated.riderHip.y).toBeCloseTo(seated.saddle.y + 60, 6);
         expect(seated.riderHip.x).toBeCloseTo(-60 - 60, 6);
         // standing: saddle slid down the seat axis by the dropper travel
         const seatRad = (78 * Math.PI) / 180;
-        expect(standing.saddle.y).toBeCloseTo(741 - 170 * Math.sin(seatRad), 0);
+        expect(standing.saddle.y).toBeCloseTo((741 - 170) * Math.sin(seatRad), 0);
         expect(standing.saddle.x).toBeCloseTo(-60 + 170 * Math.cos(seatRad), 0);
         // standing hip sits above the compressed saddle
         expect(standing.riderHip.y).toBeGreaterThan(standing.saddle.y + 100);
@@ -152,7 +152,7 @@ describe('rider mode and springs', () => {
         const s = buildBikeSketch(noSetback, computeContactGeometry(noSetback), { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
         // seat angle 78° → 741 × cos 78° − 110 ≈ 44 mm setback
         expect(s.saddle.x).toBeCloseTo(-44, 0);
-        expect(s.saddle.y).toBeCloseTo(741, 6);
+        expect(s.saddle.y).toBeCloseTo(741 * Math.sin((78 * Math.PI) / 180), 3);
     });
 
     it('keeps the dropper post and the saddle on the seat-tube axis', () => {
@@ -275,15 +275,15 @@ describe('body segment proportions', () => {
         expect(upper / armLength).toBeCloseTo(0.48, 2);
     });
 
-    it('leg segments add up to the functional leg (1.2 × inseam)', () => {
+    it('leg segments add up to the functional leg (1.18 × inseam)', () => {
         const inseam = 840;
         const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, inseam })!;
         const thigh = Math.hypot(s.riderKnee!.x - s.riderHip.x, s.riderKnee!.y - s.riderHip.y);
         const shin = Math.hypot(s.riderPedal.x - s.riderKnee!.x, s.riderPedal.y - s.riderKnee!.y);
         expect(thigh).toBeCloseTo(inseam * 0.53, 1);
-        expect(shin).toBeCloseTo(inseam * 0.67, 1);
+        expect(shin).toBeCloseTo(inseam * 0.65, 1);
         // thigh ≈ 0.44 of the functional leg
-        expect(thigh / (thigh + shin)).toBeCloseTo(0.44, 2);
+        expect(thigh / (thigh + shin)).toBeCloseTo(0.45, 2);
     });
 
     it('reproduces the knee-bend guideline at the LeMond saddle height', () => {

@@ -64,13 +64,13 @@ const HIP_ABOVE_SADDLE = 60;
  * Body segment proportions (fractions of the profile measurements):
  * - thigh (femur) ≈ 0.53 × inseam (anthropometry: femur ≈ 0.245 × height,
  *   inseam ≈ 0.47 × height → ≈ 0.52)
- * - shin incl. foot to the pedal ≈ 0.67 × inseam (tibia ≈ 0.52 × inseam plus
- *   the ankle→pedal distance; sum = 1.20 × inseam is the functional leg
+ * - shin incl. foot to the pedal ≈ 0.65 × inseam (tibia ≈ 0.52 × inseam plus
+ *   the ankle→pedal distance; sum = 1.18 × inseam is the functional leg
  *   hip joint → pedal and reproduces the 25–35° knee-bend guideline at the
- *   LeMond saddle height)
+ *   LeMond saddle height — with the saddle height measured along the seat tube)
  */
 const THIGH_RATIO = 0.53;
-const SHIN_RATIO = 0.67;
+const SHIN_RATIO = 0.65;
 /** Standing hips sit higher and slightly behind the BB compared to the seated pose. */
 const STANDING_HIP_RISE = 60;
 const STANDING_HIP_BACK = 30;
@@ -392,6 +392,7 @@ export function buildFrontSketch(
     const riderMode = opts.riderMode ?? 'seated';
     const dropperTravel = opts.dropperTravel ?? DEFAULT_DROPPER_TRAVEL;
     const saddleAboveBb = derived.saddleY ?? (frame.seatTube ?? 440) * Math.sin(seatRad);
+    const saddleAlongTube = saddleAboveBb / Math.sin(seatRad);
     const saddleGroundYSeated = bbHeight + saddleAboveBb - sagShock;
     const saddleGroundY = riderMode !== 'seated'
         ? saddleGroundYSeated - dropperTravel * Math.sin(seatRad)
@@ -404,7 +405,7 @@ export function buildFrontSketch(
         : saddleGroundYSeated + HIP_ABOVE_SADDLE + hipOffset.rise;
     // Shoulder from the same torso + arm reach as the side view
     const hipX = riderMode === 'seated'
-        ? (derived.saddleX ?? -assumedSaddleSetback(saddleAboveBb, seatAngle)) - HIP_BEHIND_NOSE
+        ? (derived.saddleX ?? -assumedSaddleSetback(saddleAlongTube, seatAngle)) - HIP_BEHIND_NOSE
         : -hipOffset.back;
     const handGroundY = derived.handY != null ? bbHeight + derived.handY - sagFork : null;
     const armFactor = riderArmFactor(riderMode);
@@ -514,9 +515,10 @@ export function buildBikeSketch(
 
     // Saddle position: height from fit (assumed when empty), setback likewise —
     // without either we can only fall back to the seat cluster.
+    const saddleAlongTube = derived.saddleY != null ? derived.saddleY / Math.sin(seatRad) : null;
     const saddleSeated: SketchPoint = derived.saddleY != null
         ? {
-            x: derived.saddleX ?? -assumedSaddleSetback(derived.saddleY, seatAngle),
+            x: derived.saddleX ?? -assumedSaddleSetback(saddleAlongTube ?? 0, seatAngle),
             y: derived.saddleY,
         }
         : seatCluster;

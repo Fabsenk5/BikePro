@@ -52,7 +52,7 @@ interface GeometryForm {
     // fit
     saddleHeight: string; saddleSetback: string;
     // measured
-    mBarX: string; mBarY: string; mSeatedReach: string; mDrop: string; mBbHeight: string;
+    mBarX: string; mBarY: string; mSaddleToHand: string; mDrop: string; mBbHeight: string;
     // meta
     source: string;
 }
@@ -61,7 +61,7 @@ const EMPTY_FORM: GeometryForm = {
     stack: '', reach: '', headAngle: '', seatAngle: '', chainstay: '', wheelbase: '', bbDrop: '', seatTube: '', headTube: '', size: '', wheelSize: '',
     barRise: '', backsweep: '', upsweep: '', barWidth: '', stemLength: '', stemAngle: '', spacers: '', crankLength: '', dropperTravel: '', seatpostExposed: '',
     saddleHeight: '', saddleSetback: '',
-    mBarX: '', mBarY: '', mSeatedReach: '', mDrop: '', mBbHeight: '',
+    mBarX: '', mBarY: '', mSaddleToHand: '', mDrop: '', mBbHeight: '',
     source: '',
 };
 
@@ -120,7 +120,7 @@ const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
     },
     fit: { saddleHeight: toNum(f.saddleHeight), saddleSetback: toNum(f.saddleSetback) },
     measured: {
-        barX: toNum(f.mBarX), barY: toNum(f.mBarY), seatedReach: toNum(f.mSeatedReach),
+        barX: toNum(f.mBarX), barY: toNum(f.mBarY), saddleToHand: toNum(f.mSaddleToHand),
         saddleToBarDrop: toNum(f.mDrop), bbHeight: toNum(f.mBbHeight),
     },
     meta: { source: f.source.trim() || undefined },
@@ -213,7 +213,7 @@ export default function GeometryScreen() {
         }
         if (geo?.measured) {
             set('mBarX', geo.measured.barX); set('mBarY', geo.measured.barY);
-            set('mSeatedReach', geo.measured.seatedReach); set('mDrop', geo.measured.saddleToBarDrop);
+            set('mSaddleToHand', geo.measured.saddleToHand); set('mDrop', geo.measured.saddleToBarDrop);
             set('mBbHeight', geo.measured.bbHeight);
         }
         if (geo?.meta?.source) f.source = geo.meta.source;
@@ -317,6 +317,7 @@ export default function GeometryScreen() {
             barX: derived.barX,
             barY: derived.barY,
             seatedReach: derived.seatedReach,
+            saddleToHand: derived.saddleToHand,
             saddleToBarDrop: derived.saddleToBarDrop,
             bbHeight: frontRadius - bbDrop,
         };
@@ -350,6 +351,7 @@ export default function GeometryScreen() {
             row('barY', derived.barY, refDerived.barY),
             row('drop', derived.saddleToBarDrop, refDerived.saddleToBarDrop),
             row('seatedReach', derived.seatedReach, refDerived.seatedReach),
+            row('saddleToHand', derived.saddleToHand, refDerived.saddleToHand),
             row('stem', geometry.cockpit?.stemLength, ref.cockpit?.stemLength),
             row('rise', geometry.cockpit?.barRise, ref.cockpit?.barRise),
             row('width', geometry.cockpit?.barWidth, ref.cockpit?.barWidth),
@@ -564,6 +566,7 @@ export default function GeometryScreen() {
                                     ['rad', derived.rad, 0],
                                     ['drop', derived.saddleToBarDrop, 0],
                                     ['seatedReach', derived.seatedReach, 0],
+                                    ['saddleToHand', derived.saddleToHand, 0],
                                     ['barY', derived.barY, 0],
                                 ] as [string, number | null | undefined, number][]).map(([id, value, digits]) => (
                                     <View key={id} style={styles.metricCell}>
@@ -701,6 +704,7 @@ export default function GeometryScreen() {
                             {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: assumedSaddleHeight != null ? String(assumedSaddleHeight) : '—' })}
                             {field('saddleSetback', 'geometry.field_saddle_setback', { placeholder: assumedSetback != null ? String(assumedSetback) : '—' })}
                         </View>
+                        <Text style={styles.hint}>{t('geometry.cockpit_saddle_hint')}</Text>
                         <View style={styles.inputRow}>
                             {field('dropperTravel', 'geometry.field_dropper_hub')}
                             {field('seatpostExposed', 'geometry.field_seatpost_exposed')}
@@ -742,20 +746,23 @@ export default function GeometryScreen() {
                             {field('mBarY', 'geometry.field_measured_bary', { placeholder: autoStr(autoMeasured.barY) })}
                             {field('mBarX', 'geometry.field_measured_barx', { placeholder: autoStr(autoMeasured.barX) })}
                         </View>
+                        <Text style={styles.hint}>{t('geometry.measured_hint_bar')}</Text>
                         <View style={styles.inputRow}>
-                            {field('mSeatedReach', 'geometry.field_measured_seated_reach', { placeholder: autoStr(autoMeasured.seatedReach) })}
+                            {field('mSaddleToHand', 'geometry.field_measured_saddle_hand', { placeholder: autoStr(autoMeasured.saddleToHand) })}
                             {field('mDrop', 'geometry.field_measured_drop', { placeholder: autoStr(autoMeasured.saddleToBarDrop) })}
                         </View>
+                        <Text style={styles.hint}>{t('geometry.measured_hint_saddle')}</Text>
                         <View style={styles.inputRow}>
                             {field('mBbHeight', 'geometry.field_measured_bb_height', { placeholder: autoStr(autoMeasured.bbHeight) })}
                         </View>
+                        <Text style={styles.hint}>{t('geometry.measured_hint_bb')}</Text>
                         <BPButton
                             title={t('geometry.measured_apply')}
                             onPress={() => setForm(prev => ({
                                 ...prev,
                                 mBarY: autoStr(autoMeasured.barY) ?? '',
                                 mBarX: autoStr(autoMeasured.barX) ?? '',
-                                mSeatedReach: autoStr(autoMeasured.seatedReach) ?? '',
+                                mSaddleToHand: autoStr(autoMeasured.saddleToHand) ?? '',
                                 mDrop: autoStr(autoMeasured.saddleToBarDrop) ?? '',
                                 mBbHeight: autoStr(autoMeasured.bbHeight) ?? '',
                             }))}
