@@ -25,7 +25,7 @@ import {
     SymptomId,
     SYMPTOMS,
 } from '@/lib/geometry';
-import { wheelRadii } from '@/lib/bikeSketch';
+import { CrankMode, wheelRadii } from '@/lib/bikeSketch';
 import { SyncBike, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -127,6 +127,7 @@ export default function GeometryScreen() {
     const [saving, setSaving] = useState(false);
     const [sag, setSag] = useState(20);
     const [viewMode, setViewMode] = useState<'side' | 'front'>('side');
+    const [crankMode, setCrankMode] = useState<CrankMode>('horizontal');
     const { width: windowWidth } = useWindowDimensions();
     const viewWidth = Math.max(260, Math.min(windowWidth, 960) - 2 * 24 - 2 * 16);
 
@@ -136,6 +137,14 @@ export default function GeometryScreen() {
         const fork = selectedBike?.components.find(c => c.type === 'fork');
         const value = parseFloat(fork?.setupValues?.find(s => s.key === 'travel')?.value ?? '');
         return Number.isFinite(value) && value > 0 ? value : travelStrokeDefaults(selectedBike?.type).travel;
+    }, [selectedBike]);
+
+    // Front tire width (mm) for the head-on sketch, from the wheel component
+    const frontTireWidthMm = useMemo(() => {
+        const wheel = selectedBike?.components.find(c => c.type === 'wheel_front');
+        const raw = setupVal(wheel, ['width', 'Breite']);
+        const inches = raw ? parseFloat(raw.replace(',', '.')) : NaN;
+        return Number.isFinite(inches) && inches > 0 ? Math.round(inches * 25.4) : null;
     }, [selectedBike]);
 
     const shockStroke = useMemo(() => {
@@ -213,6 +222,7 @@ export default function GeometryScreen() {
             inseam: toMm(profile.inseam),
             armLength: toMm(profile.armLength),
             torsoLength: toMm(profile.torsoLength),
+            shoulderWidth: toMm(profile.shoulderWidth),
         });
     }, []);
 
@@ -410,15 +420,30 @@ export default function GeometryScreen() {
                                 containerStyle={{ marginBottom: theme.spacing.md }}
                             />
                             {viewMode === 'side' ? (
-                                <BikeSideView
-                                    geometry={displayGeometry}
-                                    derived={derived}
-                                    sagPercent={sag}
-                                    forkTravel={forkTravel}
-                                    shockStroke={shockStroke}
-                                    torsoLength={rider.torsoLength}
-                                    width={viewWidth}
-                                />
+                                <>
+                                    <BPSegmentedControl
+                                        options={[
+                                            { label: t('geometry.crank_horizontal'), value: 'horizontal' },
+                                            { label: t('geometry.crank_vertical'), value: 'vertical' },
+                                        ]}
+                                        value={crankMode}
+                                        onChange={(v) => setCrankMode(v as CrankMode)}
+                                        accentColor={ACCENT}
+                                        containerStyle={{ marginBottom: theme.spacing.sm }}
+                                    />
+                                    <BikeSideView
+                                        geometry={displayGeometry}
+                                        derived={derived}
+                                        sagPercent={sag}
+                                        forkTravel={forkTravel}
+                                        shockStroke={shockStroke}
+                                        torsoLength={rider.torsoLength}
+                                        inseam={rider.inseam}
+                                        crankLength={toNum(form.crankLength)}
+                                        crankMode={crankMode}
+                                        width={viewWidth}
+                                    />
+                                </>
                             ) : (
                                 <BikeFrontView
                                     geometry={displayGeometry}
@@ -426,6 +451,7 @@ export default function GeometryScreen() {
                                     shoulderWidth={rider.shoulderWidth}
                                     sagPercent={sag}
                                     forkTravel={forkTravel}
+                                    tireWidthMm={frontTireWidthMm}
                                     width={viewWidth}
                                 />
                             )}

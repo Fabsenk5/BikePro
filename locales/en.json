@@ -1177,7 +1177,7 @@
         "saved": "Geometry saved ✅",
         "save_error": "Saving failed — offline? Will retry on next save.",
         "frame_hint": "Tip: use the “effective” seat angle (describes the actual seated position). BB drop ≠ BB height — enter the height under Measured.",
-        "view_title": "🖼️ Side view",
+        "view_title": "Geometry visualization",
         "view_sag_label": "Assumed sag",
         "view_hint": "Technical sketch (simplified): sag lowers frame and rider between the axles — the wheels stay on the ground.",
         "view_no_data": "Enter frame and cockpit values — the sketch will appear.",
@@ -1186,6 +1186,9 @@
         "view_front_caption": "Grip span {{grip}} mm · shoulders {{shoulder}} mm · Δ {{delta}} mm",
         "view_front_no_shoulder": "Add shoulder width in the profile — then we compare it with the grip span.",
         "view_front_hint": "Guideline: grips around shoulder width up to +40 mm — wider = more control, narrower = more efficient.",
+        "crank_horizontal": "Pedal horizontal",
+        "crank_vertical": "Pedal at bottom",
+        "knee_bend_caption": "Knee bend at bottom: {{deg}}° — guideline 25–35° at correct saddle height",
         "measured_apply": "Apply computed values to the fields",
         "metrics_assumed_saddle": "Saddle height: assuming {{mm}} mm (0.883 × inseam) — enter your measured saddle height in the cockpit tab.",
         "bbdrop_warning": "Careful: this looks like the BB height. BB drop is the distance below the wheel-axle line (e.g. 23 mm) — the BB height (e.g. 352 mm) belongs under Measured."

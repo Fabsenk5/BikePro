@@ -71,6 +71,28 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
         }
     });
 
+    it('rider pose: bent arms and knees for all scenarios', () => {
+        for (const s of GEOMETRY_SCENARIOS) {
+            const derived = computeContactGeometry(s.geo);
+            const opts = { sagPercent: 0, forkTravel: 170, shockStroke: 60, inseam: s.rider.inseam, crankLength: 170 };
+            const vertical = buildBikeSketch(s.geo, derived, { ...opts, crankMode: 'vertical' })!;
+            const horizontal = buildBikeSketch(s.geo, derived, { ...opts, crankMode: 'horizontal' })!;
+            // elbow sits behind the shoulder–hand line (bent arm, attack position)
+            for (const k of [vertical, horizontal]) {
+                expect(k.riderElbow.x, s.name).toBeLessThan((k.riderShoulder.x + k.hand.x) / 2);
+            }
+            // bottom pedal: leg nearly straight but not locked out
+            expect(vertical.riderPedal.x).toBeCloseTo(0, 6);
+            expect(vertical.riderPedal.y).toBeCloseTo(-170, 6);
+            expect(vertical.kneeBendDeg!, s.name).toBeGreaterThan(10);
+            expect(vertical.kneeBendDeg!, s.name).toBeLessThan(50);
+            // horizontal pedal: clearly bent knee, knee in front of the hip
+            expect(horizontal.riderPedal.x).toBeCloseTo(170, 6);
+            expect(horizontal.kneeBendDeg!, s.name).toBeGreaterThan(40);
+            expect(horizontal.riderKnee!.x, s.name).toBeGreaterThan(horizontal.riderHip.x);
+        }
+    });
+
     it('front sketch: grip span vs shoulder width', () => {
         for (const s of GEOMETRY_SCENARIOS) {
             const derived = computeContactGeometry(s.geo);
@@ -78,6 +100,7 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
                 shoulderWidth: s.rider.shoulderWidth,
                 sagPercent: 0,
                 forkTravel: 170,
+                tireWidthMm: 63,
             });
             expect(front, s.name).not.toBeNull();
             expect(front!.gripHalfSpan).toBeCloseTo(s.geo.cockpit!.barWidth! / 2 - 40, 6);
@@ -85,6 +108,7 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             expect(front!.barGroundY).toBeGreaterThan(front!.wheelRadius - 100);
             expect(front!.shoulderY).toBeGreaterThan(front!.barGroundY);
             expect(front!.headCenter.y).toBeGreaterThan(front!.shoulderY);
+            expect(front!.tireWidthMm).toBe(63);
             // modern MTB bars: grip span wider than the shoulders
             expect(front!.gripHalfSpan * 2, s.name).toBeGreaterThan(s.rider.shoulderWidth!);
         }
@@ -95,5 +119,6 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
         const derived = computeContactGeometry(s.geo);
         const front = buildFrontSketch(s.geo, derived, { shoulderWidth: null, sagPercent: 20, forkTravel: 170 })!;
         expect(front.shoulderHalfWidth).toBeNull();
+        expect(front.tireWidthMm).toBe(60); // default width
     });
 });

@@ -10,7 +10,8 @@ description: Manifest für den Feature 11 (Geometrie & Fit) Agent
 ## Spezifikation:
 - **Datenmodell:** `bikes.geometry` JSONB (frame / cockpit / fit / measured / meta), Sanitizing + Sync über `lib/sync.ts`.
 - **Rechenlogik:** `lib/geometry.ts` — Kontaktgeometrie (Bar-/Handposition inkl. Backsweep/Upsweep, RAD, Sattel→Lenker-Drop, Sitz-Reach), Disziplin-Zielbänder (Tour/Trail/Enduro/DH), Fit-Checks, Symptom-Engine (8 Symptome).
-- **Integration:** Auto-Fill aus Component Tracker (Lenker/Vorbau/Sattel), Körpermaße aus dem Profil (Größe, Innenbein, optional Arm/Oberkörper), Deep-Links (`?editComponent=`), Wiki-Messanleitung.
+- **Integration:** Auto-Fill aus Component Tracker (Lenker/Vorbau/Sattel), Körpermaße aus dem Profil (Größe, Innenbein, optional Arm/Oberkörper/Schulter), Deep-Links (`?editComponent=`), Wiki-Messanleitung.
+- **Skizzen:** `lib/bikeSketch.ts` + `components/BikeSideView.tsx`/`BikeFrontView.tsx` — Seitenansicht (Sag-Pitch, Fahrerpose mit Ellenbogen-/Kniebeugung, Pedalstellung horizontal/unten umschaltbar, Kniebeugungs-Richtwert) und Frontansicht (Reifenbreite von vorn, Schulter vs. Griffweite); Skizzen-Mathematik szenario-getestet.
 - **UI:** `app/(features)/geometry.tsx` — Tabs: Analyse, Rahmen, Cockpit, Messwerte, Vergleich.
 - **Qualität:** Unit-Tests + Szenario-Matrix (`lib/geometry*.test.ts`); jede Formel-/Band-Änderung muss die Matrix bestehen.
 

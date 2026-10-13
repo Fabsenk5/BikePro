@@ -64,3 +64,48 @@ describe('buildBikeSketch', () => {
         expect(buildBikeSketch(incomplete, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })).toBeNull();
     });
 });
+
+describe('rider pose', () => {
+    const pose = { inseam: 840, crankLength: 170 };
+
+    it('bends the elbow backward from the shoulder–hand line', () => {
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose })!;
+        const midX = (s.riderShoulder.x + s.hand.x) / 2;
+        expect(s.riderElbow.x).toBeLessThan(midX);
+        expect(s.riderElbow.y).toBeLessThan(s.riderShoulder.y);
+    });
+
+    it('bends the knee toward the bottom pedal and reports the bend', () => {
+        const s = buildBikeSketch(geo, derived, {
+            sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, crankMode: 'vertical',
+        })!;
+        expect(s.riderPedal.x).toBeCloseTo(0, 6);
+        expect(s.riderPedal.y).toBeCloseTo(-170, 6);
+        expect(s.riderKnee).not.toBeNull();
+        expect(s.kneeBendDeg).not.toBeNull();
+        // at the bottom the leg is nearly straight — but not locked out
+        expect(s.kneeBendDeg!).toBeGreaterThan(15);
+        expect(s.kneeBendDeg!).toBeLessThan(45);
+        expect(s.kopsOffsetMm).toBeNull();
+    });
+
+    it('places the horizontal pedal forward with a bent knee', () => {
+        const s = buildBikeSketch(geo, derived, {
+            sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, crankMode: 'horizontal',
+        })!;
+        expect(s.riderPedal.x).toBeCloseTo(170, 6);
+        expect(s.riderPedal.y).toBeCloseTo(0, 6);
+        expect(s.kneeBendDeg!).toBeGreaterThan(40);
+        expect(s.kopsOffsetMm).not.toBeNull();
+        expect(Math.abs(s.kopsOffsetMm!)).toBeLessThan(300);
+    });
+
+    it('falls back to a straight leg without an inseam', () => {
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s.riderKnee).toBeNull();
+        expect(s.kneeBendDeg).toBeNull();
+        expect(s.kopsOffsetMm).toBeNull();
+        // default crank mode is horizontal
+        expect(s.riderPedal.x).toBeCloseTo(170, 6);
+    });
+});

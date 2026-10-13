@@ -1177,7 +1177,7 @@
         "saved": "Geometrie gespeichert ✅",
         "save_error": "Speichern fehlgeschlagen — offline? Wird beim nächsten Speichern erneut versucht.",
         "frame_hint": "Tipp: den „effektiven\" Sitzwinkel verwenden (beschreibt die tatsächliche Sitzposition). Tretlager-Absenkung ≠ Tretlagerhöhe — die Höhe trägst du unter Messwerte ein.",
-        "view_title": "🖼️ Seitenansicht",
+        "view_title": "Geometrie-Visualisierung",
         "view_sag_label": "Sag-Annahme",
         "view_hint": "Technische Skizze (vereinfacht): Der Sag senkt Rahmen und Fahrer zwischen den Achsen ab — die Räder bleiben am Boden.",
         "view_no_data": "Trage Rahmen- und Cockpitwerte ein — dann erscheint die Skizze.",
@@ -1186,6 +1186,9 @@
         "view_front_caption": "Griffweite {{grip}} mm · Schultern {{shoulder}} mm · Δ {{delta}} mm",
         "view_front_no_shoulder": "Schulterbreite im Profil ergänzen — dann vergleichen wir sie mit der Griffweite.",
         "view_front_hint": "Richtwert: Griffe etwa auf Schulterbreite bis +40 mm — breiter = mehr Kontrolle, schmaler = effizienter.",
+        "crank_horizontal": "Pedal horizontal",
+        "crank_vertical": "Pedal unten",
+        "knee_bend_caption": "Kniebeugung unten: {{deg}}° — Richtwert 25–35° bei korrekter Sattelhöhe",
         "measured_apply": "Berechnete Werte in die Felder übernehmen",
         "metrics_assumed_saddle": "Sattelhöhe: Annahme {{mm}} mm (0,883 × Innenbein) — trage deine gemessene Sattelhöhe im Cockpit-Tab ein.",
         "bbdrop_warning": "Achtung: Das sieht nach der Tretlagerhöhe aus. Die Absenkung (BB-Drop) ist der Abstand unter der Radachsen-Linie (z. B. 23 mm) — die Tretlagerhöhe (z. B. 352 mm) trägst du unter Messwerte ein."
