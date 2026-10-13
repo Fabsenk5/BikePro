@@ -249,6 +249,42 @@ describe('rider mode and springs', () => {
     });
 });
 
+describe('body segment proportions', () => {
+    it('arm segments add up to the arm length (shoulder → ball of hand)', () => {
+        const armLength = 640;
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, inseam: 840, armLength })!;
+        const upper = Math.hypot(s.riderElbow.x - s.riderShoulder.x, s.riderElbow.y - s.riderShoulder.y);
+        const forearm = Math.hypot(s.hand.x - s.riderElbow.x, s.hand.y - s.riderElbow.y);
+        expect(upper + forearm).toBeCloseTo(armLength, 0);
+        // upper arm ≈ 0.48 of the arm (forearm incl. hand to the ball ≈ 0.52)
+        expect(upper / armLength).toBeCloseTo(0.48, 2);
+    });
+
+    it('leg segments add up to the functional leg (1.2 × inseam)', () => {
+        const inseam = 840;
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, inseam })!;
+        const thigh = Math.hypot(s.riderKnee!.x - s.riderHip.x, s.riderKnee!.y - s.riderHip.y);
+        const shin = Math.hypot(s.riderPedal.x - s.riderKnee!.x, s.riderPedal.y - s.riderKnee!.y);
+        expect(thigh).toBeCloseTo(inseam * 0.53, 1);
+        expect(shin).toBeCloseTo(inseam * 0.67, 1);
+        // thigh ≈ 0.44 of the functional leg
+        expect(thigh / (thigh + shin)).toBeCloseTo(0.44, 2);
+    });
+
+    it('reproduces the knee-bend guideline at the LeMond saddle height', () => {
+        for (const inseam of [780, 840, 900]) {
+            const saddleHeight = Math.round(0.883 * inseam);
+            const setback = Math.max(20, Math.min(120, Math.round(saddleHeight * Math.cos((78 * Math.PI) / 180) - 110)));
+            const g = { ...geo, fit: { saddleHeight, saddleSetback: setback } };
+            const s = buildBikeSketch(g, computeContactGeometry(g), {
+                sagPercent: 0, forkTravel: 170, shockStroke: 60, inseam, crankMode: 'vertical',
+            })!;
+            expect(s.kneeBendDeg!, `inseam ${inseam}`).toBeGreaterThan(15);
+            expect(s.kneeBendDeg!, `inseam ${inseam}`).toBeLessThan(40);
+        }
+    });
+});
+
 describe('springPoints', () => {
     it('draws the coil over the travel between solid body and rest', () => {
         const a = { x: 0, y: 200 };

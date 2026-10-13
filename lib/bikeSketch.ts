@@ -60,7 +60,15 @@ const HEAD_TUBE_LENGTH = 110;
 const DEFAULT_TORSO = 550;
 /** Hip joint sits above the saddle surface (mm). */
 const HIP_ABOVE_SADDLE = 60;
-/** Functional leg segments relative to inseam (shin includes the foot to the pedal). */
+/**
+ * Body segment proportions (fractions of the profile measurements):
+ * - thigh (femur) ≈ 0.53 × inseam (anthropometry: femur ≈ 0.245 × height,
+ *   inseam ≈ 0.47 × height → ≈ 0.52)
+ * - shin incl. foot to the pedal ≈ 0.67 × inseam (tibia ≈ 0.52 × inseam plus
+ *   the ankle→pedal distance; sum = 1.20 × inseam is the functional leg
+ *   hip joint → pedal and reproduces the 25–35° knee-bend guideline at the
+ *   LeMond saddle height)
+ */
 const THIGH_RATIO = 0.53;
 const SHIN_RATIO = 0.67;
 /** Standing hips sit higher and slightly behind the BB compared to the seated pose. */
@@ -129,8 +137,12 @@ function twoBoneIK(
 const ARM_BEND_FACTOR = 0.97;
 /** Attack position: strongly bent arms (effective reach share). */
 const ATTACK_ARM_BEND = 0.8;
-/** Upper-arm share of the arm length (rest = forearm + hand). */
-const UPPER_ARM_RATIO = 0.45;
+/**
+ * Arm share: upper arm (shoulder → elbow) ≈ 0.48 of the arm length, the rest
+ * is forearm + hand to the ball (≈ 0.52) — anthropometry: upper arm 0.186 ×
+ * height vs. forearm 0.146 + hand-to-ball ≈ 0.05.
+ */
+const UPPER_ARM_RATIO = 0.48;
 /** Fallback arm length (shoulder → wrist) when the profile has none. */
 export const DEFAULT_ARM = 640;
 
