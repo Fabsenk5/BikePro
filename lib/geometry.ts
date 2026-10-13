@@ -322,6 +322,40 @@ export function assumedSaddleSetback(saddleHeight: number, seatAngle: number): n
     return Math.round(Math.max(20, Math.min(120, alongTube - SADDLE_NOSE_OFFSET)));
 }
 
+/**
+ * Common cockpit standards per discipline — assumptions for missing tracker
+ * values (gray placeholders + apply option in the cockpit tab). Rider-fit
+ * dims (bar width, stem length) use typical build values per category.
+ */
+export interface CockpitDefaults {
+    barRise: number;
+    backsweep: number;
+    upsweep: number;
+    barWidth: number;
+    stemLength: number;
+    stemAngle: number;
+    crankLength: number;
+}
+
+export function cockpitDefaults(bikeType?: string): CockpitDefaults {
+    switch (bikeType) {
+        case 'xc':
+            return { barRise: 15, backsweep: 9, upsweep: 5, barWidth: 740, stemLength: 70, stemAngle: 0, crankLength: 175 };
+        case 'downhill':
+            return { barRise: 35, backsweep: 8, upsweep: 5, barWidth: 800, stemLength: 35, stemAngle: 0, crankLength: 165 };
+        case 'dirt':
+            return { barRise: 40, backsweep: 8, upsweep: 5, barWidth: 780, stemLength: 40, stemAngle: 0, crankLength: 165 };
+        case 'emtb':
+        case 'e-mtb':
+            return { barRise: 30, backsweep: 9, upsweep: 5, barWidth: 780, stemLength: 45, stemAngle: 0, crankLength: 165 };
+        case 'trail':
+            return { barRise: 25, backsweep: 9, upsweep: 5, barWidth: 770, stemLength: 50, stemAngle: 0, crankLength: 170 };
+        case 'enduro':
+        default:
+            return { barRise: 30, backsweep: 9, upsweep: 5, barWidth: 780, stemLength: 40, stemAngle: 0, crankLength: 170 };
+    }
+}
+
 const bandStatus = (value: number | null | undefined, band: ReferenceBand): CheckStatus => {
     if (value == null) return 'unknown';
     if (value < band.min) return 'low';

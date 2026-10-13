@@ -13,6 +13,7 @@ import { showAlert } from '@/lib/dialog';
 import {
     assumedSaddleSetback,
     BikeGeometry,
+    cockpitDefaults,
     computeContactGeometry,
     Discipline,
     DISCIPLINE_REFERENCES,
@@ -258,9 +259,11 @@ export default function GeometryScreen() {
 
     const geometry = useMemo(() => buildGeometryFromForm(form), [form]);
 
-    // Assumed saddle height (0.883 × inseam) and setback (from the seat-tube
-    // geometry) when none are entered yet — the model and sketches work before
-    // the tape measurement exists; both are offered as gray placeholders.
+    // Assumed saddle height (0.883 × inseam), setback (from the seat-tube
+    // geometry) and cockpit standards per discipline when none are entered yet —
+    // the model and sketches work before the tape measurement exists; all of
+    // them are offered as gray placeholders + apply option in the cockpit tab.
+    const cockpitAssumed = useMemo(() => cockpitDefaults(selectedBike?.type), [selectedBike]);
     const assumedSaddleHeight = rider.inseam ? saddleHeightTarget(rider.inseam) : null;
     const assumedSetback = useMemo(() => {
         const height = geometry.fit?.saddleHeight ?? assumedSaddleHeight;
@@ -268,14 +271,15 @@ export default function GeometryScreen() {
         return assumedSaddleSetback(height, geometry.frame?.seatAngle ?? 75);
     }, [geometry, assumedSaddleHeight]);
     const displayGeometry = useMemo(() => {
+        const cockpit = { ...geometry.cockpit };
+        (Object.keys(cockpitAssumed) as (keyof typeof cockpitAssumed)[]).forEach(key => {
+            if (cockpit[key] == null) cockpit[key] = cockpitAssumed[key];
+        });
         const fit = { ...geometry.fit };
         if (fit.saddleHeight == null && assumedSaddleHeight != null) fit.saddleHeight = assumedSaddleHeight;
         if (fit.saddleSetback == null && assumedSetback != null) fit.saddleSetback = assumedSetback;
-        if (fit.saddleHeight === geometry.fit?.saddleHeight && fit.saddleSetback === geometry.fit?.saddleSetback) {
-            return geometry;
-        }
-        return { ...geometry, fit };
-    }, [geometry, assumedSaddleHeight, assumedSetback]);
+        return { ...geometry, cockpit, fit };
+    }, [geometry, cockpitAssumed, assumedSaddleHeight, assumedSetback]);
 
     const derived = useMemo(() => computeContactGeometry(displayGeometry), [displayGeometry]);
 
@@ -296,8 +300,8 @@ export default function GeometryScreen() {
     const autoStr = (value: number | null | undefined) =>
         value == null ? undefined : String(Math.round(value));
     const reference = DISCIPLINE_REFERENCES[discipline];
-    const checks = useMemo(() => evaluateFit(geometry, derived, reference, rider), [geometry, derived, reference, rider]);
-    const advice = useMemo(() => recommendForSymptoms(symptoms, geometry, derived, rider), [symptoms, geometry, derived, rider]);
+    const checks = useMemo(() => evaluateFit(displayGeometry, derived, reference, rider), [displayGeometry, derived, reference, rider]);
+    const advice = useMemo(() => recommendForSymptoms(symptoms, displayGeometry, derived, rider), [symptoms, displayGeometry, derived, rider]);
 
     const referenceBike = bikes.find(b => b.id === referenceBikeId);
     const refDerived = useMemo(
@@ -650,43 +654,48 @@ export default function GeometryScreen() {
                     <BPCard style={styles.card}>
                         <Text style={styles.cardTitle}>🔧 {t('geometry.cockpit_title')}</Text>
                         <Text style={styles.hint}>{t('geometry.tracker_hint')}</Text>
+                        <Text style={styles.hint}>{t('geometry.cockpit_assumptions_hint')}</Text>
                         <View style={styles.inputRow}>
-                            {field('barRise', 'geometry.field_bar_rise')}
-                            {field('backsweep', 'geometry.field_backsweep', { suffix: '°', decimal: true })}
-                            {field('upsweep', 'geometry.field_upsweep', { suffix: '°', decimal: true })}
+                            {field('barRise', 'geometry.field_bar_rise', { placeholder: String(cockpitAssumed.barRise) })}
+                            {field('backsweep', 'geometry.field_backsweep', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.backsweep) })}
+                            {field('upsweep', 'geometry.field_upsweep', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.upsweep) })}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('barWidth', 'geometry.field_bar_width')}
-                            {field('stemLength', 'geometry.field_stem_length')}
+                            {field('barWidth', 'geometry.field_bar_width', { placeholder: String(cockpitAssumed.barWidth) })}
+                            {field('stemLength', 'geometry.field_stem_length', { placeholder: String(cockpitAssumed.stemLength) })}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('stemAngle', 'geometry.field_stem_angle', { suffix: '°', decimal: true })}
+                            {field('stemAngle', 'geometry.field_stem_angle', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.stemAngle) })}
                             {field('spacers', 'geometry.field_spacers')}
-                            {field('crankLength', 'geometry.field_crank_length')}
+                            {field('crankLength', 'geometry.field_crank_length', { placeholder: String(cockpitAssumed.crankLength) })}
                         </View>
                         <View style={styles.inputRow}>
                             {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: assumedSaddleHeight != null ? String(assumedSaddleHeight) : '—' })}
                             {field('saddleSetback', 'geometry.field_saddle_setback', { placeholder: assumedSetback != null ? String(assumedSetback) : '—' })}
                         </View>
-                        {(assumedSaddleHeight != null || assumedSetback != null) && (
-                            <BPButton
-                                title={t('geometry.cockpit_apply', {
-                                    height: assumedSaddleHeight ?? '—',
-                                    setback: assumedSetback ?? '—',
-                                })}
-                                onPress={() => setForm(prev => ({
-                                    ...prev,
-                                    saddleHeight: prev.saddleHeight
-                                        || (assumedSaddleHeight != null ? numStr(assumedSaddleHeight, i18n.language) : ''),
-                                    saddleSetback: prev.saddleSetback
-                                        || (assumedSetback != null ? numStr(assumedSetback, i18n.language) : ''),
-                                }))}
-                                variant="secondary"
-                                color={ACCENT}
-                                size="sm"
-                                style={{ marginTop: theme.spacing.sm }}
-                            />
-                        )}
+                        <BPButton
+                            title={t('geometry.cockpit_apply')}
+                            onPress={() => setForm(prev => {
+                                const next = { ...prev };
+                                const fill = (key: keyof GeometryForm, value?: number | null) => {
+                                    if (!next[key] && value != null) next[key] = numStr(value, i18n.language);
+                                };
+                                fill('barRise', cockpitAssumed.barRise);
+                                fill('backsweep', cockpitAssumed.backsweep);
+                                fill('upsweep', cockpitAssumed.upsweep);
+                                fill('barWidth', cockpitAssumed.barWidth);
+                                fill('stemLength', cockpitAssumed.stemLength);
+                                fill('stemAngle', cockpitAssumed.stemAngle);
+                                fill('crankLength', cockpitAssumed.crankLength);
+                                fill('saddleHeight', assumedSaddleHeight);
+                                fill('saddleSetback', assumedSetback);
+                                return next;
+                            })}
+                            variant="secondary"
+                            color={ACCENT}
+                            size="sm"
+                            style={{ marginTop: theme.spacing.sm }}
+                        />
                     </BPCard>
                 )}
 

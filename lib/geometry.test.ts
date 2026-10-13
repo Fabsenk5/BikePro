@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     assumedSaddleSetback,
     BikeGeometry,
+    cockpitDefaults,
     computeContactGeometry,
     evaluateFit,
     DISCIPLINE_REFERENCES,
@@ -106,6 +107,35 @@ describe('evaluateFit', () => {
         // clamped to a realistic band
         expect(assumedSaddleSetback(600, 80)).toBe(20);
         expect(assumedSaddleSetback(900, 60)).toBe(120);
+    });
+
+    it('provides cockpit standards per discipline', () => {
+        // freeride/DH: 0° stem, short cranks, wide bar
+        expect(cockpitDefaults('downhill')).toMatchObject({ stemAngle: 0, crankLength: 165, barWidth: 800, stemLength: 35 });
+        expect(cockpitDefaults('dirt').crankLength).toBe(165);
+        // e-MTBs run shorter cranks too
+        expect(cockpitDefaults('emtb').crankLength).toBe(165);
+        // enduro/trail standard
+        expect(cockpitDefaults('enduro')).toMatchObject({ crankLength: 170, backsweep: 9, upsweep: 5, stemAngle: 0 });
+        expect(cockpitDefaults('trail').crankLength).toBe(170);
+        // XC: longer cranks, narrow bar, long stem
+        expect(cockpitDefaults('xc')).toMatchObject({ crankLength: 175, barWidth: 740, stemLength: 70 });
+        // unknown type falls back to the enduro standard
+        expect(cockpitDefaults(undefined)).toEqual(cockpitDefaults('enduro'));
+    });
+
+    it('cockpit standards complete a bare geometry into a full model', () => {
+        const standards = cockpitDefaults('enduro');
+        const geo: BikeGeometry = { frame: { stack: 630, reach: 480 }, cockpit: { ...standards } };
+        const derived = computeContactGeometry(geo);
+        // bar = reach + stem (0°) and stack + rise (no spacers entered)
+        expect(derived.barX).toBeCloseTo(480 + standards.stemLength, 6);
+        expect(derived.barY).toBeCloseTo(630 + standards.barRise, 6);
+        // hand position uses backsweep/upsweep
+        const span = standards.barWidth / 2 - 40;
+        expect(derived.handX).toBeCloseTo(derived.barX! - span * Math.sin((standards.backsweep * Math.PI) / 180), 6);
+        expect(derived.handY).toBeCloseTo(derived.barY! + span * Math.sin((standards.upsweep * Math.PI) / 180), 6);
+        expect(derived.rad).toBeGreaterThan(600);
     });
 });
 
