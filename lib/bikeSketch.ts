@@ -74,20 +74,23 @@ const SHIN_RATIO = 0.67;
 /** Standing hips sit higher and slightly behind the BB compared to the seated pose. */
 const STANDING_HIP_RISE = 60;
 const STANDING_HIP_BACK = 30;
-/** Attack flat (flowing terrain): moderately crouched, hips back and a bit down. */
-const ATTACK_FLAT_HIP_RISE = 30;
-const ATTACK_FLAT_HIP_BACK = 70;
-/** Attack steep (steep terrain): deeper crouch, hips further back. */
-const ATTACK_STEEP_HIP_RISE = 20;
-const ATTACK_STEEP_HIP_BACK = 90;
+/**
+ * Attack positions are hip hinges: the butt goes back and up (the saddle ends
+ * up well below the hips), the chest drops — the back gets flat, the legs
+ * straighten while the pedals stay reachable.
+ */
+const ATTACK_FLAT_HIP_RISE = 50;
+const ATTACK_FLAT_HIP_BACK = 110;
+const ATTACK_STEEP_HIP_RISE = 110;
+const ATTACK_STEEP_HIP_BACK = 190;
 /** Attack arms: strongly bent (effective reach share per variant). */
 const ATTACK_FLAT_ARM_BEND = 0.8;
 const ATTACK_STEEP_ARM_BEND = 0.7;
 /** Torso lean fallbacks (from horizontal) when no bar position is known. */
 const TORSO_ANGLE_SEATED = 55;
 const TORSO_ANGLE_STANDING = 60;
-const TORSO_ANGLE_ATTACK_FLAT = 40;
-const TORSO_ANGLE_ATTACK_STEEP = 35;
+const TORSO_ANGLE_ATTACK_FLAT = 36;
+const TORSO_ANGLE_ATTACK_STEEP = 22;
 /** Hip joint sits this far behind the saddle nose (above the rail clamp). */
 const HIP_BEHIND_NOSE = 60;
 /** Dropper travel assumed when the component does not state a hub. */

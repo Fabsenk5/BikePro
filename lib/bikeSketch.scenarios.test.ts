@@ -155,12 +155,12 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             expect(standing.saddleGroundY, s.name).toBeLessThan(seated.saddleGroundY - 100);
             expect(standing.hipY, s.name).toBeGreaterThan(standing.saddleGroundY + 100);
             expect(standing.hipY, s.name).toBeCloseTo(seated.hipY + 60, 6);
-            // attack: crouched between seated and standing, dropper down too
-            expect(attack.hipY, s.name).toBeCloseTo(seated.hipY + 20, 6);
-            expect(attack.hipY, s.name).toBeLessThan(standing.hipY);
-            expect(attackFlat.hipY, s.name).toBeCloseTo(seated.hipY + 30, 6);
+            // attack: hip hinge — butt behind/above the saddle, dropper down too
+            expect(attack.hipY, s.name).toBeCloseTo(seated.hipY + 110, 6);
+            expect(attack.hipY, s.name).toBeGreaterThan(standing.hipY);
+            expect(attackFlat.hipY, s.name).toBeCloseTo(seated.hipY + 50, 6);
             expect(attackFlat.hipY, s.name).toBeLessThan(standing.hipY);
-            expect(attackFlat.hipY, s.name).toBeGreaterThan(attack.hipY);
+            expect(attackFlat.hipY, s.name).toBeLessThan(attack.hipY);
             expect(attack.saddleGroundY, s.name).toBeCloseTo(standing.saddleGroundY, 6);
             expect(attackFlat.saddleGroundY, s.name).toBeCloseTo(standing.saddleGroundY, 6);
             // no sag → no used travel

@@ -176,7 +176,7 @@ describe('rider mode and springs', () => {
         expect(Math.hypot(slide.x, slide.y)).toBeCloseTo(170, 0);
     });
 
-    it('attack positions crouch: flat moderate, steep deeper and further back', () => {
+    it('attack positions hinge the hips: flat moderate, steep deeper', () => {
         const opts = { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, dropperTravel: 170 };
         const standing = buildBikeSketch(geo, derived, { ...opts, riderMode: 'standing' })!;
         const flat = buildBikeSketch(geo, derived, { ...opts, riderMode: 'attack-flat' })!;
@@ -184,12 +184,20 @@ describe('rider mode and springs', () => {
         // dropper compressed like standing in both attack variants
         expect(flat.saddle.y).toBeCloseTo(standing.saddle.y, 6);
         expect(steep.saddle.y).toBeCloseTo(standing.saddle.y, 6);
-        // steep drops deeper and sits further back than flat
-        expect(steep.riderHip.y).toBeLessThan(flat.riderHip.y);
+        // hips go back and up (butt behind and above the saddle), steep furthest
+        expect(flat.riderHip.x).toBeLessThan(flat.saddle.x);
+        expect(flat.riderHip.y).toBeGreaterThan(flat.saddle.y + 100);
         expect(steep.riderHip.x).toBeLessThan(flat.riderHip.x);
-        // both backs are flatter than standing, steep flattest
+        expect(steep.riderHip.y).toBeGreaterThan(flat.riderHip.y);
+        // the saddle ends up clearly below the steep hips (hip hinge)
+        expect(steep.riderHip.y - steep.saddle.y).toBeGreaterThan(150);
+        // backs are flatter than standing, steep flattest
         expect(flat.torsoAngleDeg).toBeLessThan(standing.torsoAngleDeg);
         expect(steep.torsoAngleDeg).toBeLessThan(flat.torsoAngleDeg);
+        // legs stay reachable: the pedals are still solved by the IK
+        expect(flat.riderKnee).not.toBeNull();
+        expect(steep.riderKnee).not.toBeNull();
+        expect(steep.kneeBendDeg!).toBeGreaterThan(10);
         // elbows bend harder than standing: elbow further off the shoulder–hand line
         const lineDist = (
             p: { x: number; y: number },
