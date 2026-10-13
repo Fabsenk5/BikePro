@@ -84,9 +84,9 @@ export default function BikeSideView({
         />
     );
 
-    // Zigzag spring: coil over the travel, solid line for the rest
+    // Zigzag spring: solid body, coil over the travel, solid rest
     const spring = (line: SpringLine, color: string) => {
-        const { coil, solid } = springPoints(line.top, line.bottom, line.used, line.travel);
+        const { coil, solids } = springPoints(line.top, line.bottom, line.used, line.travel, line.lead);
         return (
             <>
                 <Polyline
@@ -94,7 +94,9 @@ export default function BikeSideView({
                     fill="none" stroke={color} strokeWidth={2}
                     strokeLinejoin="round" strokeLinecap="round"
                 />
-                {tube(solid[0], solid[1], color, 2)}
+                {solids.map(([from, to], i) => (
+                    <React.Fragment key={i}>{tube(from, to, color, 2)}</React.Fragment>
+                ))}
             </>
         );
     };
@@ -138,13 +140,14 @@ export default function BikeSideView({
                     ].join(' ')}
                     fill={theme.colors.accentOrange}
                 />
-                {/* rider: torso, bent arm, both legs to the pedals */}
-                {riderMode === 'seated' && tube(
-                    { x: sketch.riderHip.x, y: sketch.saddle.y },
-                    sketch.riderHip,
+                {/* rider: torso sits on the saddle (seated) or starts at the hip (standing) */}
+                {tube(
+                    riderMode === 'seated'
+                        ? { x: sketch.riderHip.x, y: sketch.saddle.y }
+                        : sketch.riderHip,
+                    sketch.riderShoulder,
                     ACCENT, 3,
                 )}
-                {tube(sketch.riderHip, sketch.riderShoulder, ACCENT, 3)}
                 {tube(sketch.riderShoulder, sketch.riderElbow, ACCENT, 2)}
                 {tube(sketch.riderElbow, sketch.hand, ACCENT, 2)}
                 {sketch.riderLegs.filter(leg => !leg.near).map((leg, i) => (

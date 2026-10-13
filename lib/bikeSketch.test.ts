@@ -206,36 +206,43 @@ describe('rider mode and springs', () => {
         expect(sagged.forkSpring.used).toBeGreaterThan(20);
         expect(sagged.forkSpring.used).toBeLessThan(34);
         expect(sagged.shockSpring.used).toBeCloseTo(12, 6);
-        // travel carried for the coil length
+        // travel carried for the coil length; fork body = half the travel
         expect(sagged.forkSpring.travel).toBe(170);
+        expect(sagged.forkSpring.lead).toBe(85);
         expect(sagged.shockSpring.travel).toBe(60);
-        // coil + solid reconstruct the un-sagged spring line
+        // shock is drawn as a real damper body: ~3× stroke overall
+        expect(sagged.shockSpring.lead).toBe(60);
         const len = (p: { top: { x: number; y: number }; bottom: { x: number; y: number } }) =>
             Math.hypot(p.bottom.x - p.top.x, p.bottom.y - p.top.y);
+        expect(len(noSag.shockSpring)).toBeCloseTo(3 * 60, 0);
+        // coil + solid reconstruct the un-sagged spring line
         expect(len(sagged.forkSpring) + sagged.forkSpring.used).toBeCloseTo(len(noSag.forkSpring), 6);
         expect(len(sagged.shockSpring) + sagged.shockSpring.used).toBeCloseTo(len(noSag.shockSpring), 6);
     });
 });
 
 describe('springPoints', () => {
-    it('draws the coil over the travel and the rest as a solid line', () => {
-        const a = { x: 0, y: 100 };
+    it('draws the coil over the travel between solid body and rest', () => {
+        const a = { x: 0, y: 200 };
         const b = { x: 0, y: 0 };
-        const { coil, solid } = springPoints(a, { x: 0, y: 20 }, 20, 60);
-        // coil covers travel − used = 40 mm, starting at the frame side
-        expect(coil[0]).toEqual(a);
-        expect(coil[coil.length - 1]).toEqual({ x: 0, y: 60 });
+        const { coil, solids } = springPoints(a, { x: 0, y: 20 }, 20, 60, 60);
+        // solid body above the coil (lead = 60)
+        expect(solids[0][0]).toEqual(a);
+        expect(solids[0][1]).toEqual({ x: 0, y: 140 });
+        // coil covers travel − used = 40 mm
+        expect(coil[0]).toEqual({ x: 0, y: 140 });
+        expect(coil[coil.length - 1]).toEqual({ x: 0, y: 100 });
         expect(coil.length).toBeGreaterThanOrEqual(7);
         // interior points alternate around the axis
         const xs = coil.slice(1, -1).map(p => p.x);
         expect(Math.max(...xs)).toBeGreaterThan(0);
         expect(Math.min(...xs)).toBeLessThan(0);
-        // solid line continues to the wheel side …
-        expect(solid[0]).toEqual({ x: 0, y: 60 });
-        expect(solid[1]).toEqual({ x: 0, y: 20 });
-        // … and keeps its length while sag grows
-        const { solid: solidNoSag } = springPoints(a, b, 0, 60);
-        expect(solidNoSag[0]).toEqual({ x: 0, y: 40 });
-        expect(solid[0].y - solid[1].y).toBeCloseTo(solidNoSag[0].y - solidNoSag[1].y, 6);
+        // rest of the line below the coil
+        expect(solids[1][0]).toEqual({ x: 0, y: 100 });
+        expect(solids[1][1]).toEqual({ x: 0, y: 20 });
+        // without sag the coil is longer and the rest shorter, total stays
+        const noSag = springPoints(a, b, 0, 60, 60);
+        expect(noSag.coil[noSag.coil.length - 1]).toEqual({ x: 0, y: 80 });
+        expect(noSag.solids[1][1]).toEqual(b);
     });
 });

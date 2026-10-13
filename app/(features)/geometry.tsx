@@ -98,6 +98,13 @@ const disciplineForBikeType = (type?: string): Discipline => {
     }
 };
 
+/** Spacer input is counted in pieces — one standard spacer is 10 mm. */
+const SPACER_MM = 10;
+const spacerPieces = (value: string): number | undefined => {
+    const n = toNum(value);
+    return n != null ? n * SPACER_MM : undefined;
+};
+
 const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
     frame: {
         stack: toNum(f.stack), reach: toNum(f.reach), headAngle: toNum(f.headAngle), seatAngle: toNum(f.seatAngle),
@@ -107,7 +114,7 @@ const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
     },
     cockpit: {
         barRise: toNum(f.barRise), backsweep: toNum(f.backsweep), upsweep: toNum(f.upsweep), barWidth: toNum(f.barWidth),
-        stemLength: toNum(f.stemLength), stemAngle: toNum(f.stemAngle), spacers: toNum(f.spacers), crankLength: toNum(f.crankLength),
+        stemLength: toNum(f.stemLength), stemAngle: toNum(f.stemAngle), spacers: spacerPieces(f.spacers), crankLength: toNum(f.crankLength),
     },
     fit: { saddleHeight: toNum(f.saddleHeight), saddleSetback: toNum(f.saddleSetback) },
     measured: {
@@ -192,7 +199,8 @@ export default function GeometryScreen() {
             set('barRise', geo.cockpit.barRise); set('backsweep', geo.cockpit.backsweep);
             set('upsweep', geo.cockpit.upsweep); set('barWidth', geo.cockpit.barWidth);
             set('stemLength', geo.cockpit.stemLength); set('stemAngle', geo.cockpit.stemAngle);
-            set('spacers', geo.cockpit.spacers); set('crankLength', geo.cockpit.crankLength);
+            set('spacers', geo.cockpit.spacers != null ? geo.cockpit.spacers / SPACER_MM : undefined);
+            set('crankLength', geo.cockpit.crankLength);
         }
         if (geo?.fit) {
             set('saddleHeight', geo.fit.saddleHeight); set('saddleSetback', geo.fit.saddleSetback);
@@ -666,7 +674,7 @@ export default function GeometryScreen() {
                         </View>
                         <View style={styles.inputRow}>
                             {field('stemAngle', 'geometry.field_stem_angle', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.stemAngle) })}
-                            {field('spacers', 'geometry.field_spacers')}
+                            {field('spacers', 'geometry.field_spacers', { suffix: t('geometry.unit_pieces') })}
                             {field('crankLength', 'geometry.field_crank_length', { placeholder: String(cockpitAssumed.crankLength) })}
                         </View>
                         <View style={styles.inputRow}>

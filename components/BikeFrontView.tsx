@@ -97,9 +97,9 @@ export default function BikeFrontView({
     const frameColor = theme.colors.text;
     const wheelColor = theme.colors.textMuted;
 
-    // Zigzag spring: coil over the travel, solid line for the rest
+    // Zigzag spring: solid crown body, coil over the travel, solid lowers
     const spring = (top: SketchPoint, bottom: SketchPoint, used: number, travel: number) => {
-        const { coil, solid } = springPoints(top, bottom, used, travel);
+        const { coil, solids } = springPoints(top, bottom, used, travel, travel / 2);
         return (
             <>
                 <Polyline
@@ -107,7 +107,11 @@ export default function BikeFrontView({
                     fill="none" stroke={frameColor} strokeWidth={2}
                     strokeLinejoin="round" strokeLinecap="round"
                 />
-                {line(solid[0].x, solid[0].y, solid[1].x, solid[1].y, frameColor, 2)}
+                {solids.map(([from, to], i) => (
+                    <React.Fragment key={i}>
+                        {line(from.x, from.y, to.x, to.y, frameColor, 2)}
+                    </React.Fragment>
+                ))}
             </>
         );
     };

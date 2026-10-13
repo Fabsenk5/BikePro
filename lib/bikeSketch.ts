@@ -74,7 +74,6 @@ export const DEFAULT_DROPPER_TRAVEL = 170;
 /** Saddle stays at least this high above the seat cluster when the dropper is compressed. */
 const SADDLE_MIN_ABOVE_CLUSTER = 60;
 /** Rear shock is drawn along the seat tube (fraction of its length + forward offset). */
-const SHOCK_LINE_FROM = 0.15;
 const SHOCK_LINE_TO = 0.85;
 const SHOCK_LINE_OFFSET = 34;
 /** Front-view legs: half hip joint distance and half pedal stance (mm). */
@@ -88,12 +87,14 @@ export type RiderMode = 'seated' | 'standing';
 export interface SpringLine {
     /** frame-side end (moves down with sag) */
     top: SketchPoint;
-    /** wheel-side end */
+    /** wheel-side end (shock: end of the drawn body) */
     bottom: SketchPoint;
     /** travel used by sag along the spring axis (mm) */
     used: number;
     /** full travel of the component (mm) — the coil is only this long */
     travel: number;
+    /** solid body above the coil (crown / shock body, mm) */
+    lead: number;
 }
 
 const distance = (a: SketchPoint, b: SketchPoint) => Math.hypot(b.x - a.x, b.y - a.y);
@@ -132,14 +133,16 @@ function kneeBend(l1: number, l2: number, d: number): number {
 
 /**
  * Zigzag spring along a→b. Only the component travel is drawn as a coil
- * (shortened by the travel used); the rest stays a solid line.
+ * (shortened by the travel used); `lead` stays a solid body above it and the
+ * rest below is a solid line too.
  */
 export function springPoints(
     a: SketchPoint,
     b: SketchPoint,
     used: number,
     travel: number,
-): { coil: SketchPoint[]; solid: [SketchPoint, SketchPoint] } {
+    lead = 0,
+): { coil: SketchPoint[]; solids: [SketchPoint, SketchPoint][] } {
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len = Math.hypot(dx, dy) || 1;
@@ -147,18 +150,29 @@ export function springPoints(
     const uy = dy / len;
     const nx = -uy;
     const ny = ux;
-    const coilLen = Math.max(0, Math.min(travel - used, len));
-    const amp = Math.min(14, coilLen / 8);
+    const leadLen = Math.max(0, Math.min(lead, len));
+    const coilLen = Math.max(0, Math.min(travel - used, len - leadLen));
+    const amp = Math.min(14, Math.max(4, coilLen / 8));
     const coils = Math.max(3, Math.min(8, Math.round(coilLen / 22)));
     const steps = coils * 2;
+    const coilStart = { x: a.x + ux * leadLen, y: a.y + uy * leadLen };
     const coil: SketchPoint[] = [];
     for (let i = 0; i <= steps; i += 1) {
         const t = i / steps;
         const off = i === 0 || i === steps ? 0 : i % 2 === 1 ? amp : -amp;
-        coil.push({ x: a.x + ux * coilLen * t + nx * off, y: a.y + uy * coilLen * t + ny * off });
+        coil.push({
+            x: coilStart.x + ux * coilLen * t + nx * off,
+            y: coilStart.y + uy * coilLen * t + ny * off,
+        });
     }
-    const coilEnd = { x: a.x + ux * coilLen, y: a.y + uy * coilLen };
-    return { coil, solid: [coilEnd, b] };
+    const coilEnd = { x: coilStart.x + ux * coilLen, y: coilStart.y + uy * coilLen };
+    return {
+        coil,
+        solids: [
+            [a, coilStart],
+            [coilEnd, b],
+        ],
+    };
 }
 
 /** Approximate outer tire radii (mm) for common wheel sizes with a 2.4–2.5" tire. */
@@ -431,36 +445,34 @@ export function buildBikeSketch(
 
     // Springs for the sag visualization: the frame side drops with the pitch,
     // the coil covers the travel and shortens by the travel used.
+    // Fork: crown body above the coil, lowers below (to the axle).
     const forkTop = drop(headBottom);
     const forkSpring: SpringLine = {
         top: forkTop,
         bottom: frontAxle,
         used: Math.max(0, distance(headBottom, frontAxle) - distance(forkTop, frontAxle)),
         travel: opts.forkTravel,
+        lead: opts.forkTravel / 2,
     };
+    // Shock: drawn as a real damper body — 1× stroke above the coil (air can),
+    // the coil itself and 1× stroke below (shaft) → ~3× stroke overall.
     const shockNormal: SketchPoint = { x: seatDir.y, y: -seatDir.x };
     const shockTop0: SketchPoint = {
         x: seatDir.x * seatTube * SHOCK_LINE_TO + shockNormal.x * SHOCK_LINE_OFFSET,
         y: seatDir.y * seatTube * SHOCK_LINE_TO + shockNormal.y * SHOCK_LINE_OFFSET,
     };
-    const shockBottom0: SketchPoint = {
-        x: seatDir.x * seatTube * SHOCK_LINE_FROM + shockNormal.x * SHOCK_LINE_OFFSET,
-        y: seatDir.y * seatTube * SHOCK_LINE_FROM + shockNormal.y * SHOCK_LINE_OFFSET,
-    };
-    const shockLen0 = distance(shockTop0, shockBottom0);
+    const shockDir: SketchPoint = { x: -seatDir.x, y: -seatDir.y };
     const shockTop = drop(shockTop0);
-    const shockDir: SketchPoint = {
-        x: (shockBottom0.x - shockTop0.x) / shockLen0,
-        y: (shockBottom0.y - shockTop0.y) / shockLen0,
-    };
+    const shockLen = Math.max(opts.shockStroke, 3 * opts.shockStroke - sagShock);
     const shockSpring: SpringLine = {
         top: shockTop,
         bottom: {
-            x: shockTop.x + shockDir.x * (shockLen0 - sagShock),
-            y: shockTop.y + shockDir.y * (shockLen0 - sagShock),
+            x: shockTop.x + shockDir.x * shockLen,
+            y: shockTop.y + shockDir.y * shockLen,
         },
         used: sagShock,
         travel: opts.shockStroke,
+        lead: opts.shockStroke,
     };
 
     return {
