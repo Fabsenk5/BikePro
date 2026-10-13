@@ -7,7 +7,7 @@
  */
 import { BPButton } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints, wheelRadii } from '@/lib/bikeSketch';
+import { buildAnimationFrame, buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints, wheelRadii } from '@/lib/bikeSketch';
 import { BikeGeometry, ContactGeometry } from '@/lib/geometry';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -76,36 +76,22 @@ export default function BikeSideView({
     const wheelbase = geometry.frame?.wheelbase ?? 0;
     const radii = wheelRadii(geometry.frame?.wheelSize);
     const rearTravelMm = rearTravel ?? shockStroke;
-
-    // Rocks: first one just reaches the suspension travel (min of both ends),
-    // then a bigger one that exceeds the fork travel so the rider absorbs.
-    const rockSmall = Math.max(20, Math.min(forkTravel, shockStroke));
-    const rockBig = Math.round(forkTravel * 1.25);
-    const phase = progress < 0.5 ? 0 : 1;
-    const local = (progress - phase * 0.5) / 0.5;
-    const rockHeight = phase === 0 ? rockSmall : rockBig;
+    const animFrame = buildAnimationFrame({
+        progress,
+        frontAxleX: wheelbase - chainstay,
+        rearAxleX: -chainstay,
+        frontRadius: radii.front,
+        rearRadius: radii.rear,
+        forkTravel,
+        shockStroke,
+        rearTravel: rearTravelMm,
+        sagPercent,
+    });
+    const { rockHeight, rockX, frontLift, rearLift, absorb } = animFrame;
+    // cumulative rolling distance for the wheel spin (continuous over phases)
     const rockStart = wheelbase - chainstay + 420;
     const rockEnd = -chainstay - 420;
-    const rockX = rockStart + (rockEnd - rockStart) * local;
-
-    // Wheel hit: smooth climb as the rock passes under the axle
-    const hitFor = (axleX: number, radius: number) => {
-        const t = Math.max(0, 1 - Math.abs(rockX - axleX) / radius);
-        return rockHeight * t * t * (3 - 2 * t);
-    };
-    const frontHit = animActive ? hitFor(wheelbase - chainstay, radii.front) : 0;
-    const rearHit = animActive ? hitFor(-chainstay, radii.rear) : 0;
-
-    // Beyond the suspension the frame lifts and the rider absorbs the rest:
-    // arms/legs bend, torso and head stay stable.
-    const frontAbsorb = Math.max(0, frontHit - forkTravel);
-    const rearAbsorb = Math.max(0, rearHit - rearTravelMm);
-    const absorb = Math.max(frontAbsorb, rearAbsorb);
-    const sagForkMm = (forkTravel * sagPercent) / 100;
-    const sagShockMm = (shockStroke * sagPercent) / 100;
-    const rearSagWheel = rearTravelMm > 0 ? (sagShockMm * rearTravelMm) / shockStroke : sagShockMm;
-    const frontLift = Math.max(-sagForkMm, frontHit - absorb);
-    const rearLift = Math.max(-rearSagWheel, rearHit - absorb);
+    const spinDistance = (progress < 0.5 ? 0 : rockStart - rockEnd) + (rockStart - rockX);
 
     const poseOpts = { torsoLength, inseam, armLength, crankLength, crankMode, riderMode, dropperTravel };
     const sketch = useMemo(
@@ -138,7 +124,8 @@ export default function BikeSideView({
     );
     const tx = (x: number) => width / 2 + x * scale;
     const tyGround = (y: number) => height - pad - (y - VIEW_BOTTOM) * scale;
-    const ty = (y: number) => tyGround(y) + absorb * scale;
+    // the bike lifts by the absorbed amount (screen y decreases upwards)
+    const ty = (y: number) => tyGround(y) - absorb * scale;
 
     // 10 cm grid with the BB (sketch origin) as reference
     const GRID_STEP = 100;
@@ -218,7 +205,7 @@ export default function BikeSideView({
                     { axle: sketch.rearAxle, radius: sketch.wheelRadiusRear },
                     { axle: sketch.frontAxle, radius: sketch.wheelRadiusFront },
                 ]).map((wheel, i) => {
-                    const spin = (phase * (rockStart - rockEnd) + (rockStart - rockX)) / wheel.radius;
+                    const spin = spinDistance / wheel.radius;
                     return (
                         <G key={`spokes-${i}`} opacity={0.6}>
                             {[0, Math.PI / 2].map((offset, j) => {

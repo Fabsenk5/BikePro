@@ -207,7 +207,72 @@ function kneeBend(l1: number, l2: number, d: number): number {
 }
 
 /**
- * Zigzag spring along a→b. Only the component travel is drawn as a coil
+ * Animation frame: rock position/lift curve, wheel lifts and rider absorption.
+ * The world bottom of a wheel is `lift + absorb` above the ground — this must
+ * never go negative and must match the rock height at the peak (tested).
+ */
+export interface AnimationFrame {
+    rockHeight: number;
+    rockX: number;
+    /** wheel lift relative to the frame (mm) */
+    frontLift: number;
+    rearLift: number;
+    /** frame lift absorbed by the rider (mm) */
+    absorb: number;
+}
+
+export function buildAnimationFrame(params: {
+    progress: number;
+    frontAxleX: number;
+    rearAxleX: number;
+    frontRadius: number;
+    rearRadius: number;
+    forkTravel: number;
+    shockStroke: number;
+    rearTravel: number;
+    sagPercent: number;
+}): AnimationFrame {
+    const {
+        progress, frontAxleX, rearAxleX, frontRadius, rearRadius,
+        forkTravel, shockStroke, rearTravel, sagPercent,
+    } = params;
+    // Rocks: first one just reaches the suspension travel, then a bigger one
+    // that exceeds the fork travel so the rider has to absorb the rest.
+    const rockSmall = Math.max(20, Math.min(forkTravel, shockStroke));
+    const rockBig = Math.round(forkTravel * 1.25);
+    const phase = progress < 0.5 ? 0 : 1;
+    const local = (progress - phase * 0.5) / 0.5;
+    const rockHeight = phase === 0 ? rockSmall : rockBig;
+    const rockStart = frontAxleX + 420;
+    const rockEnd = rearAxleX - 420;
+    const rockX = rockStart + (rockEnd - rockStart) * local;
+
+    // Wheel hit: smooth climb while the rock passes under the axle
+    const hitFor = (axleX: number, radius: number) => {
+        const t = Math.max(0, 1 - Math.abs(rockX - axleX) / radius);
+        return rockHeight * t * t * (3 - 2 * t);
+    };
+    const frontHit = hitFor(frontAxleX, frontRadius);
+    const rearHit = hitFor(rearAxleX, rearRadius);
+
+    // Beyond the suspension the frame lifts and the rider absorbs the rest
+    const absorb = Math.max(
+        Math.max(0, frontHit - forkTravel),
+        Math.max(0, rearHit - rearTravel),
+    );
+    const sagFork = (forkTravel * sagPercent) / 100;
+    const sagShock = (shockStroke * sagPercent) / 100;
+    const rearSagWheel = rearTravel > 0 ? (sagShock * rearTravel) / shockStroke : sagShock;
+    return {
+        rockHeight,
+        rockX,
+        absorb,
+        frontLift: Math.max(-sagFork, frontHit - absorb),
+        rearLift: Math.max(-rearSagWheel, rearHit - absorb),
+    };
+}
+
+/** Zigzag spring along a→b. Only the component travel is drawn as a coil
  * (shortened by the travel used); `lead` stays a solid body above it and the
  * rest below is a solid line too.
  */

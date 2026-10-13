@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBikeSketch, springPoints, wheelRadii } from './bikeSketch';
+import { buildAnimationFrame, buildBikeSketch, springPoints, wheelRadii } from './bikeSketch';
 import { computeContactGeometry } from './geometry';
 
 const geo = {
@@ -321,6 +321,40 @@ describe('animation wheel lifts', () => {
         expect(frontHit.riderHead.y - absorbed.riderHead.y).toBeGreaterThan(50);
         expect(frontHit.riderHead.y - absorbed.riderHead.y).toBeLessThan(75);
         expect(Math.abs(absorbed.torsoAngleDeg - frontHit.torsoAngleDeg)).toBeLessThanOrEqual(2);
+    });
+});
+
+describe('animation frame (rocks)', () => {
+    const params = {
+        frontAxleX: 839, rearAxleX: -445, frontRadius: 374, rearRadius: 355,
+        forkTravel: 180, shockStroke: 65, rearTravel: 170, sagPercent: 20,
+    };
+
+    it('never sinks a wheel below the ground and never floats above its rock', () => {
+        for (let i = 0; i <= 100; i += 1) {
+            const f = buildAnimationFrame({ ...params, progress: i / 100 });
+            // world bottom of each wheel above the ground (mm)
+            expect(f.frontLift + f.absorb, `front @${i}`).toBeGreaterThanOrEqual(-0.001);
+            expect(f.rearLift + f.absorb, `rear @${i}`).toBeGreaterThanOrEqual(-0.001);
+            // and never above the rock height currently under it
+            expect(f.frontLift + f.absorb, `front max @${i}`).toBeLessThanOrEqual(f.rockHeight + 0.001);
+            expect(f.rearLift + f.absorb, `rear max @${i}`).toBeLessThanOrEqual(f.rockHeight + 0.001);
+        }
+    });
+
+    it('puts the wheel exactly on the rock at the peaks', () => {
+        const rockStart = params.frontAxleX + 420;
+        const rockEnd = params.rearAxleX - 420;
+        const span = rockStart - rockEnd;
+        for (const phase of [0, 1]) {
+            for (const [axleX, wheel] of [[params.frontAxleX, 'front'], [params.rearAxleX, 'rear']] as const) {
+                const local = (rockStart - axleX) / span;
+                const progress = phase * 0.5 + local * 0.5;
+                const f = buildAnimationFrame({ ...params, progress });
+                const bottom = wheel === 'front' ? f.frontLift + f.absorb : f.rearLift + f.absorb;
+                expect(bottom, `${wheel} phase ${phase}`).toBeCloseTo(f.rockHeight, 0);
+            }
+        }
     });
 });
 
