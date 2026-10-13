@@ -31,9 +31,14 @@ export interface BikeSketch {
     riderHeadRadius: number;
     /** elbow of the bent arm (shoulder → elbow → hand) */
     riderElbow: SketchPoint;
-    /** knee of the bent leg (null when no inseam is known) */
+    /** knee of the near leg (null when no inseam is known) */
     riderKnee: SketchPoint | null;
+    /** pedal of the near leg (forward / bottom) */
     riderPedal: SketchPoint;
+    /** both legs: near (forward/bottom pedal) and far (opposite crank) */
+    riderLegs: { pedal: SketchPoint; knee: SketchPoint | null; near: boolean }[];
+    /** rail clamp on the seat-tube axis (dropper post top) */
+    saddleClamp: SketchPoint;
     /** knee bend in degrees (0 = straight) at the current pedal position */
     kneeBendDeg: number | null;
     /** knee-over-pedal horizontal offset (positive = knee ahead) — horizontal mode */
@@ -363,6 +368,12 @@ export function buildBikeSketch(
         ? { x: derived.handX, y: derived.handY }
         : bar;
 
+    // Rail clamp sits on the seat-tube axis (never behind the drawn rails):
+    // this is what keeps the dropper post parallel to the seat angle.
+    const clampY = saddle.y - 10;
+    const clampX = Math.max(-clampY / Math.tan(seatRad), saddle.x - 115);
+    const saddleClamp: SketchPoint = { x: clampX, y: clampY };
+
     // Rider: seated hip on the saddle (above the rail clamp, not the nose),
     // standing hip lifted off it; torso leans up-forward
     const torso = opts.torsoLength ?? DEFAULT_TORSO;
@@ -386,21 +397,27 @@ export function buildBikeSketch(
     // Elbow: bend the arm upward from the shoulder–hand line (attack position)
     const elbow = bendPoint(shoulder, hand, 70);
 
-    // Leg: two-bone IK from hip to pedal, knee forward of the hip–pedal line
+    // Legs: two-bone IK from hip to pedal, knee forward of the hip–pedal line.
+    // Both cranks are drawn — near leg on the forward/bottom pedal, far leg opposite.
     const crank = opts.crankLength ?? geo.cockpit?.crankLength ?? 170;
     const crankMode = opts.crankMode ?? 'horizontal';
-    const pedal: SketchPoint = crankMode === 'vertical'
-        ? { x: bb.x, y: bb.y - crank }
-        : { x: bb.x + crank, y: bb.y };
+    const pedalAt = (dir: number): SketchPoint => crankMode === 'vertical'
+        ? { x: bb.x, y: bb.y + dir * crank }
+        : { x: bb.x + dir * crank, y: bb.y };
     const inseam = opts.inseam != null && opts.inseam > 0 ? opts.inseam : null;
-    let knee: SketchPoint | null = null;
-    let kneeBendDeg: number | null = null;
-    if (inseam) {
+    const legAt = (dir: number, near: boolean) => {
+        const pedal = pedalAt(dir);
+        if (!inseam) return { pedal, knee: null, near };
         const thigh = inseam * THIGH_RATIO;
         const shin = inseam * SHIN_RATIO;
-        knee = twoBoneIK(hip, pedal, thigh, shin);
-        kneeBendDeg = kneeBend(thigh, shin, distance(hip, pedal));
-    }
+        return { pedal, knee: twoBoneIK(hip, pedal, thigh, shin), near };
+    };
+    const riderLegs = crankMode === 'vertical'
+        ? [legAt(-1, true), legAt(1, false)]
+        : [legAt(1, true), legAt(-1, false)];
+    const knee = riderLegs[0].knee;
+    const pedal = riderLegs[0].pedal;
+    const kneeBendDeg = inseam ? kneeBend(inseam * THIGH_RATIO, inseam * SHIN_RATIO, distance(hip, pedal)) : null;
     const kopsOffsetMm = crankMode === 'horizontal' && knee ? knee.x - pedal.x : null;
 
     // Sag: linear pitch between the axles (wheels stay on the ground)
@@ -464,6 +481,12 @@ export function buildBikeSketch(
         riderElbow: drop(elbow),
         riderKnee: knee ? drop(knee) : null,
         riderPedal: drop(pedal),
+        riderLegs: riderLegs.map(leg => ({
+            pedal: drop(leg.pedal),
+            knee: leg.knee ? drop(leg.knee) : null,
+            near: leg.near,
+        })),
+        saddleClamp: drop(saddleClamp),
         kneeBendDeg,
         kopsOffsetMm,
         wheelRadiusRear: radii.rear,

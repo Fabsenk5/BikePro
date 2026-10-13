@@ -151,6 +151,45 @@ describe('rider mode and springs', () => {
         expect(s.saddle.y).toBeCloseTo(741, 6);
     });
 
+    it('keeps the dropper post and the saddle on the seat-tube axis', () => {
+        const seatRad = (78 * Math.PI) / 180;
+        const axisRatio = -Math.cos(seatRad) / Math.sin(seatRad);
+        for (const riderMode of ['seated', 'standing'] as const) {
+            const s = buildBikeSketch(geo, derived, {
+                sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode, dropperTravel: 170,
+            })!;
+            // rail clamp sits on the axis through the BB
+            expect(s.saddleClamp.x, riderMode).toBeCloseTo(-s.saddleClamp.y / Math.tan(seatRad), 0);
+            // post from the seat cluster to the clamp follows the seat angle
+            const post = { x: s.saddleClamp.x - s.seatCluster.x, y: s.saddleClamp.y - s.seatCluster.y };
+            expect(post.x / post.y, riderMode).toBeCloseTo(axisRatio, 2);
+        }
+        // compressing the dropper slides the saddle down along the axis
+        const seated = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'seated' })!;
+        const standing = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'standing', dropperTravel: 170 })!;
+        const slide = { x: standing.saddle.x - seated.saddle.x, y: standing.saddle.y - seated.saddle.y };
+        expect(slide.x / -slide.y).toBeCloseTo(Math.cos(seatRad) / Math.sin(seatRad), 3);
+        expect(Math.hypot(slide.x, slide.y)).toBeCloseTo(170, 0);
+    });
+
+    it('draws both legs on opposite crank positions', () => {
+        const horizontal = buildBikeSketch(geo, derived, {
+            sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, crankMode: 'horizontal',
+        })!;
+        expect(horizontal.riderLegs).toHaveLength(2);
+        const near = horizontal.riderLegs.find(l => l.near)!;
+        const far = horizontal.riderLegs.find(l => !l.near)!;
+        expect(near.pedal.x).toBeCloseTo(170, 6);
+        expect(far.pedal.x).toBeCloseTo(-170, 6);
+        // the back leg is more compressed than the forward leg
+        expect(far.knee!.x).toBeLessThan(near.knee!.x);
+        const vertical = buildBikeSketch(geo, derived, {
+            sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, crankMode: 'vertical',
+        })!;
+        expect(vertical.riderLegs.find(l => l.near)!.pedal.y).toBeCloseTo(-170, 6);
+        expect(vertical.riderLegs.find(l => !l.near)!.pedal.y).toBeCloseTo(170, 6);
+    });
+
     it('clamps the compressed saddle above the seat cluster', () => {
         const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, riderMode: 'standing', dropperTravel: 400 })!;
         const seatClusterY = 450 * Math.sin((78 * Math.PI) / 180);

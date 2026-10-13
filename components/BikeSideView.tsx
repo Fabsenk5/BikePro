@@ -8,7 +8,7 @@ import { BikeGeometry, ContactGeometry } from '@/lib/geometry';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
+import Svg, { Circle, G, Line, Polygon, Polyline } from 'react-native-svg';
 
 const ACCENT = '#00BFA5';
 
@@ -128,8 +128,8 @@ export default function BikeSideView({
                     { x: sketch.bar.x + 45, y: sketch.bar.y - 10 },
                     frameColor, 4,
                 )}
-                {/* seatpost + saddle (nose forward, wide tail at the back) */}
-                {tube(sketch.seatCluster, { x: sketch.saddle.x - 60, y: sketch.saddle.y - 8 }, frameColor, 2)}
+                {/* seatpost (along the seat angle) + saddle (nose forward) */}
+                {tube(sketch.seatCluster, sketch.saddleClamp, frameColor, 2)}
                 <Polygon
                     points={[
                         `${tx(sketch.saddle.x)},${ty(sketch.saddle.y)}`,
@@ -138,24 +138,37 @@ export default function BikeSideView({
                     ].join(' ')}
                     fill={theme.colors.accentOrange}
                 />
-                {/* rider: torso, bent arm, bent leg to the pedal */}
-                {riderMode === 'seated' && tube({ x: sketch.saddle.x - 60, y: sketch.saddle.y }, sketch.riderHip, ACCENT, 3)}
+                {/* rider: torso, bent arm, both legs to the pedals */}
+                {riderMode === 'seated' && tube(
+                    { x: sketch.riderHip.x, y: sketch.saddle.y },
+                    sketch.riderHip,
+                    ACCENT, 3,
+                )}
                 {tube(sketch.riderHip, sketch.riderShoulder, ACCENT, 3)}
                 {tube(sketch.riderShoulder, sketch.riderElbow, ACCENT, 2)}
                 {tube(sketch.riderElbow, sketch.hand, ACCENT, 2)}
-                {sketch.riderKnee ? (
-                    <>
-                        {tube(sketch.riderHip, sketch.riderKnee, ACCENT, 2)}
-                        {tube(sketch.riderKnee, sketch.riderPedal, ACCENT, 2)}
-                    </>
-                ) : (
-                    tube(sketch.riderHip, sketch.riderPedal, ACCENT, 2)
-                )}
-                {tube(sketch.bb, sketch.riderPedal, frameColor, 2)}
-                <Circle
-                    cx={tx(sketch.riderPedal.x)} cy={ty(sketch.riderPedal.y)}
-                    r={Math.max(2, 25 * scale)} fill={ACCENT}
-                />
+                {sketch.riderLegs.filter(leg => !leg.near).map((leg, i) => (
+                    <G key={`far-${i}`} opacity={0.45}>
+                        {leg.knee && tube(sketch.riderHip, leg.knee, ACCENT, 2)}
+                        {tube(leg.knee ?? sketch.riderHip, leg.pedal, ACCENT, 2)}
+                        {tube(sketch.bb, leg.pedal, frameColor, 2)}
+                        <Circle
+                            cx={tx(leg.pedal.x)} cy={ty(leg.pedal.y)}
+                            r={Math.max(2, 20 * scale)} fill={ACCENT}
+                        />
+                    </G>
+                ))}
+                {sketch.riderLegs.filter(leg => leg.near).map((leg, i) => (
+                    <G key={`near-${i}`}>
+                        {leg.knee && tube(sketch.riderHip, leg.knee, ACCENT, 2)}
+                        {tube(leg.knee ?? sketch.riderHip, leg.pedal, ACCENT, 2)}
+                        {tube(sketch.bb, leg.pedal, frameColor, 2)}
+                        <Circle
+                            cx={tx(leg.pedal.x)} cy={ty(leg.pedal.y)}
+                            r={Math.max(2, 25 * scale)} fill={ACCENT}
+                        />
+                    </G>
+                ))}
                 <Circle
                     cx={tx(sketch.riderHead.x)} cy={ty(sketch.riderHead.y)}
                     r={sketch.riderHeadRadius * scale} stroke={ACCENT} strokeWidth={2} fill="none"
