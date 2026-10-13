@@ -1186,6 +1186,7 @@
         "view_mode_front": "Front",
         "rider_mode_seated": "Seated",
         "rider_mode_standing": "Standing",
+        "rider_mode_attack": "Attack position",
         "springs_legend_side": "Springs show the travel — fork {{fork}} mm · shock {{shock}} mm; they shorten with sag ({{sag}} %).",
         "springs_legend_front": "Spring shows the fork travel ({{fork}} mm) — it shortens with sag.",
         "dropper_default_hint": "Dropper hub unknown — assuming {{mm}} mm (tracker → seatpost → hub).",

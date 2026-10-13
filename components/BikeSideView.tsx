@@ -54,7 +54,7 @@ export default function BikeSideView({
     // Bounds from the un-sagged sketches of both rider modes: the zoom stays
     // fixed while sag and pose change (side and front view behave the same).
     const baseSketches = useMemo(
-        () => (['seated', 'standing'] as RiderMode[])
+        () => (['seated', 'standing', 'attack'] as RiderMode[])
             .map(mode => buildBikeSketch(geometry, derived, { sagPercent: 0, forkTravel, shockStroke, ...poseOpts, riderMode: mode }))
             .filter((s): s is BikeSketch => s != null),
         // eslint-disable-next-line react-hooks/exhaustive-deps

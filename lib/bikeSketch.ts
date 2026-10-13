@@ -66,9 +66,13 @@ const SHIN_RATIO = 0.67;
 /** Standing hips sit higher and slightly behind the BB compared to the seated pose. */
 const STANDING_HIP_RISE = 60;
 const STANDING_HIP_BACK = 30;
-/** Torso lean from horizontal — standing is more upright (leaning back). */
+/** Attack position: hips drop back and down, arms bend hard (downhill ready). */
+const ATTACK_HIP_RISE = 30;
+const ATTACK_HIP_BACK = 70;
+/** Torso lean fallbacks (from horizontal) when no bar position is known. */
 const TORSO_ANGLE_SEATED = 55;
 const TORSO_ANGLE_STANDING = 60;
+const TORSO_ANGLE_ATTACK = 40;
 /** Hip joint sits this far behind the saddle nose (above the rail clamp). */
 const HIP_BEHIND_NOSE = 60;
 /** Dropper travel assumed when the component does not state a hub. */
@@ -83,7 +87,7 @@ const FRONT_HIP_HALF = 55;
 const FRONT_PEDAL_HALF = 80;
 
 export type CrankMode = 'horizontal' | 'vertical';
-export type RiderMode = 'seated' | 'standing';
+export type RiderMode = 'seated' | 'standing' | 'attack';
 
 /** Spring line for the sag visualization: coil length = remaining travel. */
 export interface SpringLine {
@@ -123,6 +127,8 @@ function twoBoneIK(
 
 /** Elbow bend factor: the arm reaches the bar with slightly bent elbows. */
 const ARM_BEND_FACTOR = 0.97;
+/** Attack position: strongly bent arms (effective reach share). */
+const ATTACK_ARM_BEND = 0.8;
 /** Upper-arm share of the arm length (rest = forearm + hand). */
 const UPPER_ARM_RATIO = 0.45;
 /** Fallback arm length (shoulder → wrist) when the profile has none. */
@@ -131,17 +137,25 @@ export const DEFAULT_ARM = 640;
 /**
  * Shoulder from the torso + arm reach to the bar: two-bone IK between the hip
  * and the hand. The back angle follows saddle height, stack/reach and the
- * rider's proportions instead of a fixed value.
+ * rider's proportions instead of a fixed value. `armFactor` < 1 models more
+ * strongly bent arms (attack position).
  */
 export function torsoReach(
     hip: SketchPoint,
     hand: SketchPoint,
     torsoLength: number,
     armLength: number,
+    armFactor = ARM_BEND_FACTOR,
 ): { shoulder: SketchPoint; angleDeg: number } {
-    const shoulder = twoBoneIK(hip, hand, torsoLength, armLength * ARM_BEND_FACTOR, 'up');
+    const shoulder = twoBoneIK(hip, hand, torsoLength, armLength * armFactor, 'up');
     const angleDeg = Math.round((Math.atan2(shoulder.y - hip.y, shoulder.x - hip.x) * 180) / Math.PI);
     return { shoulder, angleDeg };
+}
+
+/** Fallback torso lean (radians) when no bar position is available. */
+function fallbackTorsoAngle(mode: RiderMode): number {
+    const deg = mode === 'attack' ? TORSO_ANGLE_ATTACK : mode === 'standing' ? TORSO_ANGLE_STANDING : TORSO_ANGLE_SEATED;
+    return (deg * Math.PI) / 180;
 }
 
 /** Knee bend in degrees (0 = straight leg). */
@@ -274,23 +288,24 @@ export function buildFrontSketch(
     const dropperTravel = opts.dropperTravel ?? DEFAULT_DROPPER_TRAVEL;
     const saddleAboveBb = derived.saddleY ?? (frame.seatTube ?? 440) * Math.sin(seatRad);
     const saddleGroundYSeated = bbHeight + saddleAboveBb - sagShock;
-    const saddleGroundY = riderMode === 'standing'
+    const saddleGroundY = riderMode !== 'seated'
         ? saddleGroundYSeated - dropperTravel * Math.sin(seatRad)
         : saddleGroundYSeated;
     const torso = opts.torsoLength ?? DEFAULT_TORSO;
     const arm = opts.armLength ?? DEFAULT_ARM;
-    const hipY = riderMode === 'standing'
-        ? saddleGroundYSeated + HIP_ABOVE_SADDLE + STANDING_HIP_RISE
-        : saddleGroundY + HIP_ABOVE_SADDLE;
+    const hipY = riderMode === 'seated'
+        ? saddleGroundY + HIP_ABOVE_SADDLE
+        : saddleGroundYSeated + HIP_ABOVE_SADDLE + (riderMode === 'standing' ? STANDING_HIP_RISE : ATTACK_HIP_RISE);
     // Shoulder from the same torso + arm reach as the side view
-    const hipX = riderMode === 'standing'
-        ? -STANDING_HIP_BACK
-        : (derived.saddleX ?? -assumedSaddleSetback(saddleAboveBb, seatAngle)) - HIP_BEHIND_NOSE;
+    const hipX = riderMode === 'seated'
+        ? (derived.saddleX ?? -assumedSaddleSetback(saddleAboveBb, seatAngle)) - HIP_BEHIND_NOSE
+        : riderMode === 'standing' ? -STANDING_HIP_BACK : -ATTACK_HIP_BACK;
     const handGroundY = derived.handY != null ? bbHeight + derived.handY - sagFork : null;
+    const armFactor = riderMode === 'attack' ? ATTACK_ARM_BEND : ARM_BEND_FACTOR;
     const reach = derived.handX != null && handGroundY != null
-        ? torsoReach({ x: hipX, y: hipY }, { x: derived.handX, y: handGroundY }, torso, arm)
+        ? torsoReach({ x: hipX, y: hipY }, { x: derived.handX, y: handGroundY }, torso, arm, armFactor)
         : null;
-    const fallbackAngle = ((riderMode === 'standing' ? TORSO_ANGLE_STANDING : TORSO_ANGLE_SEATED) * Math.PI) / 180;
+    const fallbackAngle = fallbackTorsoAngle(riderMode);
     const shoulderY = reach?.shoulder.y ?? hipY + torso * Math.sin(fallbackAngle);
 
     // Legs seen from the front: hip → knee → pedal, feet per crank position
@@ -391,12 +406,13 @@ export function buildBikeSketch(
         }
         : seatCluster;
 
-    // Rider mode: seated keeps the dropper extended, standing compresses it
+    // Rider mode: seated keeps the dropper extended; standing and attack
+    // (downhill ready) ride with it compressed
     const riderMode = opts.riderMode ?? 'seated';
     const dropperTravel = opts.dropperTravel ?? DEFAULT_DROPPER_TRAVEL;
     const seatDir: SketchPoint = { x: -Math.cos(seatRad), y: Math.sin(seatRad) };
     let saddle = saddleSeated;
-    if (riderMode === 'standing') {
+    if (riderMode !== 'seated') {
         const dropped = {
             x: saddleSeated.x - seatDir.x * dropperTravel,
             y: saddleSeated.y - seatDir.y * dropperTravel,
@@ -429,13 +445,16 @@ export function buildBikeSketch(
         x: saddleSeated.x - (derived.saddleY != null ? HIP_BEHIND_NOSE : 0),
         y: saddleSeated.y + HIP_ABOVE_SADDLE,
     };
-    const hip: SketchPoint = riderMode === 'standing'
-        ? { x: bb.x - STANDING_HIP_BACK, y: seatedHip.y + STANDING_HIP_RISE }
-        : { x: saddle.x - HIP_BEHIND_NOSE, y: saddle.y + HIP_ABOVE_SADDLE };
+    const hip: SketchPoint = riderMode === 'seated'
+        ? { x: saddle.x - HIP_BEHIND_NOSE, y: saddle.y + HIP_ABOVE_SADDLE }
+        : riderMode === 'standing'
+            ? { x: bb.x - STANDING_HIP_BACK, y: seatedHip.y + STANDING_HIP_RISE }
+            : { x: bb.x - ATTACK_HIP_BACK, y: seatedHip.y + ATTACK_HIP_RISE };
 
-    const fallbackAngle = ((riderMode === 'standing' ? TORSO_ANGLE_STANDING : TORSO_ANGLE_SEATED) * Math.PI) / 180;
+    const fallbackAngle = fallbackTorsoAngle(riderMode);
+    const armFactor = riderMode === 'attack' ? ATTACK_ARM_BEND : ARM_BEND_FACTOR;
     const barReach = derived.handX != null && derived.handY != null
-        ? torsoReach(hip, hand, torso, arm)
+        ? torsoReach(hip, hand, torso, arm, armFactor)
         : null;
     const shoulder: SketchPoint = barReach?.shoulder ?? {
         x: hip.x + torso * Math.cos(fallbackAngle),

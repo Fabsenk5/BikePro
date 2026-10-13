@@ -460,40 +460,39 @@ export default function GeometryScreen() {
                                 options={[
                                     { label: t('geometry.rider_mode_seated'), value: 'seated' },
                                     { label: t('geometry.rider_mode_standing'), value: 'standing' },
+                                    { label: t('geometry.rider_mode_attack'), value: 'attack' },
                                 ]}
                                 value={riderMode}
                                 onChange={(v) => setRiderMode(v as RiderMode)}
                                 accentColor={ACCENT}
+                                containerStyle={{ marginBottom: theme.spacing.sm }}
+                            />
+                            <BPSegmentedControl
+                                options={[
+                                    { label: t('geometry.crank_horizontal'), value: 'horizontal' },
+                                    { label: t('geometry.crank_vertical'), value: 'vertical' },
+                                ]}
+                                value={crankMode}
+                                onChange={(v) => setCrankMode(v as CrankMode)}
+                                accentColor={ACCENT}
                                 containerStyle={{ marginBottom: theme.spacing.md }}
                             />
                             {viewMode === 'side' ? (
-                                <>
-                                    <BPSegmentedControl
-                                        options={[
-                                            { label: t('geometry.crank_horizontal'), value: 'horizontal' },
-                                            { label: t('geometry.crank_vertical'), value: 'vertical' },
-                                        ]}
-                                        value={crankMode}
-                                        onChange={(v) => setCrankMode(v as CrankMode)}
-                                        accentColor={ACCENT}
-                                        containerStyle={{ marginBottom: theme.spacing.sm }}
-                                    />
-                                    <BikeSideView
-                                        geometry={displayGeometry}
-                                        derived={derived}
-                                        sagPercent={sag}
-                                        forkTravel={forkTravel}
-                                        shockStroke={shockStroke}
-                                        torsoLength={rider.torsoLength}
-                                        inseam={rider.inseam}
-                                        armLength={rider.armLength}
-                                        crankLength={toNum(form.crankLength)}
-                                        crankMode={crankMode}
-                                        riderMode={riderMode}
-                                        dropperTravel={dropperTravel}
-                                        width={viewWidth}
-                                    />
-                                </>
+                                <BikeSideView
+                                    geometry={displayGeometry}
+                                    derived={derived}
+                                    sagPercent={sag}
+                                    forkTravel={forkTravel}
+                                    shockStroke={shockStroke}
+                                    torsoLength={rider.torsoLength}
+                                    inseam={rider.inseam}
+                                    armLength={rider.armLength}
+                                    crankLength={toNum(form.crankLength)}
+                                    crankMode={crankMode}
+                                    riderMode={riderMode}
+                                    dropperTravel={dropperTravel}
+                                    width={viewWidth}
+                                />
                             ) : (
                                 <BikeFrontView
                                     geometry={displayGeometry}
