@@ -176,17 +176,21 @@ describe('rider mode and springs', () => {
         expect(Math.hypot(slide.x, slide.y)).toBeCloseTo(170, 0);
     });
 
-    it('attack position crouches: hips back and down, arms strongly bent', () => {
-        const standing = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'standing', dropperTravel: 170 })!;
-        const attack = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'attack', dropperTravel: 170 })!;
-        // dropper compressed like standing
-        expect(attack.saddle.y).toBeCloseTo(standing.saddle.y, 6);
-        // hips lower and further back than standing
-        expect(attack.riderHip.y).toBeLessThan(standing.riderHip.y);
-        expect(attack.riderHip.x).toBeLessThan(standing.riderHip.x);
-        // back flatter (crouched) than standing
-        expect(attack.torsoAngleDeg).toBeLessThan(standing.torsoAngleDeg);
-        // elbows bend harder: elbow further off the shoulder–hand line
+    it('attack positions crouch: flat moderate, steep deeper and further back', () => {
+        const opts = { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, dropperTravel: 170 };
+        const standing = buildBikeSketch(geo, derived, { ...opts, riderMode: 'standing' })!;
+        const flat = buildBikeSketch(geo, derived, { ...opts, riderMode: 'attack-flat' })!;
+        const steep = buildBikeSketch(geo, derived, { ...opts, riderMode: 'attack-steep' })!;
+        // dropper compressed like standing in both attack variants
+        expect(flat.saddle.y).toBeCloseTo(standing.saddle.y, 6);
+        expect(steep.saddle.y).toBeCloseTo(standing.saddle.y, 6);
+        // steep drops deeper and sits further back than flat
+        expect(steep.riderHip.y).toBeLessThan(flat.riderHip.y);
+        expect(steep.riderHip.x).toBeLessThan(flat.riderHip.x);
+        // both backs are flatter than standing, steep flattest
+        expect(flat.torsoAngleDeg).toBeLessThan(standing.torsoAngleDeg);
+        expect(steep.torsoAngleDeg).toBeLessThan(flat.torsoAngleDeg);
+        // elbows bend harder than standing: elbow further off the shoulder–hand line
         const lineDist = (
             p: { x: number; y: number },
             a: { x: number; y: number },
@@ -197,8 +201,11 @@ describe('rider mode and springs', () => {
             const len = Math.hypot(dx, dy) || 1;
             return Math.abs(dx * (p.y - a.y) - dy * (p.x - a.x)) / len;
         };
-        expect(lineDist(attack.riderElbow, attack.riderShoulder, attack.hand))
-            .toBeGreaterThan(lineDist(standing.riderElbow, standing.riderShoulder, standing.hand));
+        const standingElbow = lineDist(standing.riderElbow, standing.riderShoulder, standing.hand);
+        const flatElbow = lineDist(flat.riderElbow, flat.riderShoulder, flat.hand);
+        const steepElbow = lineDist(steep.riderElbow, steep.riderShoulder, steep.hand);
+        expect(flatElbow).toBeGreaterThan(standingElbow);
+        expect(steepElbow).toBeGreaterThan(flatElbow);
     });
 
     it('draws both legs on opposite crank positions', () => {        const horizontal = buildBikeSketch(geo, derived, {

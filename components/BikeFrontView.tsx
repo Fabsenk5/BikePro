@@ -58,7 +58,7 @@ export default function BikeFrontView({
     // Bounds from the un-sagged sketches of both rider modes: the zoom stays
     // fixed while sag and pose change (side and front view behave the same).
     const baseSketches = useMemo(
-        () => (['seated', 'standing', 'attack'] as RiderMode[])
+        () => (['seated', 'standing', 'attack-flat', 'attack-steep'] as RiderMode[])
             .map(mode => buildFrontSketch(geometry, derived, {
                 shoulderWidth, sagPercent: 0, forkTravel, shockStroke, tireWidthMm, torsoLength,
                 riderMode: mode, dropperTravel, crankMode, crankLength, armLength,

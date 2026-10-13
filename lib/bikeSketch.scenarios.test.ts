@@ -146,7 +146,8 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             };
             const seated = buildFrontSketch(s.geo, derived, { ...base, riderMode: 'seated' })!;
             const standing = buildFrontSketch(s.geo, derived, { ...base, riderMode: 'standing' })!;
-            const attack = buildFrontSketch(s.geo, derived, { ...base, riderMode: 'attack' })!;
+            const attack = buildFrontSketch(s.geo, derived, { ...base, riderMode: 'attack-steep' })!;
+            const attackFlat = buildFrontSketch(s.geo, derived, { ...base, riderMode: 'attack-flat' })!;
             // seated: hip sits on the saddle, above the bar (positive drop)
             expect(seated.hipY, s.name).toBeCloseTo(seated.saddleGroundY + 60, 6);
             expect(seated.hipY, s.name).toBeGreaterThan(seated.barGroundY);
@@ -157,7 +158,11 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             // attack: crouched between seated and standing, dropper down too
             expect(attack.hipY, s.name).toBeCloseTo(seated.hipY + 20, 6);
             expect(attack.hipY, s.name).toBeLessThan(standing.hipY);
+            expect(attackFlat.hipY, s.name).toBeCloseTo(seated.hipY + 30, 6);
+            expect(attackFlat.hipY, s.name).toBeLessThan(standing.hipY);
+            expect(attackFlat.hipY, s.name).toBeGreaterThan(attack.hipY);
             expect(attack.saddleGroundY, s.name).toBeCloseTo(standing.saddleGroundY, 6);
+            expect(attackFlat.saddleGroundY, s.name).toBeCloseTo(standing.saddleGroundY, 6);
             // no sag → no used travel
             expect(seated.forkUsed).toBeCloseTo(0, 6);
             // both legs are present, feet per crank position at the BB height

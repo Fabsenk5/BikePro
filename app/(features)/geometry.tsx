@@ -22,6 +22,7 @@ import {
     recommendForSymptoms,
     RiderBody,
     saddleHeightTarget,
+    seatpostSaddleHeight,
     sanitizeGeometry,
     stripComputedMeasured,
     SymptomId,
@@ -47,7 +48,7 @@ interface GeometryForm {
     size: string; wheelSize: string;
     // cockpit
     barRise: string; backsweep: string; upsweep: string; barWidth: string;
-    stemLength: string; stemAngle: string; spacers: string; crankLength: string; dropperTravel: string;
+    stemLength: string; stemAngle: string; spacers: string; crankLength: string; dropperTravel: string; seatpostExposed: string;
     // fit
     saddleHeight: string; saddleSetback: string;
     // measured
@@ -58,7 +59,7 @@ interface GeometryForm {
 
 const EMPTY_FORM: GeometryForm = {
     stack: '', reach: '', headAngle: '', seatAngle: '', chainstay: '', wheelbase: '', bbDrop: '', seatTube: '', headTube: '', size: '', wheelSize: '',
-    barRise: '', backsweep: '', upsweep: '', barWidth: '', stemLength: '', stemAngle: '', spacers: '', crankLength: '', dropperTravel: '',
+    barRise: '', backsweep: '', upsweep: '', barWidth: '', stemLength: '', stemAngle: '', spacers: '', crankLength: '', dropperTravel: '', seatpostExposed: '',
     saddleHeight: '', saddleSetback: '',
     mBarX: '', mBarY: '', mSeatedReach: '', mDrop: '', mBbHeight: '',
     source: '',
@@ -115,7 +116,7 @@ const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
     cockpit: {
         barRise: toNum(f.barRise), backsweep: toNum(f.backsweep), upsweep: toNum(f.upsweep), barWidth: toNum(f.barWidth),
         stemLength: toNum(f.stemLength), stemAngle: toNum(f.stemAngle), spacers: spacerPieces(f.spacers), crankLength: toNum(f.crankLength),
-        dropperTravel: toNum(f.dropperTravel),
+        dropperTravel: toNum(f.dropperTravel), seatpostExposed: toNum(f.seatpostExposed),
     },
     fit: { saddleHeight: toNum(f.saddleHeight), saddleSetback: toNum(f.saddleSetback) },
     measured: {
@@ -205,6 +206,7 @@ export default function GeometryScreen() {
             set('spacers', geo.cockpit.spacers != null ? geo.cockpit.spacers / SPACER_MM : undefined);
             set('crankLength', geo.cockpit.crankLength);
             set('dropperTravel', geo.cockpit.dropperTravel);
+            set('seatpostExposed', geo.cockpit.seatpostExposed);
         }
         if (geo?.fit) {
             set('saddleHeight', geo.fit.saddleHeight); set('saddleSetback', geo.fit.saddleSetback);
@@ -276,7 +278,18 @@ export default function GeometryScreen() {
     // the model and sketches work before the tape measurement exists; all of
     // them are offered as gray placeholders + apply option in the cockpit tab.
     const cockpitAssumed = useMemo(() => cockpitDefaults(selectedBike?.type), [selectedBike]);
-    const assumedSaddleHeight = rider.inseam ? saddleHeightTarget(rider.inseam) : null;
+    // Saddle height derived from the seatpost hardware (seat tube + Auszug +
+    // Hub + saddle stack) — preferred over the LeMond estimate when complete.
+    const seatpostHeight = useMemo(() => seatpostSaddleHeight(
+        geometry.frame?.seatTube,
+        toNum(form.seatpostExposed),
+        dropperTravel,
+        geometry.frame?.seatAngle ?? 75,
+    ), [geometry.frame?.seatTube, geometry.frame?.seatAngle, form.seatpostExposed, dropperTravel]);
+    const assumedSaddleHeight = useMemo(() => {
+        if (seatpostHeight != null) return seatpostHeight;
+        return rider.inseam ? saddleHeightTarget(rider.inseam) : null;
+    }, [seatpostHeight, rider.inseam]);
     const assumedSetback = useMemo(() => {
         const height = geometry.fit?.saddleHeight ?? assumedSaddleHeight;
         if (height == null) return null;
@@ -464,7 +477,8 @@ export default function GeometryScreen() {
                                 options={[
                                     { label: t('geometry.rider_mode_seated'), value: 'seated' },
                                     { label: t('geometry.rider_mode_standing'), value: 'standing' },
-                                    { label: t('geometry.rider_mode_attack'), value: 'attack' },
+                                    { label: t('geometry.rider_mode_attack_flat'), value: 'attack-flat' },
+                                    { label: t('geometry.rider_mode_attack_steep'), value: 'attack-steep' },
                                 ]}
                                 value={riderMode}
                                 onChange={(v) => setRiderMode(v as RiderMode)}
@@ -685,8 +699,14 @@ export default function GeometryScreen() {
                         <View style={styles.inputRow}>
                             {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: assumedSaddleHeight != null ? String(assumedSaddleHeight) : '—' })}
                             {field('saddleSetback', 'geometry.field_saddle_setback', { placeholder: assumedSetback != null ? String(assumedSetback) : '—' })}
-                            {field('dropperTravel', 'geometry.field_dropper_hub')}
                         </View>
+                        <View style={styles.inputRow}>
+                            {field('dropperTravel', 'geometry.field_dropper_hub')}
+                            {field('seatpostExposed', 'geometry.field_seatpost_exposed')}
+                        </View>
+                        {seatpostHeight != null && (
+                            <Text style={styles.hint}>{t('geometry.seatpost_height_hint', { mm: seatpostHeight })}</Text>
+                        )}
                         <BPButton
                             title={t('geometry.cockpit_apply')}
                             onPress={() => setForm(prev => {

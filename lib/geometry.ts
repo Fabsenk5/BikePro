@@ -40,6 +40,8 @@ export interface GeometryCockpit {
     crankLength?: number;
     /** dropper post travel (Hub) in mm — overrides the tracker value */
     dropperTravel?: number;
+    /** seatpost exposed above the seat tube (collar + pull-out) up to the hub */
+    seatpostExposed?: number;
 }
 
 export interface GeometryFit {
@@ -74,7 +76,8 @@ const FRAME_NUMBERS: (keyof GeometryFrame)[] = [
     'stack', 'reach', 'headAngle', 'seatAngle', 'chainstay', 'wheelbase', 'bbDrop', 'seatTube', 'headTube',
 ];
 const COCKPIT_NUMBERS: (keyof GeometryCockpit)[] = [
-    'barRise', 'backsweep', 'upsweep', 'barWidth', 'stemLength', 'stemAngle', 'spacers', 'crankLength', 'dropperTravel',
+    'barRise', 'backsweep', 'upsweep', 'barWidth', 'stemLength', 'stemAngle', 'spacers', 'crankLength',
+    'dropperTravel', 'seatpostExposed',
 ];
 const FIT_NUMBERS: (keyof GeometryFit)[] = ['saddleHeight', 'saddleSetback'];
 const MEASURED_NUMBERS: (keyof GeometryMeasured)[] = [
@@ -339,8 +342,7 @@ export interface CockpitDefaults {
     crankLength: number;
 }
 
-export function cockpitDefaults(bikeType?: string): CockpitDefaults {
-    switch (bikeType) {
+export function cockpitDefaults(bikeType?: string): CockpitDefaults {    switch (bikeType) {
         case 'xc':
             return { barRise: 15, backsweep: 9, upsweep: 5, barWidth: 740, stemLength: 70, stemAngle: 0, crankLength: 175 };
         case 'downhill':
@@ -356,6 +358,26 @@ export function cockpitDefaults(bikeType?: string): CockpitDefaults {
         default:
             return { barRise: 30, backsweep: 9, upsweep: 5, barWidth: 780, stemLength: 40, stemAngle: 0, crankLength: 170 };
     }
+}
+
+/** Saddle clamp + saddle shell above the stanchion top (typical, mm). */
+const SADDLE_STACK = 40;
+
+/**
+ * Saddle height (vertical) derived from the seatpost hardware: seat tube +
+ * exposed post (collar/pull-out) + dropper hub + saddle stack, projected from
+ * the seat-tube axis to the vertical. Used as an assumption when the rider has
+ * not measured the saddle height yet.
+ */
+export function seatpostSaddleHeight(
+    seatTube: number | null | undefined,
+    exposed: number | null | undefined,
+    hub: number | null | undefined,
+    seatAngle: number,
+): number | null {
+    if (seatTube == null || exposed == null || hub == null) return null;
+    const alongTube = seatTube + exposed + hub + SADDLE_STACK;
+    return Math.round(alongTube * Math.sin((seatAngle * Math.PI) / 180));
 }
 
 const bandStatus = (value: number | null | undefined, band: ReferenceBand): CheckStatus => {

@@ -9,6 +9,7 @@ import {
     recommendForSymptoms,
     saddleHeightTarget,
     sanitizeGeometry,
+    seatpostSaddleHeight,
     stripComputedMeasured,
 } from './geometry';
 
@@ -107,6 +108,15 @@ describe('evaluateFit', () => {
         // clamped to a realistic band
         expect(assumedSaddleSetback(600, 80)).toBe(20);
         expect(assumedSaddleSetback(900, 60)).toBe(120);
+    });
+
+    it('derives the saddle height from the seatpost hardware', () => {
+        // 450 seat tube + 80 exposed + 210 hub + 40 stack = 780 along the tube
+        // → vertical with 78° seat angle ≈ 763 mm
+        expect(seatpostSaddleHeight(450, 80, 210, 78)).toBe(763);
+        // incomplete hardware → no estimate
+        expect(seatpostSaddleHeight(450, null, 210, 78)).toBeNull();
+        expect(seatpostSaddleHeight(null, 80, 210, 78)).toBeNull();
     });
 
     it('provides cockpit standards per discipline', () => {
