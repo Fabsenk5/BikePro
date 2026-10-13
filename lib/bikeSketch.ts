@@ -48,6 +48,7 @@ export interface BikeSketch {
     shockSpring: SpringLine;
 }
 
+/** Fallback head tube length when the frame data has none (mm). */
 const HEAD_TUBE_LENGTH = 110;
 const DEFAULT_TORSO = 550;
 /** Hip joint sits above the saddle surface (mm). */
@@ -188,6 +189,8 @@ export interface FrontSketch {
     forkTravel: number;
     /** BB height above the ground (front leg origin) */
     bbGroundY: number;
+    /** head tube length — crown sits this far below the bar */
+    headTubeLength: number;
     /** both legs hip → knee → pedal (front view, feet per crank position) */
     legs: { hip: SketchPoint; knee: SketchPoint; foot: SketchPoint }[];
 }
@@ -274,6 +277,7 @@ export function buildFrontSketch(
         forkUsed: sagFork,
         forkTravel: opts.forkTravel,
         bbGroundY: bbHeight,
+        headTubeLength: frame.headTube ?? HEAD_TUBE_LENGTH,
         legs,
     };
 }
@@ -301,6 +305,7 @@ export function buildBikeSketch(
     const headAngle = frame.headAngle ?? 65;
     const seatAngle = frame.seatAngle ?? 75;
     const seatTube = frame.seatTube ?? 440;
+    const headTube = frame.headTube ?? HEAD_TUBE_LENGTH;
 
     const radii = wheelRadii(frame.wheelSize);
     // BB height above ground: measured value wins, else derived from the front
@@ -316,8 +321,8 @@ export function buildBikeSketch(
     const headRad = (headAngle * Math.PI) / 180;
     // The head tube leans back: its bottom sits FORWARD of the top
     const headBottom: SketchPoint = {
-        x: headTop.x + HEAD_TUBE_LENGTH * Math.cos(headRad),
-        y: headTop.y - HEAD_TUBE_LENGTH * Math.sin(headRad),
+        x: headTop.x + headTube * Math.cos(headRad),
+        y: headTop.y - headTube * Math.sin(headRad),
     };
 
     const seatRad = (seatAngle * Math.PI) / 180;

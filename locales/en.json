@@ -1133,6 +1133,7 @@
         "field_wheelbase": "Wheelbase",
         "field_bb_drop": "BB drop",
         "field_seat_tube": "Seat tube / frame height",
+        "field_head_tube": "Head tube length",
         "field_size": "Frame size",
         "field_wheel_size": "Wheel size",
         "source_label": "Source/note",

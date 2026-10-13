@@ -63,6 +63,15 @@ describe('buildBikeSketch', () => {
         const incomplete = { frame: { stack: 630 } };
         expect(buildBikeSketch(incomplete, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })).toBeNull();
     });
+
+    it('moves the crown down with the frame head tube length', () => {
+        const long = { ...geo, frame: { ...geo.frame, headTube: 150 } };
+        const s = buildBikeSketch(long, computeContactGeometry(long), { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        const base = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        // 150 vs 110 mm: the crown drops 40 × sin(63.5°)
+        expect(base.headBottom.y - s.headBottom.y).toBeCloseTo(40 * Math.sin((63.5 * Math.PI) / 180), 0);
+        expect(s.headBottom.x).toBeGreaterThan(base.headBottom.x);
+    });
 });
 
 describe('rider pose', () => {

@@ -1133,6 +1133,7 @@
         "field_wheelbase": "Radstand",
         "field_bb_drop": "Tretlager-Absenkung (BB-Drop)",
         "field_seat_tube": "Sitzrohr / Rahmenhöhe",
+        "field_head_tube": "Steuerrohrlänge",
         "field_size": "Rahmengröße",
         "field_wheel_size": "Laufradgröße",
         "source_label": "Quelle/Notiz",

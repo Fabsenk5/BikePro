@@ -42,7 +42,7 @@ type Tab = 'analysis' | 'frame' | 'cockpit' | 'measured' | 'compare';
 interface GeometryForm {
     // frame
     stack: string; reach: string; headAngle: string; seatAngle: string;
-    chainstay: string; wheelbase: string; bbDrop: string; seatTube: string;
+    chainstay: string; wheelbase: string; bbDrop: string; seatTube: string; headTube: string;
     size: string; wheelSize: string;
     // cockpit
     barRise: string; backsweep: string; upsweep: string; barWidth: string;
@@ -56,7 +56,7 @@ interface GeometryForm {
 }
 
 const EMPTY_FORM: GeometryForm = {
-    stack: '', reach: '', headAngle: '', seatAngle: '', chainstay: '', wheelbase: '', bbDrop: '', seatTube: '', size: '', wheelSize: '',
+    stack: '', reach: '', headAngle: '', seatAngle: '', chainstay: '', wheelbase: '', bbDrop: '', seatTube: '', headTube: '', size: '', wheelSize: '',
     barRise: '', backsweep: '', upsweep: '', barWidth: '', stemLength: '', stemAngle: '', spacers: '', crankLength: '',
     saddleHeight: '', saddleSetback: '',
     mBarX: '', mBarY: '', mSeatedReach: '', mDrop: '', mBbHeight: '',
@@ -101,6 +101,7 @@ const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
     frame: {
         stack: toNum(f.stack), reach: toNum(f.reach), headAngle: toNum(f.headAngle), seatAngle: toNum(f.seatAngle),
         chainstay: toNum(f.chainstay), wheelbase: toNum(f.wheelbase), bbDrop: toNum(f.bbDrop), seatTube: toNum(f.seatTube),
+        headTube: toNum(f.headTube),
         size: f.size.trim() || undefined, wheelSize: f.wheelSize.trim() || undefined,
     },
     cockpit: {
@@ -183,6 +184,7 @@ export default function GeometryScreen() {
             set('headAngle', geo.frame.headAngle); set('seatAngle', geo.frame.seatAngle);
             set('chainstay', geo.frame.chainstay); set('wheelbase', geo.frame.wheelbase);
             set('bbDrop', geo.frame.bbDrop); set('seatTube', geo.frame.seatTube);
+            set('headTube', geo.frame.headTube);
             set('size', geo.frame.size); set('wheelSize', geo.frame.wheelSize);
         }
         if (geo?.cockpit) {
@@ -620,6 +622,9 @@ export default function GeometryScreen() {
                         <View style={styles.inputRow}>
                             {field('bbDrop', 'geometry.field_bb_drop')}
                             {field('seatTube', 'geometry.field_seat_tube')}
+                        </View>
+                        <View style={styles.inputRow}>
+                            {field('headTube', 'geometry.field_head_tube')}
                         </View>
                         {toNum(form.bbDrop) != null && toNum(form.bbDrop)! > 100 && (
                             <Text style={styles.warning}>{t('geometry.bbdrop_warning')}</Text>

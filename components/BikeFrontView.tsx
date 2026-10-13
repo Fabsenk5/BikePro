@@ -81,9 +81,9 @@ export default function BikeFrontView({
     // Bent arms: elbow above the shoulder–grip line, slightly outward
     const elbowX = (shoulderHalf + sketch.gripHalfSpan) / 2 + 25;
     const elbowY = (sketch.shoulderY + sketch.barGroundY) / 2 + 60;
-    // Fork legs run outside the tire
+    // Fork legs run outside the tire; the crown sits below the bar by the head tube
     const legX = Math.max(30, sketch.tireWidthMm / 2 + 10);
-    const crownY = sketch.barGroundY - 110;
+    const crownY = sketch.barGroundY - sketch.headTubeLength;
     // Dropper post below the saddle: long when extended, short when compressed
     const postLength = riderMode === 'standing' ? 40 : 140;
 

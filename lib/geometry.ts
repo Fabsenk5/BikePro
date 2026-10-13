@@ -23,6 +23,8 @@ export interface GeometryFrame {
     wheelbase?: number;
     bbDrop?: number;
     seatTube?: number;
+    /** head tube length (Steuerrohr) — used for the fork/crown sketch */
+    headTube?: number;
     size?: string;
     wheelSize?: string;
 }
@@ -67,7 +69,7 @@ export interface BikeGeometry {
 // ─── Sanitizing (form/JSONB → stored shape) ───
 
 const FRAME_NUMBERS: (keyof GeometryFrame)[] = [
-    'stack', 'reach', 'headAngle', 'seatAngle', 'chainstay', 'wheelbase', 'bbDrop', 'seatTube',
+    'stack', 'reach', 'headAngle', 'seatAngle', 'chainstay', 'wheelbase', 'bbDrop', 'seatTube', 'headTube',
 ];
 const COCKPIT_NUMBERS: (keyof GeometryCockpit)[] = [
     'barRise', 'backsweep', 'upsweep', 'barWidth', 'stemLength', 'stemAngle', 'spacers', 'crankLength',
