@@ -1198,6 +1198,7 @@
         "crank_horizontal": "Pedal horizontal",
         "crank_vertical": "Pedal at bottom",
         "knee_bend_caption": "Knee bend at bottom: {{deg}}° — guideline 25–35° at correct saddle height",
+        "torso_angle_caption": "Back angle: {{deg}}° (derived from body measurements and bar position)",
         "measured_apply": "Apply computed values to the fields",
         "metrics_assumed_saddle": "Saddle height: assuming {{mm}} mm (0.883 × inseam) — enter your measured saddle height in the cockpit tab.",
         "bbdrop_warning": "Careful: this looks like the BB height. BB drop is the distance below the wheel-axle line (e.g. 23 mm) — the BB height (e.g. 352 mm) belongs under Measured."

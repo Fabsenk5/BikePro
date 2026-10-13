@@ -486,6 +486,7 @@ export default function GeometryScreen() {
                                         shockStroke={shockStroke}
                                         torsoLength={rider.torsoLength}
                                         inseam={rider.inseam}
+                                        armLength={rider.armLength}
                                         crankLength={toNum(form.crankLength)}
                                         crankMode={crankMode}
                                         riderMode={riderMode}
@@ -503,6 +504,7 @@ export default function GeometryScreen() {
                                     shockStroke={shockStroke}
                                     tireWidthMm={frontTireWidthMm}
                                     torsoLength={rider.torsoLength}
+                                    armLength={rider.armLength}
                                     riderMode={riderMode}
                                     dropperTravel={dropperTravel}
                                     crankMode={crankMode}

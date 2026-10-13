@@ -1198,6 +1198,7 @@
         "crank_horizontal": "Pedal horizontal",
         "crank_vertical": "Pedal unten",
         "knee_bend_caption": "Kniebeugung unten: {{deg}}° — Richtwert 25–35° bei korrekter Sattelhöhe",
+        "torso_angle_caption": "Rückenwinkel: {{deg}}° (aus Körpermaßen und Lenkerposition abgeleitet)",
         "measured_apply": "Berechnete Werte in die Felder übernehmen",
         "metrics_assumed_saddle": "Sattelhöhe: Annahme {{mm}} mm (0,883 × Innenbein) — trage deine gemessene Sattelhöhe im Cockpit-Tab ein.",
         "bbdrop_warning": "Achtung: Das sieht nach der Tretlagerhöhe aus. Die Absenkung (BB-Drop) ist der Abstand unter der Radachsen-Linie (z. B. 23 mm) — die Tretlagerhöhe (z. B. 352 mm) trägst du unter Messwerte ein."

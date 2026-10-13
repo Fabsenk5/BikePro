@@ -22,6 +22,7 @@ interface Props {
     shockStroke?: number | null;
     tireWidthMm?: number | null;
     torsoLength?: number | null;
+    armLength?: number | null;
     riderMode: RiderMode;
     dropperTravel?: number | null;
     crankMode?: CrankMode;
@@ -38,6 +39,7 @@ export default function BikeFrontView({
     shockStroke,
     tireWidthMm,
     torsoLength,
+    armLength,
     riderMode,
     dropperTravel,
     crankMode,
@@ -49,9 +51,9 @@ export default function BikeFrontView({
     const sketch = useMemo(
         () => buildFrontSketch(geometry, derived, {
             shoulderWidth, sagPercent, forkTravel, shockStroke, tireWidthMm, torsoLength,
-            riderMode, dropperTravel, crankMode, crankLength,
+            riderMode, dropperTravel, crankMode, crankLength, armLength,
         }),
-        [geometry, derived, shoulderWidth, sagPercent, forkTravel, shockStroke, tireWidthMm, torsoLength, riderMode, dropperTravel, crankMode, crankLength],
+        [geometry, derived, shoulderWidth, sagPercent, forkTravel, shockStroke, tireWidthMm, torsoLength, riderMode, dropperTravel, crankMode, crankLength, armLength],
     );
     // Bounds from the un-sagged sketches of both rider modes: the zoom stays
     // fixed while sag and pose change (side and front view behave the same).
@@ -59,10 +61,10 @@ export default function BikeFrontView({
         () => (['seated', 'standing'] as RiderMode[])
             .map(mode => buildFrontSketch(geometry, derived, {
                 shoulderWidth, sagPercent: 0, forkTravel, shockStroke, tireWidthMm, torsoLength,
-                riderMode: mode, dropperTravel, crankMode, crankLength,
+                riderMode: mode, dropperTravel, crankMode, crankLength, armLength,
             }))
             .filter((s): s is FrontSketch => s != null),
-        [geometry, derived, shoulderWidth, forkTravel, shockStroke, tireWidthMm, torsoLength, dropperTravel, crankMode, crankLength],
+        [geometry, derived, shoulderWidth, forkTravel, shockStroke, tireWidthMm, torsoLength, dropperTravel, crankMode, crankLength, armLength],
     );
     if (!sketch || !baseSketches.length) {
         return <Text style={styles.hint}>{t('geometry.view_no_data')}</Text>;

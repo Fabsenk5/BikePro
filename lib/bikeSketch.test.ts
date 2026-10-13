@@ -133,11 +133,15 @@ describe('rider mode and springs', () => {
         const seatRad = (78 * Math.PI) / 180;
         expect(standing.saddle.y).toBeCloseTo(741 - 170 * Math.sin(seatRad), 0);
         expect(standing.saddle.x).toBeCloseTo(-60 + 170 * Math.cos(seatRad), 0);
-        // standing hip sits above the compressed saddle and leans back more
+        // standing hip sits above the compressed saddle
         expect(standing.riderHip.y).toBeGreaterThan(standing.saddle.y + 100);
         expect(standing.riderHip.y).toBeCloseTo(seated.riderHip.y + 60, 6);
-        expect(standing.riderShoulder.y - standing.riderHip.y)
-            .toBeGreaterThan(seated.riderShoulder.y - seated.riderHip.y);
+        // the back angle is derived (not fixed) and differs per pose
+        for (const s of [seated, standing]) {
+            expect(s.torsoAngleDeg).toBeGreaterThan(35);
+            expect(s.torsoAngleDeg).toBeLessThan(70);
+        }
+        expect(standing.torsoAngleDeg).not.toBe(seated.torsoAngleDeg);
         // the standing rider still reaches the pedal
         expect(standing.riderKnee).not.toBeNull();
         expect(standing.kneeBendDeg!).toBeGreaterThan(20);

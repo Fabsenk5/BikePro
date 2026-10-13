@@ -29,6 +29,8 @@ export interface BikeSketch {
     riderShoulder: SketchPoint;
     riderHead: SketchPoint;
     riderHeadRadius: number;
+    /** derived back angle (hip → shoulder) in degrees from horizontal */
+    torsoAngleDeg: number;
     /** elbow of the bent arm (shoulder → elbow → hand) */
     riderElbow: SketchPoint;
     /** knee of the near leg (null when no inseam is known) */
@@ -99,28 +101,47 @@ export interface SpringLine {
 
 const distance = (a: SketchPoint, b: SketchPoint) => Math.hypot(b.x - a.x, b.y - a.y);
 
-/** Point offset perpendicular to the a→b line, bowing backward (elbow bend). */
-function bendPoint(a: SketchPoint, b: SketchPoint, offset: number): SketchPoint {
-    const ux = b.x - a.x;
-    const uy = b.y - a.y;
-    const len = Math.hypot(ux, uy) || 1;
-    let nx = -uy / len;
-    let ny = ux / len;
-    // Rider faces +x: the elbow bows backward (−x), never forward
-    if (nx > 0) { nx = -nx; ny = -ny; }
-    return { x: (a.x + b.x) / 2 + nx * offset, y: (a.y + b.y) / 2 + ny * offset };
+/** Two-bone IK for a joint, choosing the preferred solution side. */
+function twoBoneIK(
+    a: SketchPoint,
+    target: SketchPoint,
+    l1: number,
+    l2: number,
+    prefer: 'forward' | 'back' | 'up' = 'forward',
+): SketchPoint {
+    const d = Math.min(distance(a, target), l1 + l2 - 1);
+    const along = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
+    const h = Math.sqrt(Math.max(0, l1 * l1 - along * along));
+    const ux = (target.x - a.x) / d;
+    const uy = (target.y - a.y) / d;
+    const k1 = { x: a.x + along * ux - h * uy, y: a.y + along * uy + h * ux };
+    const k2 = { x: a.x + along * ux + h * uy, y: a.y + along * uy - h * ux };
+    if (prefer === 'up') return k1.y >= k2.y ? k1 : k2;
+    if (prefer === 'back') return k1.x <= k2.x ? k1 : k2;
+    return k1.x >= k2.x ? k1 : k2;
 }
 
-/** Two-bone IK for the knee, choosing the forward (+x) solution. */
-function twoBoneIK(hip: SketchPoint, target: SketchPoint, l1: number, l2: number): SketchPoint {
-    const d = Math.min(distance(hip, target), l1 + l2 - 1);
-    const a = (l1 * l1 - l2 * l2 + d * d) / (2 * d);
-    const h = Math.sqrt(Math.max(0, l1 * l1 - a * a));
-    const ux = (target.x - hip.x) / d;
-    const uy = (target.y - hip.y) / d;
-    const k1 = { x: hip.x + a * ux - h * uy, y: hip.y + a * uy + h * ux };
-    const k2 = { x: hip.x + a * ux + h * uy, y: hip.y + a * uy - h * ux };
-    return k1.x >= k2.x ? k1 : k2;
+/** Elbow bend factor: the arm reaches the bar with slightly bent elbows. */
+const ARM_BEND_FACTOR = 0.97;
+/** Upper-arm share of the arm length (rest = forearm + hand). */
+const UPPER_ARM_RATIO = 0.45;
+/** Fallback arm length (shoulder → wrist) when the profile has none. */
+export const DEFAULT_ARM = 640;
+
+/**
+ * Shoulder from the torso + arm reach to the bar: two-bone IK between the hip
+ * and the hand. The back angle follows saddle height, stack/reach and the
+ * rider's proportions instead of a fixed value.
+ */
+export function torsoReach(
+    hip: SketchPoint,
+    hand: SketchPoint,
+    torsoLength: number,
+    armLength: number,
+): { shoulder: SketchPoint; angleDeg: number } {
+    const shoulder = twoBoneIK(hip, hand, torsoLength, armLength * ARM_BEND_FACTOR, 'up');
+    const angleDeg = Math.round((Math.atan2(shoulder.y - hip.y, shoulder.x - hip.x) * 180) / Math.PI);
+    return { shoulder, angleDeg };
 }
 
 /** Knee bend in degrees (0 = straight leg). */
@@ -226,6 +247,7 @@ export function buildFrontSketch(
         riderMode?: RiderMode;
         dropperTravel?: number | null;
         torsoLength?: number | null;
+        armLength?: number | null;
         crankMode?: CrankMode;
         crankLength?: number | null;
     },
@@ -256,11 +278,20 @@ export function buildFrontSketch(
         ? saddleGroundYSeated - dropperTravel * Math.sin(seatRad)
         : saddleGroundYSeated;
     const torso = opts.torsoLength ?? DEFAULT_TORSO;
+    const arm = opts.armLength ?? DEFAULT_ARM;
     const hipY = riderMode === 'standing'
         ? saddleGroundYSeated + HIP_ABOVE_SADDLE + STANDING_HIP_RISE
         : saddleGroundY + HIP_ABOVE_SADDLE;
-    const torsoAngle = riderMode === 'standing' ? TORSO_ANGLE_STANDING : TORSO_ANGLE_SEATED;
-    const shoulderY = hipY + torso * Math.sin((torsoAngle * Math.PI) / 180);
+    // Shoulder from the same torso + arm reach as the side view
+    const hipX = riderMode === 'standing'
+        ? -STANDING_HIP_BACK
+        : (derived.saddleX ?? -assumedSaddleSetback(saddleAboveBb, seatAngle)) - HIP_BEHIND_NOSE;
+    const handGroundY = derived.handY != null ? bbHeight + derived.handY - sagFork : null;
+    const reach = derived.handX != null && handGroundY != null
+        ? torsoReach({ x: hipX, y: hipY }, { x: derived.handX, y: handGroundY }, torso, arm)
+        : null;
+    const fallbackAngle = ((riderMode === 'standing' ? TORSO_ANGLE_STANDING : TORSO_ANGLE_SEATED) * Math.PI) / 180;
+    const shoulderY = reach?.shoulder.y ?? hipY + torso * Math.sin(fallbackAngle);
 
     // Legs seen from the front: hip → knee → pedal, feet per crank position
     const crank = opts.crankLength ?? geo.cockpit?.crankLength ?? 170;
@@ -310,6 +341,7 @@ export function buildBikeSketch(
         shockStroke: number;
         torsoLength?: number | null;
         inseam?: number | null;
+        armLength?: number | null;
         crankLength?: number | null;
         crankMode?: CrankMode;
         riderMode?: RiderMode;
@@ -389,8 +421,10 @@ export function buildBikeSketch(
     const saddleClamp: SketchPoint = { x: clampX, y: clampY };
 
     // Rider: seated hip on the saddle (above the rail clamp, not the nose),
-    // standing hip lifted off it; torso leans up-forward
+    // standing hip lifted off it. The shoulder comes from the torso + arm
+    // reach to the bar — the back angle follows the bike and the rider.
     const torso = opts.torsoLength ?? DEFAULT_TORSO;
+    const arm = opts.armLength ?? DEFAULT_ARM;
     const seatedHip: SketchPoint = {
         x: saddleSeated.x - (derived.saddleY != null ? HIP_BEHIND_NOSE : 0),
         y: saddleSeated.y + HIP_ABOVE_SADDLE,
@@ -398,18 +432,28 @@ export function buildBikeSketch(
     const hip: SketchPoint = riderMode === 'standing'
         ? { x: bb.x - STANDING_HIP_BACK, y: seatedHip.y + STANDING_HIP_RISE }
         : { x: saddle.x - HIP_BEHIND_NOSE, y: saddle.y + HIP_ABOVE_SADDLE };
-    const torsoAngle = ((riderMode === 'standing' ? TORSO_ANGLE_STANDING : TORSO_ANGLE_SEATED) * Math.PI) / 180;
-    const shoulder: SketchPoint = {
-        x: hip.x + torso * Math.cos(torsoAngle),
-        y: hip.y + torso * Math.sin(torsoAngle),
+
+    const fallbackAngle = ((riderMode === 'standing' ? TORSO_ANGLE_STANDING : TORSO_ANGLE_SEATED) * Math.PI) / 180;
+    const barReach = derived.handX != null && derived.handY != null
+        ? torsoReach(hip, hand, torso, arm)
+        : null;
+    const shoulder: SketchPoint = barReach?.shoulder ?? {
+        x: hip.x + torso * Math.cos(fallbackAngle),
+        y: hip.y + torso * Math.sin(fallbackAngle),
+    };
+    const torsoAngleDeg = barReach?.angleDeg ?? Math.round((fallbackAngle * 180) / Math.PI);
+    const torsoDir: SketchPoint = {
+        x: (shoulder.x - hip.x) / torso,
+        y: (shoulder.y - hip.y) / torso,
     };
     const head: SketchPoint = {
-        x: shoulder.x + 90 * Math.cos(torsoAngle),
-        y: shoulder.y + 90 * Math.sin(torsoAngle),
+        x: shoulder.x + 90 * torsoDir.x,
+        y: shoulder.y + 90 * torsoDir.y,
     };
 
-    // Elbow: bend the arm upward from the shoulder–hand line (attack position)
-    const elbow = bendPoint(shoulder, hand, 70);
+    // Elbow: two-bone arm IK from the shoulder to the hand, bowing backward
+    const upperArm = arm * UPPER_ARM_RATIO;
+    const elbow = twoBoneIK(shoulder, hand, upperArm, arm - upperArm, 'back');
 
     // Legs: two-bone IK from hip to pedal, knee forward of the hip–pedal line.
     // Both cranks are drawn — near leg on the forward/bottom pedal, far leg opposite.
@@ -490,6 +534,7 @@ export function buildBikeSketch(
         riderShoulder: drop(shoulder),
         riderHead: drop(head),
         riderHeadRadius: 60,
+        torsoAngleDeg,
         riderElbow: drop(elbow),
         riderKnee: knee ? drop(knee) : null,
         riderPedal: drop(pedal),

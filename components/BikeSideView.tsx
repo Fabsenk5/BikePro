@@ -20,6 +20,7 @@ interface Props {
     shockStroke: number;
     torsoLength?: number | null;
     inseam?: number | null;
+    armLength?: number | null;
     crankLength?: number | null;
     crankMode?: CrankMode;
     riderMode: RiderMode;
@@ -35,6 +36,7 @@ export default function BikeSideView({
     shockStroke,
     torsoLength,
     inseam,
+    armLength,
     crankLength,
     crankMode,
     riderMode,
@@ -43,11 +45,11 @@ export default function BikeSideView({
 }: Props) {
     const { t } = useTranslation();
 
-    const poseOpts = { torsoLength, inseam, crankLength, crankMode, riderMode, dropperTravel };
+    const poseOpts = { torsoLength, inseam, armLength, crankLength, crankMode, riderMode, dropperTravel };
     const sketch = useMemo(
         () => buildBikeSketch(geometry, derived, { sagPercent, forkTravel, shockStroke, ...poseOpts }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [geometry, derived, sagPercent, forkTravel, shockStroke, torsoLength, inseam, crankLength, crankMode, riderMode, dropperTravel],
+        [geometry, derived, sagPercent, forkTravel, shockStroke, torsoLength, inseam, armLength, crankLength, crankMode, riderMode, dropperTravel],
     );
     // Bounds from the un-sagged sketches of both rider modes: the zoom stays
     // fixed while sag and pose change (side and front view behave the same).
@@ -56,7 +58,7 @@ export default function BikeSideView({
             .map(mode => buildBikeSketch(geometry, derived, { sagPercent: 0, forkTravel, shockStroke, ...poseOpts, riderMode: mode }))
             .filter((s): s is BikeSketch => s != null),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [geometry, derived, forkTravel, shockStroke, torsoLength, inseam, crankLength, crankMode, dropperTravel],
+        [geometry, derived, forkTravel, shockStroke, torsoLength, inseam, armLength, crankLength, crankMode, dropperTravel],
     );
     if (!sketch || !baseSketches.length) {
         return <Text style={styles.hint}>{t('geometry.view_no_data')}</Text>;
@@ -140,14 +142,8 @@ export default function BikeSideView({
                     ].join(' ')}
                     fill={theme.colors.accentOrange}
                 />
-                {/* rider: torso sits on the saddle (seated) or starts at the hip (standing) */}
-                {tube(
-                    riderMode === 'seated'
-                        ? { x: sketch.riderHip.x, y: sketch.saddle.y }
-                        : sketch.riderHip,
-                    sketch.riderShoulder,
-                    ACCENT, 3,
-                )}
+                {/* rider: torso from the hip (rotation point), bent arms and legs */}
+                {tube(sketch.riderHip, sketch.riderShoulder, ACCENT, 3)}
                 {tube(sketch.riderShoulder, sketch.riderElbow, ACCENT, 2)}
                 {tube(sketch.riderElbow, sketch.hand, ACCENT, 2)}
                 {sketch.riderLegs.filter(leg => !leg.near).map((leg, i) => (
@@ -180,6 +176,7 @@ export default function BikeSideView({
             {riderMode === 'seated' && crankMode === 'vertical' && sketch.kneeBendDeg != null && (
                 <Text style={styles.hint}>{t('geometry.knee_bend_caption', { deg: sketch.kneeBendDeg })}</Text>
             )}
+            <Text style={styles.hint}>{t('geometry.torso_angle_caption', { deg: sketch.torsoAngleDeg })}</Text>
             <Text style={styles.hint}>
                 {t('geometry.springs_legend_side', {
                     fork: Math.round(forkTravel),
