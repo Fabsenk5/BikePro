@@ -300,6 +300,30 @@ describe('body segment proportions', () => {
     });
 });
 
+describe('animation wheel lifts', () => {
+    it('compresses fork and shock over rocks and lets the rider absorb', () => {
+        const opts = { sagPercent: 20, forkTravel: 180, shockStroke: 65, rearTravel: 170, inseam: 840, crankLength: 170 };
+        const base = buildBikeSketch(geo, derived, opts)!;
+        // front wheel over a rock: axle lifts, fork compresses towards travel
+        const frontHit = buildBikeSketch(geo, derived, { ...opts, wheelLift: { front: 180 } })!;
+        expect(frontHit.frontAxle.y).toBeCloseTo(base.frontAxle.y + 180, 6);
+        expect(frontHit.forkSpring.used).toBeGreaterThan(150);
+        expect(frontHit.forkSpring.used).toBeLessThanOrEqual(180);
+        // rear wheel travel compresses the shock via the leverage: 170 mm wheel
+        // travel uses the full 65 mm stroke
+        const rearHit = buildBikeSketch(geo, derived, { ...opts, wheelLift: { rear: 170 } })!;
+        expect(rearHit.rearAxle.y).toBeCloseTo(base.rearAxle.y + 170, 6);
+        expect(rearHit.shockSpring.used).toBeCloseTo(65, 1);
+        // beyond the suspension the frame lifts and the rider absorbs it:
+        // body drops in the frame-fixed sketch, back angle stays stable
+        const absorbed = buildBikeSketch(geo, derived, { ...opts, wheelLift: { front: 180 }, riderAbsorb: 60 })!;
+        expect(absorbed.riderHip.y).toBeCloseTo(frontHit.riderHip.y - 60, 6);
+        expect(frontHit.riderHead.y - absorbed.riderHead.y).toBeGreaterThan(50);
+        expect(frontHit.riderHead.y - absorbed.riderHead.y).toBeLessThan(75);
+        expect(Math.abs(absorbed.torsoAngleDeg - frontHit.torsoAngleDeg)).toBeLessThanOrEqual(2);
+    });
+});
+
 describe('springPoints', () => {
     it('draws the coil over the travel between solid body and rest', () => {
         const a = { x: 0, y: 200 };

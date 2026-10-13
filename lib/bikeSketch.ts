@@ -402,6 +402,12 @@ export function buildBikeSketch(
         crankMode?: CrankMode;
         riderMode?: RiderMode;
         dropperTravel?: number | null;
+        /** animation: vertical wheel lift in mm (rock under the wheel) */
+        wheelLift?: { front?: number; rear?: number } | null;
+        /** rear wheel travel for the shock leverage (mm) */
+        rearTravel?: number | null;
+        /** animation: frame lift absorbed by the rider (arms/legs bend) */
+        riderAbsorb?: number | null;
     },
 ): BikeSketch | null {
     const frame = geo.frame ?? {};
@@ -420,9 +426,12 @@ export function buildBikeSketch(
     const bbHeight = geo.measured?.bbHeight ?? (radii.front - bbDrop);
 
     const bb: SketchPoint = { x: 0, y: 0 };
-    // Both wheels stand on the ground: axle height = wheel radius − BB height
-    const rearAxle: SketchPoint = { x: -chainstay, y: radii.rear - bbHeight };
-    const frontAxle: SketchPoint = { x: wheelbase - chainstay, y: radii.front - bbHeight };
+    // Both wheels stand on the ground unless the animation lifts them over a
+    // rock; a negative lift means the suspension extends on the other end.
+    const frontLift = opts.wheelLift?.front ?? 0;
+    const rearLift = opts.wheelLift?.rear ?? 0;
+    const rearAxle: SketchPoint = { x: -chainstay, y: radii.rear - bbHeight + rearLift };
+    const frontAxle: SketchPoint = { x: wheelbase - chainstay, y: radii.front - bbHeight + frontLift };
 
     const headTop: SketchPoint = { x: reach, y: stack };
     const headRad = (headAngle * Math.PI) / 180;
@@ -487,12 +496,16 @@ export function buildBikeSketch(
         y: saddleSeated.y + HIP_ABOVE_SADDLE,
     };
     const hipOffset = riderHipOffset(riderMode);
+    // Animation: the frame lifts beyond the suspension and the rider absorbs it —
+    // the body (hip/shoulder) stays put in the world, so it drops in the
+    // frame-fixed sketch while the arms/legs bend to take up the movement.
+    const absorb = Math.max(0, opts.riderAbsorb ?? 0);
     const hip: SketchPoint = riderMode === 'seated'
-        ? { x: saddle.x - HIP_BEHIND_NOSE, y: saddle.y + HIP_ABOVE_SADDLE }
-        : { x: bb.x - hipOffset.back, y: seatedHip.y + hipOffset.rise };
+        ? { x: saddle.x - HIP_BEHIND_NOSE, y: saddle.y + HIP_ABOVE_SADDLE - absorb }
+        : { x: bb.x - hipOffset.back, y: seatedHip.y + hipOffset.rise - absorb };
 
     const fallbackAngle = fallbackTorsoAngle(riderMode);
-    const armFactor = riderArmFactor(riderMode);
+    const armFactor = Math.max(0.4, riderArmFactor(riderMode) - absorb / arm);
     const barReach = derived.handX != null && derived.handY != null
         ? torsoReach(hip, hand, torso, arm, armFactor)
         : null;
@@ -550,10 +563,11 @@ export function buildBikeSketch(
     // the coil covers the travel and shortens by the travel used.
     // Fork: crown body above the coil, lowers below (to the axle).
     const forkTop = drop(headBottom);
+    const frontAxleGround: SketchPoint = { x: frontAxle.x, y: radii.front - bbHeight };
     const forkSpring: SpringLine = {
         top: forkTop,
         bottom: frontAxle,
-        used: Math.max(0, distance(headBottom, frontAxle) - distance(forkTop, frontAxle)),
+        used: Math.max(0, distance(headBottom, frontAxleGround) - distance(forkTop, frontAxle)),
         travel: opts.forkTravel,
         lead: opts.forkTravel / 2,
     };
@@ -566,14 +580,20 @@ export function buildBikeSketch(
     };
     const shockDir: SketchPoint = { x: -seatDir.x, y: -seatDir.y };
     const shockTop = drop(shockTop0);
-    const shockLen = Math.max(opts.shockStroke, 3 * opts.shockStroke - sagShock);
+    // Animation: the rear wheel travel compresses the shock via the leverage
+    const rearTravel = Math.max(1, opts.rearTravel ?? opts.shockStroke);
+    const shockUsed = Math.min(
+        opts.shockStroke,
+        sagShock + Math.max(0, rearLift) * (opts.shockStroke / rearTravel),
+    );
+    const shockLen = Math.max(opts.shockStroke, 3 * opts.shockStroke - shockUsed);
     const shockSpring: SpringLine = {
         top: shockTop,
         bottom: {
             x: shockTop.x + shockDir.x * shockLen,
             y: shockTop.y + shockDir.y * shockLen,
         },
-        used: sagShock,
+        used: shockUsed,
         travel: opts.shockStroke,
         lead: opts.shockStroke,
     };

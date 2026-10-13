@@ -1,16 +1,21 @@
 /**
  * BikeSideView — simple technical side-view sketch (geometric shapes) with sag.
  * Pure presentation; all coordinates come from lib/bikeSketch.ts.
+ * Animation mode: wheels roll in place while a rock passes under them — the
+ * suspension compresses first, then (big rock) the bike lifts and the rider
+ * absorbs the rest with arms and legs.
  */
+import { BPButton } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { BikeSketch, buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints } from '@/lib/bikeSketch';
+import { BikeSketch, buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints, wheelRadii } from '@/lib/bikeSketch';
 import { BikeGeometry, ContactGeometry } from '@/lib/geometry';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Polygon, Polyline } from 'react-native-svg';
 
 const ACCENT = '#00BFA5';
+const ANIMATION_MS = 6400;
 
 interface Props {
     geometry: BikeGeometry;
@@ -18,6 +23,7 @@ interface Props {
     sagPercent: number;
     forkTravel: number;
     shockStroke: number;
+    rearTravel?: number | null;
     torsoLength?: number | null;
     inseam?: number | null;
     armLength?: number | null;
@@ -34,6 +40,7 @@ export default function BikeSideView({
     sagPercent,
     forkTravel,
     shockStroke,
+    rearTravel,
     torsoLength,
     inseam,
     armLength,
@@ -45,14 +52,74 @@ export default function BikeSideView({
 }: Props) {
     const { t } = useTranslation();
 
+    // ─── Animation state ───
+    const [playing, setPlaying] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const startedAt = useRef(0);
+    const toggle = () => {
+        if (!playing) startedAt.current = Date.now() - progress * ANIMATION_MS;
+        setPlaying(p => !p);
+    };
+    useEffect(() => {
+        if (!playing) return;
+        let raf = 0;
+        const tick = () => {
+            setProgress(((Date.now() - startedAt.current) % ANIMATION_MS) / ANIMATION_MS);
+            raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(raf);
+    }, [playing]);
+
+    const animActive = playing || progress > 0;
+    const chainstay = geometry.frame?.chainstay ?? 0;
+    const wheelbase = geometry.frame?.wheelbase ?? 0;
+    const radii = wheelRadii(geometry.frame?.wheelSize);
+    const rearTravelMm = rearTravel ?? shockStroke;
+
+    // Rocks: first one just reaches the suspension travel (min of both ends),
+    // then a bigger one that exceeds the fork travel so the rider absorbs.
+    const rockSmall = Math.max(20, Math.min(forkTravel, shockStroke));
+    const rockBig = Math.round(forkTravel * 1.25);
+    const phase = progress < 0.5 ? 0 : 1;
+    const local = (progress - phase * 0.5) / 0.5;
+    const rockHeight = phase === 0 ? rockSmall : rockBig;
+    const rockStart = wheelbase - chainstay + 420;
+    const rockEnd = -chainstay - 420;
+    const rockX = rockStart + (rockEnd - rockStart) * local;
+
+    // Wheel hit: smooth climb as the rock passes under the axle
+    const hitFor = (axleX: number, radius: number) => {
+        const t = Math.max(0, 1 - Math.abs(rockX - axleX) / radius);
+        return rockHeight * t * t * (3 - 2 * t);
+    };
+    const frontHit = animActive ? hitFor(wheelbase - chainstay, radii.front) : 0;
+    const rearHit = animActive ? hitFor(-chainstay, radii.rear) : 0;
+
+    // Beyond the suspension the frame lifts and the rider absorbs the rest:
+    // arms/legs bend, torso and head stay stable.
+    const frontAbsorb = Math.max(0, frontHit - forkTravel);
+    const rearAbsorb = Math.max(0, rearHit - rearTravelMm);
+    const absorb = Math.max(frontAbsorb, rearAbsorb);
+    const sagForkMm = (forkTravel * sagPercent) / 100;
+    const sagShockMm = (shockStroke * sagPercent) / 100;
+    const rearSagWheel = rearTravelMm > 0 ? (sagShockMm * rearTravelMm) / shockStroke : sagShockMm;
+    const frontLift = Math.max(-sagForkMm, frontHit - absorb);
+    const rearLift = Math.max(-rearSagWheel, rearHit - absorb);
+
     const poseOpts = { torsoLength, inseam, armLength, crankLength, crankMode, riderMode, dropperTravel };
     const sketch = useMemo(
-        () => buildBikeSketch(geometry, derived, { sagPercent, forkTravel, shockStroke, ...poseOpts }),
+        () => buildBikeSketch(geometry, derived, {
+            sagPercent, forkTravel, shockStroke, ...poseOpts,
+            wheelLift: { front: frontLift, rear: rearLift },
+            rearTravel: rearTravelMm,
+            riderAbsorb: absorb,
+        }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [geometry, derived, sagPercent, forkTravel, shockStroke, torsoLength, inseam, armLength, crankLength, crankMode, riderMode, dropperTravel],
+        [geometry, derived, sagPercent, forkTravel, shockStroke, torsoLength, inseam, armLength, crankLength, crankMode, riderMode, dropperTravel, frontLift, rearLift, rearTravelMm, absorb],
     );
-    // Bounds from the un-sagged sketches of both rider modes: the zoom stays
-    // fixed while sag and pose change (side and front view behave the same).
+    // Bounds from the un-sagged sketches of all rider modes: the zoom stays
+    // fixed while sag, pose and animation change (side and front view alike).
     const baseSketches = useMemo(
         () => (['seated', 'standing', 'attack-flat', 'attack-steep'] as RiderMode[])
             .map(mode => buildBikeSketch(geometry, derived, { sagPercent: 0, forkTravel, shockStroke, ...poseOpts, riderMode: mode }))
@@ -109,11 +176,49 @@ export default function BikeSideView({
     return (
         <View>
             <Svg width={width} height={height}>
-                {/* ground */}
-                <Line x1={pad} y1={ty(sketch.groundY)} x2={width - pad} y2={ty(sketch.groundY)} stroke={theme.colors.border} strokeWidth={1} />
-                {/* wheels */}
+                {/* ground (drops when the frame lifts over a big rock) */}
+                <Line
+                    x1={pad} y1={ty(sketch.groundY - absorb)} x2={width - pad} y2={ty(sketch.groundY - absorb)}
+                    stroke={theme.colors.border} strokeWidth={1}
+                />
+                {/* rock rolling towards the bike */}
+                {animActive && (
+                    <Polygon
+                        points={[
+                            `${tx(rockX - rockHeight * 0.8)},${ty(sketch.groundY - absorb)}`,
+                            `${tx(rockX - rockHeight * 0.5)},${ty(sketch.groundY - absorb + rockHeight * 0.75)}`,
+                            `${tx(rockX)},${ty(sketch.groundY - absorb + rockHeight)}`,
+                            `${tx(rockX + rockHeight * 0.55)},${ty(sketch.groundY - absorb + rockHeight * 0.7)}`,
+                            `${tx(rockX + rockHeight * 0.8)},${ty(sketch.groundY - absorb)}`,
+                        ].join(' ')}
+                        fill={theme.colors.textMuted} opacity={0.5}
+                    />
+                )}
+                {/* wheels (spokes spin while the rock rolls underneath) */}
                 <Circle cx={tx(sketch.rearAxle.x)} cy={ty(sketch.rearAxle.y)} r={sketch.wheelRadiusRear * scale} stroke={wheelColor} strokeWidth={2} fill="none" />
                 <Circle cx={tx(sketch.frontAxle.x)} cy={ty(sketch.frontAxle.y)} r={sketch.wheelRadiusFront * scale} stroke={wheelColor} strokeWidth={2} fill="none" />
+                {animActive && ([
+                    { axle: sketch.rearAxle, radius: sketch.wheelRadiusRear },
+                    { axle: sketch.frontAxle, radius: sketch.wheelRadiusFront },
+                ]).map((wheel, i) => {
+                    const spin = (phase * (rockStart - rockEnd) + (rockStart - rockX)) / wheel.radius;
+                    return (
+                        <G key={`spokes-${i}`} opacity={0.6}>
+                            {[0, Math.PI / 2].map((offset, j) => {
+                                const dx = Math.cos(spin + offset) * wheel.radius;
+                                const dy = Math.sin(spin + offset) * wheel.radius;
+                                return (
+                                    <Line
+                                        key={j}
+                                        x1={tx(wheel.axle.x - dx)} y1={ty(wheel.axle.y - dy)}
+                                        x2={tx(wheel.axle.x + dx)} y2={ty(wheel.axle.y + dy)}
+                                        stroke={wheelColor} strokeWidth={1.5}
+                                    />
+                                );
+                            })}
+                        </G>
+                    );
+                })}
                 {/* front triangle */}
                 {tube(sketch.bb, sketch.headBottom, frameColor)}
                 {tube(sketch.bb, sketch.seatCluster, frameColor)}
@@ -173,6 +278,25 @@ export default function BikeSideView({
                     r={sketch.riderHeadRadius * scale} stroke={ACCENT} strokeWidth={2} fill="none"
                 />
             </Svg>
+            <BPButton
+                title={playing ? t('geometry.animation_stop') : t('geometry.animation_play')}
+                onPress={toggle}
+                variant="secondary"
+                color={ACCENT}
+                size="sm"
+                style={{ marginBottom: theme.spacing.sm }}
+            />
+            {animActive && (
+                <Text style={styles.hint}>
+                    {t('geometry.animation_used', {
+                        fork: Math.round(Math.max(0, frontLift)),
+                        forkMax: Math.round(forkTravel),
+                        shock: Math.round(Math.max(0, rearLift) * (shockStroke / rearTravelMm)),
+                        shockMax: Math.round(shockStroke),
+                        absorb: Math.round(absorb),
+                    })}
+                </Text>
+            )}
             {riderMode === 'seated' && crankMode === 'vertical' && sketch.kneeBendDeg != null && (
                 <Text style={styles.hint}>{t('geometry.knee_bend_caption', { deg: sketch.kneeBendDeg })}</Text>
             )}

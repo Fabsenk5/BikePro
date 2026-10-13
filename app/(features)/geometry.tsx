@@ -502,6 +502,7 @@ export default function GeometryScreen() {
                                     sagPercent={sag}
                                     forkTravel={forkTravel}
                                     shockStroke={shockStroke}
+                                    rearTravel={travelStrokeDefaults(selectedBike?.type).travel}
                                     torsoLength={rider.torsoLength}
                                     inseam={rider.inseam}
                                     armLength={rider.armLength}
