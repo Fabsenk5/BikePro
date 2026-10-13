@@ -75,8 +75,8 @@ const SHIN_RATIO = 0.67;
 const STANDING_HIP_RISE = 60;
 const STANDING_HIP_BACK = 30;
 /** Attack position: hips drop back and down, arms bend hard (downhill ready). */
-const ATTACK_HIP_RISE = 30;
-const ATTACK_HIP_BACK = 70;
+const ATTACK_HIP_RISE = 20;
+const ATTACK_HIP_BACK = 90;
 /** Torso lean fallbacks (from horizontal) when no bar position is known. */
 const TORSO_ANGLE_SEATED = 55;
 const TORSO_ANGLE_STANDING = 60;
@@ -136,7 +136,7 @@ function twoBoneIK(
 /** Elbow bend factor: the arm reaches the bar with slightly bent elbows. */
 const ARM_BEND_FACTOR = 0.97;
 /** Attack position: strongly bent arms (effective reach share). */
-const ATTACK_ARM_BEND = 0.8;
+const ATTACK_ARM_BEND = 0.7;
 /**
  * Arm share: upper arm (shoulder → elbow) ≈ 0.48 of the arm length, the rest
  * is forearm + hand to the ball (≈ 0.52) — anthropometry: upper arm 0.186 ×

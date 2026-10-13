@@ -38,6 +38,8 @@ export interface GeometryCockpit {
     stemAngle?: number;
     spacers?: number;
     crankLength?: number;
+    /** dropper post travel (Hub) in mm — overrides the tracker value */
+    dropperTravel?: number;
 }
 
 export interface GeometryFit {
@@ -72,7 +74,7 @@ const FRAME_NUMBERS: (keyof GeometryFrame)[] = [
     'stack', 'reach', 'headAngle', 'seatAngle', 'chainstay', 'wheelbase', 'bbDrop', 'seatTube', 'headTube',
 ];
 const COCKPIT_NUMBERS: (keyof GeometryCockpit)[] = [
-    'barRise', 'backsweep', 'upsweep', 'barWidth', 'stemLength', 'stemAngle', 'spacers', 'crankLength',
+    'barRise', 'backsweep', 'upsweep', 'barWidth', 'stemLength', 'stemAngle', 'spacers', 'crankLength', 'dropperTravel',
 ];
 const FIT_NUMBERS: (keyof GeometryFit)[] = ['saddleHeight', 'saddleSetback'];
 const MEASURED_NUMBERS: (keyof GeometryMeasured)[] = [

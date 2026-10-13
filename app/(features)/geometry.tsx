@@ -47,7 +47,7 @@ interface GeometryForm {
     size: string; wheelSize: string;
     // cockpit
     barRise: string; backsweep: string; upsweep: string; barWidth: string;
-    stemLength: string; stemAngle: string; spacers: string; crankLength: string;
+    stemLength: string; stemAngle: string; spacers: string; crankLength: string; dropperTravel: string;
     // fit
     saddleHeight: string; saddleSetback: string;
     // measured
@@ -58,7 +58,7 @@ interface GeometryForm {
 
 const EMPTY_FORM: GeometryForm = {
     stack: '', reach: '', headAngle: '', seatAngle: '', chainstay: '', wheelbase: '', bbDrop: '', seatTube: '', headTube: '', size: '', wheelSize: '',
-    barRise: '', backsweep: '', upsweep: '', barWidth: '', stemLength: '', stemAngle: '', spacers: '', crankLength: '',
+    barRise: '', backsweep: '', upsweep: '', barWidth: '', stemLength: '', stemAngle: '', spacers: '', crankLength: '', dropperTravel: '',
     saddleHeight: '', saddleSetback: '',
     mBarX: '', mBarY: '', mSeatedReach: '', mDrop: '', mBbHeight: '',
     source: '',
@@ -115,6 +115,7 @@ const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
     cockpit: {
         barRise: toNum(f.barRise), backsweep: toNum(f.backsweep), upsweep: toNum(f.upsweep), barWidth: toNum(f.barWidth),
         stemLength: toNum(f.stemLength), stemAngle: toNum(f.stemAngle), spacers: spacerPieces(f.spacers), crankLength: toNum(f.crankLength),
+        dropperTravel: toNum(f.dropperTravel),
     },
     fit: { saddleHeight: toNum(f.saddleHeight), saddleSetback: toNum(f.saddleSetback) },
     measured: {
@@ -153,6 +154,8 @@ export default function GeometryScreen() {
     // Dropper hub for the standing pose: tracker value first, then a travel
     // number in the model name ("Dropper V3 210mm"); null → lib default.
     const dropperTravel = useMemo(() => {
+        const fromForm = toNum(form.dropperTravel);
+        if (fromForm != null && fromForm >= 60 && fromForm <= 260) return Math.round(fromForm);
         const post = selectedBike?.components.find(c => c.type === 'seatpost');
         const raw = setupVal(post, ['Hub', 'Travel', 'travel']);
         const hub = raw ? parseFloat(raw.replace(',', '.')) : NaN;
@@ -160,7 +163,7 @@ export default function GeometryScreen() {
         const matches = [...(post?.model ?? '').matchAll(/(\d{2,3})\s*mm/gi)];
         const last = matches.length ? parseInt(matches[matches.length - 1][1], 10) : NaN;
         return Number.isFinite(last) && last >= 60 && last <= 260 ? last : null;
-    }, [selectedBike]);
+    }, [selectedBike, form.dropperTravel]);
 
     // Front tire width (mm) for the head-on sketch, from the wheel component
     const frontTireWidthMm = useMemo(() => {
@@ -201,6 +204,7 @@ export default function GeometryScreen() {
             set('stemLength', geo.cockpit.stemLength); set('stemAngle', geo.cockpit.stemAngle);
             set('spacers', geo.cockpit.spacers != null ? geo.cockpit.spacers / SPACER_MM : undefined);
             set('crankLength', geo.cockpit.crankLength);
+            set('dropperTravel', geo.cockpit.dropperTravel);
         }
         if (geo?.fit) {
             set('saddleHeight', geo.fit.saddleHeight); set('saddleSetback', geo.fit.saddleSetback);
@@ -524,7 +528,7 @@ export default function GeometryScreen() {
                             {viewMode === 'side' && (
                                 <Text style={styles.hint}>{t('geometry.view_hint')}</Text>
                             )}
-                            {riderMode === 'standing' && dropperTravel == null && (
+                            {riderMode !== 'seated' && dropperTravel == null && (
                                 <Text style={styles.hint}>
                                     {t('geometry.dropper_default_hint', { mm: DEFAULT_DROPPER_TRAVEL })}
                                 </Text>
@@ -681,6 +685,7 @@ export default function GeometryScreen() {
                         <View style={styles.inputRow}>
                             {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: assumedSaddleHeight != null ? String(assumedSaddleHeight) : '—' })}
                             {field('saddleSetback', 'geometry.field_saddle_setback', { placeholder: assumedSetback != null ? String(assumedSetback) : '—' })}
+                            {field('dropperTravel', 'geometry.field_dropper_hub')}
                         </View>
                         <BPButton
                             title={t('geometry.cockpit_apply')}
