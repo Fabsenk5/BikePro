@@ -3,12 +3,12 @@
  * Pure presentation; all coordinates come from lib/bikeSketch.ts.
  */
 import { theme } from '@/constants/Colors';
-import { buildBikeSketch, CrankMode, SketchPoint } from '@/lib/bikeSketch';
+import { BikeSketch, buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints } from '@/lib/bikeSketch';
 import { BikeGeometry, ContactGeometry } from '@/lib/geometry';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Line, Polygon } from 'react-native-svg';
+import Svg, { Circle, Line, Polygon, Polyline } from 'react-native-svg';
 
 const ACCENT = '#00BFA5';
 
@@ -22,6 +22,8 @@ interface Props {
     inseam?: number | null;
     crankLength?: number | null;
     crankMode?: CrankMode;
+    riderMode: RiderMode;
+    dropperTravel?: number | null;
     width: number;
 }
 
@@ -35,37 +37,42 @@ export default function BikeSideView({
     inseam,
     crankLength,
     crankMode,
+    riderMode,
+    dropperTravel,
     width,
 }: Props) {
     const { t } = useTranslation();
 
-    const poseOpts = { torsoLength, inseam, crankLength, crankMode };
+    const poseOpts = { torsoLength, inseam, crankLength, crankMode, riderMode, dropperTravel };
     const sketch = useMemo(
         () => buildBikeSketch(geometry, derived, { sagPercent, forkTravel, shockStroke, ...poseOpts }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [geometry, derived, sagPercent, forkTravel, shockStroke, torsoLength, inseam, crankLength, crankMode],
+        [geometry, derived, sagPercent, forkTravel, shockStroke, torsoLength, inseam, crankLength, crankMode, riderMode, dropperTravel],
     );
-    // Bounds from the un-sagged sketch so the zoom stays fixed while sag changes.
-    const baseSketch = useMemo(
-        () => buildBikeSketch(geometry, derived, { sagPercent: 0, forkTravel, shockStroke, ...poseOpts }),
+    // Bounds from the un-sagged sketches of both rider modes: the zoom stays
+    // fixed while sag and pose change (side and front view behave the same).
+    const baseSketches = useMemo(
+        () => (['seated', 'standing'] as RiderMode[])
+            .map(mode => buildBikeSketch(geometry, derived, { sagPercent: 0, forkTravel, shockStroke, ...poseOpts, riderMode: mode }))
+            .filter((s): s is BikeSketch => s != null),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [geometry, derived, forkTravel, shockStroke, torsoLength, inseam, crankLength, crankMode],
+        [geometry, derived, forkTravel, shockStroke, torsoLength, inseam, crankLength, crankMode, dropperTravel],
     );
-    if (!sketch || !baseSketch) {
+    if (!sketch || !baseSketches.length) {
         return <Text style={styles.hint}>{t('geometry.view_no_data')}</Text>;
     }
 
     const height = Math.round(width * 0.62);
     const pad = 16;
-    const minX = baseSketch.rearAxle.x - baseSketch.wheelRadiusRear;
-    const maxX = baseSketch.frontAxle.x + baseSketch.wheelRadiusFront;
-    const minY = baseSketch.groundY - 20;
-    const maxY = Math.max(
-        baseSketch.wheelRadiusRear * 2,
-        baseSketch.saddle.y + 200,
-        baseSketch.riderHead.y + baseSketch.riderHeadRadius,
-        baseSketch.headTop.y,
-    );
+    const minX = Math.min(...baseSketches.map(s => s.rearAxle.x - s.wheelRadiusRear));
+    const maxX = Math.max(...baseSketches.map(s => s.frontAxle.x + s.wheelRadiusFront));
+    const minY = Math.min(...baseSketches.map(s => s.groundY)) - 20;
+    const maxY = Math.max(...baseSketches.flatMap(s => [
+        s.wheelRadiusRear * 2,
+        s.saddle.y + 200,
+        s.riderHead.y + s.riderHeadRadius,
+        s.headTop.y,
+    ]));
     const scale = Math.min((width - pad * 2) / (maxX - minX), (height - pad * 2) / (maxY - minY));
     const tx = (x: number) => pad + (x - minX) * scale;
     const ty = (y: number) => height - pad - (y - minY) * scale;
@@ -76,6 +83,26 @@ export default function BikeSideView({
             stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"
         />
     );
+
+    // Zigzag spring: coil over the current length, orange bar = used travel
+    const spring = (line: SpringLine, color: string) => {
+        const { coil, bar } = springPoints(line.top, line.bottom, line.used);
+        return (
+            <>
+                <Polyline
+                    points={coil.map(p => `${tx(p.x)},${ty(p.y)}`).join(' ')}
+                    fill="none" stroke={color} strokeWidth={2}
+                    strokeLinejoin="round" strokeLinecap="round"
+                />
+                {line.used > 1 && (
+                    <Line
+                        x1={tx(bar[0].x)} y1={ty(bar[0].y)} x2={tx(bar[1].x)} y2={ty(bar[1].y)}
+                        stroke={theme.colors.accentOrange} strokeWidth={5} strokeLinecap="round"
+                    />
+                )}
+            </>
+        );
+    };
 
     const frameColor = theme.colors.text;
     const wheelColor = theme.colors.textMuted;
@@ -96,8 +123,9 @@ export default function BikeSideView({
                 {/* rear triangle */}
                 {tube(sketch.bb, sketch.rearAxle, frameColor, 2)}
                 {tube(sketch.seatCluster, sketch.rearAxle, frameColor, 2)}
-                {/* fork */}
-                {tube(sketch.headBottom, sketch.frontAxle, ACCENT, 3)}
+                {/* fork + shock as springs (orange = used hub) */}
+                {spring(sketch.forkSpring, frameColor)}
+                {spring(sketch.shockSpring, frameColor)}
                 {/* stem + bar */}
                 {tube(sketch.headTop, sketch.bar, frameColor, 3)}
                 {tube(
@@ -137,9 +165,16 @@ export default function BikeSideView({
                     r={sketch.riderHeadRadius * scale} stroke={ACCENT} strokeWidth={2} fill="none"
                 />
             </Svg>
-            {crankMode === 'vertical' && sketch.kneeBendDeg != null && (
+            {riderMode === 'seated' && crankMode === 'vertical' && sketch.kneeBendDeg != null && (
                 <Text style={styles.hint}>{t('geometry.knee_bend_caption', { deg: sketch.kneeBendDeg })}</Text>
             )}
+            <Text style={styles.hint}>
+                {t('geometry.springs_legend_side', {
+                    fork: Math.round(forkTravel * sagPercent / 100),
+                    shock: Math.round(shockStroke * sagPercent / 100),
+                    sag: sagPercent,
+                })}
+            </Text>
         </View>
     );
 }

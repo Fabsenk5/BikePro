@@ -25,7 +25,7 @@ import {
     SymptomId,
     SYMPTOMS,
 } from '@/lib/geometry';
-import { CrankMode, wheelRadii } from '@/lib/bikeSketch';
+import { CrankMode, DEFAULT_DROPPER_TRAVEL, RiderMode, wheelRadii } from '@/lib/bikeSketch';
 import { SyncBike, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -128,6 +128,7 @@ export default function GeometryScreen() {
     const [sag, setSag] = useState(20);
     const [viewMode, setViewMode] = useState<'side' | 'front'>('side');
     const [crankMode, setCrankMode] = useState<CrankMode>('horizontal');
+    const [riderMode, setRiderMode] = useState<RiderMode>('seated');
     const { width: windowWidth } = useWindowDimensions();
     const viewWidth = Math.max(260, Math.min(windowWidth, 960) - 2 * 24 - 2 * 16);
 
@@ -137,6 +138,18 @@ export default function GeometryScreen() {
         const fork = selectedBike?.components.find(c => c.type === 'fork');
         const value = parseFloat(fork?.setupValues?.find(s => s.key === 'travel')?.value ?? '');
         return Number.isFinite(value) && value > 0 ? value : travelStrokeDefaults(selectedBike?.type).travel;
+    }, [selectedBike]);
+
+    // Dropper hub for the standing pose: tracker value first, then a travel
+    // number in the model name ("Dropper V3 210mm"); null → lib default.
+    const dropperTravel = useMemo(() => {
+        const post = selectedBike?.components.find(c => c.type === 'seatpost');
+        const raw = setupVal(post, ['Hub', 'Travel', 'travel']);
+        const hub = raw ? parseFloat(raw.replace(',', '.')) : NaN;
+        if (Number.isFinite(hub) && hub >= 60 && hub <= 260) return Math.round(hub);
+        const matches = [...(post?.model ?? '').matchAll(/(\d{2,3})\s*mm/gi)];
+        const last = matches.length ? parseInt(matches[matches.length - 1][1], 10) : NaN;
+        return Number.isFinite(last) && last >= 60 && last <= 260 ? last : null;
     }, [selectedBike]);
 
     // Front tire width (mm) for the head-on sketch, from the wheel component
@@ -251,8 +264,6 @@ export default function GeometryScreen() {
     }, [geometry, assumedSaddleHeight]);
 
     const derived = useMemo(() => computeContactGeometry(displayGeometry), [displayGeometry]);
-    // Grip span = bar width minus the hand inset (40 mm per side)
-    const gripSpan = toNum(form.barWidth) != null ? toNum(form.barWidth)! - 80 : null;
 
     // Model values for the measured fields: computed from frame + cockpit + fit.
     // Shown as gray placeholders and used by the model while the field is empty.
@@ -417,6 +428,16 @@ export default function GeometryScreen() {
                                 value={viewMode}
                                 onChange={(v) => setViewMode(v as 'side' | 'front')}
                                 accentColor={ACCENT}
+                                containerStyle={{ marginBottom: theme.spacing.sm }}
+                            />
+                            <BPSegmentedControl
+                                options={[
+                                    { label: t('geometry.rider_mode_seated'), value: 'seated' },
+                                    { label: t('geometry.rider_mode_standing'), value: 'standing' },
+                                ]}
+                                value={riderMode}
+                                onChange={(v) => setRiderMode(v as RiderMode)}
+                                accentColor={ACCENT}
                                 containerStyle={{ marginBottom: theme.spacing.md }}
                             />
                             {viewMode === 'side' ? (
@@ -441,6 +462,8 @@ export default function GeometryScreen() {
                                         inseam={rider.inseam}
                                         crankLength={toNum(form.crankLength)}
                                         crankMode={crankMode}
+                                        riderMode={riderMode}
+                                        dropperTravel={dropperTravel}
                                         width={viewWidth}
                                     />
                                 </>
@@ -451,7 +474,11 @@ export default function GeometryScreen() {
                                     shoulderWidth={rider.shoulderWidth}
                                     sagPercent={sag}
                                     forkTravel={forkTravel}
+                                    shockStroke={shockStroke}
                                     tireWidthMm={frontTireWidthMm}
+                                    torsoLength={rider.torsoLength}
+                                    riderMode={riderMode}
+                                    dropperTravel={dropperTravel}
                                     width={viewWidth}
                                 />
                             )}
@@ -465,23 +492,13 @@ export default function GeometryScreen() {
                                 accentColor={ACCENT}
                                 onValueChange={setSag}
                             />
-                            {viewMode === 'side' ? (
+                            {viewMode === 'side' && (
                                 <Text style={styles.hint}>{t('geometry.view_hint')}</Text>
-                            ) : (
-                                <>
-                                    {gripSpan != null && rider.shoulderWidth ? (
-                                        <Text style={styles.hint}>
-                                            {t('geometry.view_front_caption', {
-                                                grip: Math.round(gripSpan),
-                                                shoulder: Math.round(rider.shoulderWidth),
-                                                delta: Math.round(gripSpan - rider.shoulderWidth),
-                                            })}
-                                        </Text>
-                                    ) : (
-                                        <Text style={styles.hint}>{t('geometry.view_front_no_shoulder')}</Text>
-                                    )}
-                                    <Text style={styles.hint}>{t('geometry.view_front_hint')}</Text>
-                                </>
+                            )}
+                            {riderMode === 'standing' && dropperTravel == null && (
+                                <Text style={styles.hint}>
+                                    {t('geometry.dropper_default_hint', { mm: DEFAULT_DROPPER_TRAVEL })}
+                                </Text>
                             )}
                         </BPCard>
 

@@ -114,6 +114,54 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
         }
     });
 
+    it('rider modes: dropper state and springs for all scenarios', () => {
+        for (const s of GEOMETRY_SCENARIOS) {
+            const derived = computeContactGeometry(s.geo);
+            const opts = {
+                sagPercent: 20, forkTravel: 170, shockStroke: 60,
+                riderMode: 'standing' as const, dropperTravel: 170, inseam: s.rider.inseam,
+            };
+            const standing = buildBikeSketch(s.geo, derived, opts)!;
+            const seated = buildBikeSketch(s.geo, derived, { ...opts, riderMode: 'seated' })!;
+            // the compressed saddle sits clearly below the seated position
+            expect(standing.saddle.y, s.name).toBeLessThan(seated.saddle.y - 100);
+            // standing hips stay above the compressed saddle and reach the pedals
+            expect(standing.riderHip.y, s.name).toBeGreaterThan(standing.saddle.y + 80);
+            expect(standing.riderKnee, s.name).not.toBeNull();
+            expect(standing.kneeBendDeg!, s.name).toBeGreaterThan(10);
+            expect(standing.kneeBendDeg!, s.name).toBeLessThan(120);
+            // springs: used travel stays within the component travel
+            expect(standing.forkSpring.used, s.name).toBeGreaterThanOrEqual(0);
+            expect(standing.forkSpring.used, s.name).toBeLessThanOrEqual(170);
+            expect(standing.shockSpring.used, s.name).toBeCloseTo(12, 6);
+        }
+    });
+
+    it('front sketch: rider modes place hips and saddle consistently', () => {
+        for (const s of GEOMETRY_SCENARIOS) {
+            const derived = computeContactGeometry(s.geo);
+            const base = {
+                shoulderWidth: s.rider.shoulderWidth, sagPercent: 0, forkTravel: 170,
+                shockStroke: 60, dropperTravel: 170,
+            };
+            const seated = buildFrontSketch(s.geo, derived, { ...base, riderMode: 'seated' })!;
+            const standing = buildFrontSketch(s.geo, derived, { ...base, riderMode: 'standing' })!;
+            // seated: hip sits on the saddle, above the bar (positive drop)
+            expect(seated.hipY, s.name).toBeCloseTo(seated.saddleGroundY + 60, 6);
+            expect(seated.hipY, s.name).toBeGreaterThan(seated.barGroundY);
+            // standing: saddle compressed, hip lifted off it
+            expect(standing.saddleGroundY, s.name).toBeLessThan(seated.saddleGroundY - 100);
+            expect(standing.hipY, s.name).toBeGreaterThan(standing.saddleGroundY + 100);
+            expect(standing.hipY, s.name).toBeCloseTo(seated.hipY + 40, 6);
+            // no sag → no used travel
+            expect(seated.forkUsed).toBeCloseTo(0, 6);
+        }
+        // sag 20 → fork shows 20 % of the travel as used
+        const s = GEOMETRY_SCENARIOS[0];
+        const front = buildFrontSketch(s.geo, computeContactGeometry(s.geo), { sagPercent: 20, forkTravel: 170, shockStroke: 60 })!;
+        expect(front.forkUsed).toBeCloseTo(34, 6);
+    });
+
     it('front sketch tolerates a missing shoulder width', () => {
         const s = GEOMETRY_SCENARIOS[2];
         const derived = computeContactGeometry(s.geo);

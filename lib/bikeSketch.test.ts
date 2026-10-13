@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBikeSketch, wheelRadii } from './bikeSketch';
+import { buildBikeSketch, springPoints, wheelRadii } from './bikeSketch';
 import { computeContactGeometry } from './geometry';
 
 const geo = {
@@ -107,5 +107,68 @@ describe('rider pose', () => {
         expect(s.kopsOffsetMm).toBeNull();
         // default crank mode is horizontal
         expect(s.riderPedal.x).toBeCloseTo(170, 6);
+    });
+});
+
+describe('rider mode and springs', () => {
+    const pose = { inseam: 840, crankLength: 170 };
+
+    it('seated keeps the dropper extended, standing compresses it', () => {
+        const seated = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'seated' })!;
+        const standing = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'standing', dropperTravel: 170 })!;
+        // seated: saddle at the fit height, hip on the saddle
+        expect(seated.saddle.y).toBeCloseTo(741, 6);
+        expect(seated.riderHip.y).toBeCloseTo(741 + 60, 6);
+        // standing: saddle slid down the seat axis by the dropper travel
+        const seatRad = (78 * Math.PI) / 180;
+        expect(standing.saddle.y).toBeCloseTo(741 - 170 * Math.sin(seatRad), 0);
+        expect(standing.saddle.x).toBeCloseTo(-60 + 170 * Math.cos(seatRad), 0);
+        // standing hip sits above the compressed saddle
+        expect(standing.riderHip.y).toBeGreaterThan(standing.saddle.y + 100);
+        expect(standing.riderHip.y).toBeCloseTo(seated.riderHip.y + 40, 6);
+        // the standing rider still reaches the pedal
+        expect(standing.riderKnee).not.toBeNull();
+        expect(standing.kneeBendDeg!).toBeGreaterThan(20);
+    });
+
+    it('clamps the compressed saddle above the seat cluster', () => {
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, riderMode: 'standing', dropperTravel: 400 })!;
+        const seatClusterY = 450 * Math.sin((78 * Math.PI) / 180);
+        expect(s.saddle.y).toBeGreaterThanOrEqual(seatClusterY + 60);
+    });
+
+    it('springs shorten with sag and mark the used travel', () => {
+        const noSag = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose })!;
+        const sagged = buildBikeSketch(geo, derived, { sagPercent: 20, forkTravel: 170, shockStroke: 60, ...pose })!;
+        // no sag → no used travel, full coil length
+        expect(noSag.forkSpring.used).toBeCloseTo(0, 6);
+        expect(noSag.shockSpring.used).toBeCloseTo(0, 6);
+        // sag → fork uses part of its travel, shock exactly its sag
+        expect(sagged.forkSpring.used).toBeGreaterThan(20);
+        expect(sagged.forkSpring.used).toBeLessThan(34);
+        expect(sagged.shockSpring.used).toBeCloseTo(12, 6);
+        // coil + used bar reconstruct the un-sagged spring line
+        const len = (p: { top: { x: number; y: number }; bottom: { x: number; y: number } }) =>
+            Math.hypot(p.bottom.x - p.top.x, p.bottom.y - p.top.y);
+        expect(len(sagged.forkSpring) + sagged.forkSpring.used).toBeCloseTo(len(noSag.forkSpring), 6);
+        expect(len(sagged.shockSpring) + sagged.shockSpring.used).toBeCloseTo(len(noSag.shockSpring), 6);
+    });
+});
+
+describe('springPoints', () => {
+    it('zigzags between the ends and extends the used bar beyond the top', () => {
+        const a = { x: 0, y: 100 };
+        const b = { x: 0, y: 0 };
+        const { coil, bar } = springPoints(a, b, 20);
+        expect(coil[0]).toEqual(a);
+        expect(coil[coil.length - 1]).toEqual(b);
+        expect(coil.length).toBeGreaterThanOrEqual(9);
+        // interior points alternate around the axis
+        const xs = coil.slice(1, -1).map(p => p.x);
+        expect(Math.max(...xs)).toBeGreaterThan(0);
+        expect(Math.min(...xs)).toBeLessThan(0);
+        // the used bar extends upward from the frame-side end
+        expect(bar[0]).toEqual(a);
+        expect(bar[1]).toEqual({ x: 0, y: 120 });
     });
 });

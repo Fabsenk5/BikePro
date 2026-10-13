@@ -42,6 +42,10 @@ export interface BikeSketch {
     wheelRadiusFront: number;
     sagFork: number;
     sagShock: number;
+    /** fork spring (crown → front axle) for the sag visualization */
+    forkSpring: SpringLine;
+    /** rear shock spring, drawn along the seat tube */
+    shockSpring: SpringLine;
 }
 
 const HEAD_TUBE_LENGTH = 110;
@@ -51,8 +55,32 @@ const HIP_ABOVE_SADDLE = 60;
 /** Functional leg segments relative to inseam (shin includes the foot to the pedal). */
 const THIGH_RATIO = 0.53;
 const SHIN_RATIO = 0.67;
+/** Standing hips sit higher and slightly behind the BB compared to the seated pose. */
+const STANDING_HIP_RISE = 40;
+const STANDING_HIP_BACK = 30;
+/** Torso lean from horizontal (seated and standing share it — simplified figure). */
+const TORSO_ANGLE = 55;
+/** Dropper travel assumed when the component does not state a hub. */
+export const DEFAULT_DROPPER_TRAVEL = 170;
+/** Saddle stays at least this high above the seat cluster when the dropper is compressed. */
+const SADDLE_MIN_ABOVE_CLUSTER = 60;
+/** Rear shock is drawn along the seat tube (fraction of its length + forward offset). */
+const SHOCK_LINE_FROM = 0.15;
+const SHOCK_LINE_TO = 0.85;
+const SHOCK_LINE_OFFSET = 34;
 
 export type CrankMode = 'horizontal' | 'vertical';
+export type RiderMode = 'seated' | 'standing';
+
+/** Spring line for the sag visualization: the colored bar marks the travel used. */
+export interface SpringLine {
+    /** frame-side end (moves down with sag) */
+    top: SketchPoint;
+    /** wheel-side end */
+    bottom: SketchPoint;
+    /** travel used by sag along the spring axis (mm) */
+    used: number;
+}
 
 const distance = (a: SketchPoint, b: SketchPoint) => Math.hypot(b.x - a.x, b.y - a.y);
 
@@ -88,6 +116,35 @@ function kneeBend(l1: number, l2: number, d: number): number {
     return Math.round((180 - interior) * 10) / 10;
 }
 
+/**
+ * Zigzag spring along a→b plus the used-travel bar extending beyond `a`
+ * (frame side): as sag grows the coil shrinks and the orange bar grows.
+ */
+export function springPoints(
+    a: SketchPoint,
+    b: SketchPoint,
+    used: number,
+): { coil: SketchPoint[]; bar: [SketchPoint, SketchPoint] } {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny = ux;
+    const amp = Math.min(14, len / 8);
+    const coils = Math.max(4, Math.min(12, Math.round(len / 55)));
+    const steps = coils * 2;
+    const coil: SketchPoint[] = [];
+    for (let i = 0; i <= steps; i += 1) {
+        const t = i / steps;
+        const off = i === 0 || i === steps ? 0 : i % 2 === 1 ? amp : -amp;
+        coil.push({ x: a.x + dx * t + nx * off, y: a.y + dy * t + ny * off });
+    }
+    const barLength = Math.max(0, used);
+    return { coil, bar: [a, { x: a.x - ux * barLength, y: a.y - uy * barLength }] };
+}
+
 /** Approximate outer tire radii (mm) for common wheel sizes with a 2.4–2.5" tire. */
 const TIRE_RADIUS: Record<string, number> = { '29': 374, '27.5': 355, '26': 340 };
 
@@ -113,10 +170,11 @@ export interface FrontSketch {
     headRadius: number;
     /** tire width for the head-on view (mm) */
     tireWidthMm: number;
+    /** saddle top above the ground — dropper extended (seated) or compressed (standing) */
+    saddleGroundY: number;
+    /** fork travel used by sag (mm) — drawn as the orange bar */
+    forkUsed: number;
 }
-
-/** Approximate shoulder rise above the bar in attack position (mm). */
-const SHOULDER_RISE_ABOVE_BAR = 250;
 
 export function buildFrontSketch(
     geo: BikeGeometry,
@@ -125,7 +183,11 @@ export function buildFrontSketch(
         shoulderWidth?: number | null;
         sagPercent: number;
         forkTravel: number;
+        shockStroke?: number | null;
         tireWidthMm?: number | null;
+        riderMode?: RiderMode;
+        dropperTravel?: number | null;
+        torsoLength?: number | null;
     },
 ): FrontSketch | null {
     const frame = geo.frame ?? {};
@@ -133,15 +195,31 @@ export function buildFrontSketch(
     if (cockpit.barWidth == null || derived.barY == null) return null;
 
     const bbDrop = frame.bbDrop ?? 30;
+    const seatAngle = frame.seatAngle ?? 75;
+    const seatRad = (seatAngle * Math.PI) / 180;
     const radii = wheelRadii(frame.wheelSize);
     const bbHeight = geo.measured?.bbHeight ?? (radii.front - bbDrop);
     const sagFork = Math.max(0, (opts.forkTravel * opts.sagPercent) / 100);
+    const sagShock = Math.max(0, ((opts.shockStroke ?? 0) * opts.sagPercent) / 100);
     const barGroundY = bbHeight + derived.barY - sagFork;
     const gripHalfSpan = Math.max(0, cockpit.barWidth / 2 - GRIP_INSET_MM);
     const shoulderHalfWidth = opts.shoulderWidth != null && opts.shoulderWidth > 0
         ? opts.shoulderWidth / 2
         : null;
-    const shoulderY = barGroundY + SHOULDER_RISE_ABOVE_BAR;
+
+    // Rider mode mirrors the side view: same hip heights, dropper state and lean
+    const riderMode = opts.riderMode ?? 'seated';
+    const dropperTravel = opts.dropperTravel ?? DEFAULT_DROPPER_TRAVEL;
+    const saddleAboveBb = derived.saddleY ?? (frame.seatTube ?? 440) * Math.sin(seatRad);
+    const saddleGroundYSeated = bbHeight + saddleAboveBb - sagShock;
+    const saddleGroundY = riderMode === 'standing'
+        ? saddleGroundYSeated - dropperTravel * Math.sin(seatRad)
+        : saddleGroundYSeated;
+    const torso = opts.torsoLength ?? DEFAULT_TORSO;
+    const hipY = riderMode === 'standing'
+        ? saddleGroundYSeated + HIP_ABOVE_SADDLE + STANDING_HIP_RISE
+        : saddleGroundY + HIP_ABOVE_SADDLE;
+    const shoulderY = hipY + torso * Math.sin((TORSO_ANGLE * Math.PI) / 180);
 
     return {
         wheelRadius: radii.front,
@@ -150,10 +228,12 @@ export function buildFrontSketch(
         shoulderHalfWidth,
         barGroundY,
         shoulderY,
-        hipY: barGroundY - 100,
+        hipY,
         headCenter: { x: 0, y: shoulderY + 90 },
         headRadius: 60,
         tireWidthMm: opts.tireWidthMm != null && opts.tireWidthMm > 0 ? opts.tireWidthMm : 60,
+        saddleGroundY,
+        forkUsed: sagFork,
     };
 }
 
@@ -168,6 +248,8 @@ export function buildBikeSketch(
         inseam?: number | null;
         crankLength?: number | null;
         crankMode?: CrankMode;
+        riderMode?: RiderMode;
+        dropperTravel?: number | null;
     },
 ): BikeSketch | null {
     const frame = geo.frame ?? {};
@@ -202,9 +284,26 @@ export function buildBikeSketch(
         y: seatTube * Math.sin(seatRad),
     };
 
-    const saddle: SketchPoint = derived.saddleX != null && derived.saddleY != null
+    const saddleSeated: SketchPoint = derived.saddleX != null && derived.saddleY != null
         ? { x: derived.saddleX, y: derived.saddleY }
         : seatCluster;
+
+    // Rider mode: seated keeps the dropper extended, standing compresses it
+    const riderMode = opts.riderMode ?? 'seated';
+    const dropperTravel = opts.dropperTravel ?? DEFAULT_DROPPER_TRAVEL;
+    const seatDir: SketchPoint = { x: -Math.cos(seatRad), y: Math.sin(seatRad) };
+    let saddle = saddleSeated;
+    if (riderMode === 'standing') {
+        const dropped = {
+            x: saddleSeated.x - seatDir.x * dropperTravel,
+            y: saddleSeated.y - seatDir.y * dropperTravel,
+        };
+        const minY = seatCluster.y + SADDLE_MIN_ABOVE_CLUSTER;
+        saddle = dropped.y < minY
+            ? { x: seatCluster.x + ((minY - seatCluster.y) / seatDir.y) * seatDir.x, y: minY }
+            : dropped;
+    }
+
     const bar: SketchPoint = derived.barX != null && derived.barY != null
         ? { x: derived.barX, y: derived.barY }
         : { x: headTop.x + 40, y: headTop.y };
@@ -212,10 +311,13 @@ export function buildBikeSketch(
         ? { x: derived.handX, y: derived.handY }
         : bar;
 
-    // Rider: hip at the saddle, torso leans up-forward, arms reach down to the bar
+    // Rider: seated hip on the saddle, standing hip lifted off it; torso leans up-forward
     const torso = opts.torsoLength ?? DEFAULT_TORSO;
-    const hip: SketchPoint = { x: saddle.x, y: saddle.y + HIP_ABOVE_SADDLE };
-    const torsoAngle = (55 * Math.PI) / 180;
+    const seatedHip: SketchPoint = { x: saddleSeated.x, y: saddleSeated.y + HIP_ABOVE_SADDLE };
+    const hip: SketchPoint = riderMode === 'standing'
+        ? { x: bb.x - STANDING_HIP_BACK, y: seatedHip.y + STANDING_HIP_RISE }
+        : { x: saddle.x, y: saddle.y + HIP_ABOVE_SADDLE };
+    const torsoAngle = (TORSO_ANGLE * Math.PI) / 180;
     const shoulder: SketchPoint = {
         x: hip.x + torso * Math.cos(torsoAngle),
         y: hip.y + torso * Math.sin(torsoAngle),
@@ -254,6 +356,38 @@ export function buildBikeSketch(
         return { x: p.x, y: p.y - d };
     };
 
+    // Springs for the sag visualization: the frame side drops with the pitch,
+    // the coil shortens and the orange bar marks the travel used.
+    const forkTop = drop(headBottom);
+    const forkSpring: SpringLine = {
+        top: forkTop,
+        bottom: frontAxle,
+        used: Math.max(0, distance(headBottom, frontAxle) - distance(forkTop, frontAxle)),
+    };
+    const shockNormal: SketchPoint = { x: seatDir.y, y: -seatDir.x };
+    const shockTop0: SketchPoint = {
+        x: seatDir.x * seatTube * SHOCK_LINE_TO + shockNormal.x * SHOCK_LINE_OFFSET,
+        y: seatDir.y * seatTube * SHOCK_LINE_TO + shockNormal.y * SHOCK_LINE_OFFSET,
+    };
+    const shockBottom0: SketchPoint = {
+        x: seatDir.x * seatTube * SHOCK_LINE_FROM + shockNormal.x * SHOCK_LINE_OFFSET,
+        y: seatDir.y * seatTube * SHOCK_LINE_FROM + shockNormal.y * SHOCK_LINE_OFFSET,
+    };
+    const shockLen0 = distance(shockTop0, shockBottom0);
+    const shockTop = drop(shockTop0);
+    const shockDir: SketchPoint = {
+        x: (shockBottom0.x - shockTop0.x) / shockLen0,
+        y: (shockBottom0.y - shockTop0.y) / shockLen0,
+    };
+    const shockSpring: SpringLine = {
+        top: shockTop,
+        bottom: {
+            x: shockTop.x + shockDir.x * (shockLen0 - sagShock),
+            y: shockTop.y + shockDir.y * (shockLen0 - sagShock),
+        },
+        used: sagShock,
+    };
+
     return {
         bb: drop(bb),
         rearAxle,
@@ -278,5 +412,7 @@ export function buildBikeSketch(
         wheelRadiusFront: radii.front,
         sagFork,
         sagShock,
+        forkSpring,
+        shockSpring,
     };
 }
