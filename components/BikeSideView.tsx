@@ -7,7 +7,7 @@
  */
 import { BPButton } from '@/components/ui';
 import { theme } from '@/constants/Colors';
-import { BikeSketch, buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints, wheelRadii } from '@/lib/bikeSketch';
+import { buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints, wheelRadii } from '@/lib/bikeSketch';
 import { BikeGeometry, ContactGeometry } from '@/lib/geometry';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -118,33 +118,35 @@ export default function BikeSideView({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [geometry, derived, sagPercent, forkTravel, shockStroke, torsoLength, inseam, armLength, crankLength, crankMode, riderMode, dropperTravel, frontLift, rearLift, rearTravelMm, absorb],
     );
-    // Bounds from the un-sagged sketches of all rider modes: the zoom stays
-    // fixed while sag, pose and animation change (side and front view alike).
-    const baseSketches = useMemo(
-        () => (['seated', 'standing', 'attack-flat', 'attack-steep'] as RiderMode[])
-            .map(mode => buildBikeSketch(geometry, derived, { sagPercent: 0, forkTravel, shockStroke, ...poseOpts, riderMode: mode }))
-            .filter((s): s is BikeSketch => s != null),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [geometry, derived, forkTravel, shockStroke, torsoLength, inseam, armLength, crankLength, crankMode, dropperTravel],
-    );
-    if (!sketch || !baseSketches.length) {
+    // Bounds are fixed (see below), so no per-bike base sketches are needed —
+    // the zoom and origin stay identical across bikes, modes and animation.
+    if (!sketch) {
         return <Text style={styles.hint}>{t('geometry.view_no_data')}</Text>;
     }
 
     const height = Math.round(width * 0.62);
     const pad = 16;
-    const minX = Math.min(...baseSketches.map(s => s.rearAxle.x - s.wheelRadiusRear));
-    const maxX = Math.max(...baseSketches.map(s => s.frontAxle.x + s.wheelRadiusFront));
-    const minY = Math.min(...baseSketches.map(s => s.groundY)) - 20;
-    const maxY = Math.max(...baseSketches.flatMap(s => [
-        s.wheelRadiusRear * 2,
-        s.saddle.y + 200,
-        s.riderHead.y + s.riderHeadRadius,
-        s.headTop.y,
-    ]));
-    const scale = Math.min((width - pad * 2) / (maxX - minX), (height - pad * 2) / (maxY - minY));
-    const tx = (x: number) => pad + (x - minX) * scale;
-    const ty = (y: number) => height - pad - (y - minY) * scale;
+    // Fixed view frame for every bike and every state: BB at the horizontal
+    // centre, ground at a fixed height — so geometries overlay directly and
+    // the bike lifts over rocks instead of the ground dropping.
+    const VIEW_SIDE = 1300;   // mm to each side of the BB
+    const VIEW_TOP = 1700;    // mm above the BB (rider + headroom)
+    const VIEW_BOTTOM = -400; // mm below the BB (ground of the biggest wheel)
+    const scale = Math.min(
+        (width / 2 - pad) / VIEW_SIDE,
+        (height - pad * 2) / (VIEW_TOP - VIEW_BOTTOM),
+    );
+    const tx = (x: number) => width / 2 + x * scale;
+    const tyGround = (y: number) => height - pad - (y - VIEW_BOTTOM) * scale;
+    const ty = (y: number) => tyGround(y) + absorb * scale;
+
+    // 10 cm grid with the BB (sketch origin) as reference
+    const GRID_STEP = 100;
+    const gridXs: number[] = [];
+    for (let x = -VIEW_SIDE + GRID_STEP; x < VIEW_SIDE; x += GRID_STEP) gridXs.push(x);
+    const gridYs: number[] = [];
+    for (let y = Math.ceil(VIEW_BOTTOM / GRID_STEP) * GRID_STEP; y <= VIEW_TOP; y += GRID_STEP) gridYs.push(y);
+    const gridColor = theme.colors.border;
 
     const tube = (a: SketchPoint, b: SketchPoint, color: string, strokeWidth = 3) => (
         <Line
@@ -176,20 +178,35 @@ export default function BikeSideView({
     return (
         <View>
             <Svg width={width} height={height}>
-                {/* ground (drops when the frame lifts over a big rock) */}
+                {/* 10 cm grid, origin at the BB */}
+                {gridXs.map(x => (
+                    <Line
+                        key={`gx-${x}`} x1={tx(x)} y1={tyGround(VIEW_BOTTOM)} x2={tx(x)} y2={tyGround(VIEW_TOP)}
+                        stroke={gridColor} strokeWidth={x === 0 ? 1.5 : 0.7}
+                        opacity={x === 0 ? 0.9 : 0.35}
+                    />
+                ))}
+                {gridYs.map(y => (
+                    <Line
+                        key={`gy-${y}`} x1={tx(-VIEW_SIDE)} y1={tyGround(y)} x2={tx(VIEW_SIDE)} y2={tyGround(y)}
+                        stroke={gridColor} strokeWidth={y === 0 ? 1.5 : 0.7}
+                        opacity={y === 0 ? 0.9 : 0.35}
+                    />
+                ))}
+                {/* ground — fixed; the bike lifts over rocks instead */}
                 <Line
-                    x1={pad} y1={ty(sketch.groundY - absorb)} x2={width - pad} y2={ty(sketch.groundY - absorb)}
+                    x1={pad} y1={tyGround(sketch.groundY)} x2={width - pad} y2={tyGround(sketch.groundY)}
                     stroke={theme.colors.border} strokeWidth={1}
                 />
                 {/* rock rolling towards the bike */}
                 {animActive && (
                     <Polygon
                         points={[
-                            `${tx(rockX - rockHeight * 0.8)},${ty(sketch.groundY - absorb)}`,
-                            `${tx(rockX - rockHeight * 0.5)},${ty(sketch.groundY - absorb + rockHeight * 0.75)}`,
-                            `${tx(rockX)},${ty(sketch.groundY - absorb + rockHeight)}`,
-                            `${tx(rockX + rockHeight * 0.55)},${ty(sketch.groundY - absorb + rockHeight * 0.7)}`,
-                            `${tx(rockX + rockHeight * 0.8)},${ty(sketch.groundY - absorb)}`,
+                            `${tx(rockX - rockHeight * 0.8)},${tyGround(sketch.groundY)}`,
+                            `${tx(rockX - rockHeight * 0.5)},${tyGround(sketch.groundY + rockHeight * 0.75)}`,
+                            `${tx(rockX)},${tyGround(sketch.groundY + rockHeight)}`,
+                            `${tx(rockX + rockHeight * 0.55)},${tyGround(sketch.groundY + rockHeight * 0.7)}`,
+                            `${tx(rockX + rockHeight * 0.8)},${tyGround(sketch.groundY)}`,
                         ].join(' ')}
                         fill={theme.colors.textMuted} opacity={0.5}
                     />
