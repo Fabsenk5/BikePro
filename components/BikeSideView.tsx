@@ -84,9 +84,9 @@ export default function BikeSideView({
         />
     );
 
-    // Zigzag spring: coil over the current length, orange bar = used travel
+    // Zigzag spring: coil over the travel, solid line for the rest
     const spring = (line: SpringLine, color: string) => {
-        const { coil, bar } = springPoints(line.top, line.bottom, line.used);
+        const { coil, solid } = springPoints(line.top, line.bottom, line.used, line.travel);
         return (
             <>
                 <Polyline
@@ -94,12 +94,7 @@ export default function BikeSideView({
                     fill="none" stroke={color} strokeWidth={2}
                     strokeLinejoin="round" strokeLinecap="round"
                 />
-                {line.used > 1 && (
-                    <Line
-                        x1={tx(bar[0].x)} y1={ty(bar[0].y)} x2={tx(bar[1].x)} y2={ty(bar[1].y)}
-                        stroke={theme.colors.accentOrange} strokeWidth={5} strokeLinecap="round"
-                    />
-                )}
+                {tube(solid[0], solid[1], color, 2)}
             </>
         );
     };
@@ -144,6 +139,7 @@ export default function BikeSideView({
                     fill={theme.colors.accentOrange}
                 />
                 {/* rider: torso, bent arm, bent leg to the pedal */}
+                {riderMode === 'seated' && tube({ x: sketch.saddle.x - 60, y: sketch.saddle.y }, sketch.riderHip, ACCENT, 3)}
                 {tube(sketch.riderHip, sketch.riderShoulder, ACCENT, 3)}
                 {tube(sketch.riderShoulder, sketch.riderElbow, ACCENT, 2)}
                 {tube(sketch.riderElbow, sketch.hand, ACCENT, 2)}
@@ -170,8 +166,8 @@ export default function BikeSideView({
             )}
             <Text style={styles.hint}>
                 {t('geometry.springs_legend_side', {
-                    fork: Math.round(forkTravel * sagPercent / 100),
-                    shock: Math.round(shockStroke * sagPercent / 100),
+                    fork: Math.round(forkTravel),
+                    shock: Math.round(shockStroke),
                     sag: sagPercent,
                 })}
             </Text>

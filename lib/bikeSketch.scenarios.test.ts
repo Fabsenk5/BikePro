@@ -32,9 +32,9 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             expect(sketch!.wheelRadiusFront).toBe(radii.front);
             expect(sketch!.wheelRadiusRear).toBe(radii.rear);
 
-            // head tube points down/back along the head angle; seat cluster up/back
+            // head tube leans back (bottom forward of the top); seat cluster up/back
             expect(sketch!.headBottom.y).toBeLessThan(sketch!.headTop.y);
-            expect(sketch!.headBottom.x).toBeLessThan(sketch!.headTop.x);
+            expect(sketch!.headBottom.x).toBeGreaterThan(sketch!.headTop.x);
             expect(sketch!.seatCluster.y).toBeGreaterThan(300);
             expect(sketch!.seatCluster.x).toBeLessThan(0);
 
@@ -152,14 +152,28 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             // standing: saddle compressed, hip lifted off it
             expect(standing.saddleGroundY, s.name).toBeLessThan(seated.saddleGroundY - 100);
             expect(standing.hipY, s.name).toBeGreaterThan(standing.saddleGroundY + 100);
-            expect(standing.hipY, s.name).toBeCloseTo(seated.hipY + 40, 6);
+            expect(standing.hipY, s.name).toBeCloseTo(seated.hipY + 60, 6);
             // no sag → no used travel
             expect(seated.forkUsed).toBeCloseTo(0, 6);
+            // both legs are present, feet per crank position at the BB height
+            expect(seated.legs, s.name).toHaveLength(2);
+            for (const leg of seated.legs) {
+                expect(leg.hip.y).toBeCloseTo(seated.hipY, 6);
+                expect(leg.foot.y, s.name).toBeCloseTo(seated.bbGroundY, 6);
+                expect(Math.abs(leg.foot.x), s.name).toBeGreaterThan(Math.abs(leg.hip.x));
+            }
         }
         // sag 20 → fork shows 20 % of the travel as used
         const s = GEOMETRY_SCENARIOS[0];
         const front = buildFrontSketch(s.geo, computeContactGeometry(s.geo), { sagPercent: 20, forkTravel: 170, shockStroke: 60 })!;
         expect(front.forkUsed).toBeCloseTo(34, 6);
+        expect(front.forkTravel).toBe(170);
+        // vertical crank position: one foot up, one down
+        const vertical = buildFrontSketch(s.geo, computeContactGeometry(s.geo), {
+            sagPercent: 20, forkTravel: 170, shockStroke: 60, crankMode: 'vertical', crankLength: 170,
+        })!;
+        expect(vertical.legs[0].foot.y).toBeCloseTo(vertical.bbGroundY + 170, 6);
+        expect(vertical.legs[1].foot.y).toBeCloseTo(vertical.bbGroundY - 170, 6);
     });
 
     it('front sketch tolerates a missing shoulder width', () => {

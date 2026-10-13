@@ -307,6 +307,19 @@ export function saddleHeightTarget(inseam: number): number {
     return Math.round(0.883 * inseam);
 }
 
+/** Nose-to-rail-clamp distance of a typical saddle (mm). */
+const SADDLE_NOSE_OFFSET = 110;
+
+/**
+ * Assumed saddle setback (nose behind the BB) when the rider has not measured
+ * it: seat-tube geometry minus a typical saddle nose offset, clamped to a
+ * realistic band. Used as a gray placeholder + apply option in the cockpit tab.
+ */
+export function assumedSaddleSetback(saddleHeight: number, seatAngle: number): number {
+    const alongTube = saddleHeight * Math.cos((seatAngle * Math.PI) / 180);
+    return Math.round(Math.max(20, Math.min(120, alongTube - SADDLE_NOSE_OFFSET)));
+}
+
 const bandStatus = (value: number | null | undefined, band: ReferenceBand): CheckStatus => {
     if (value == null) return 'unknown';
     if (value < band.min) return 'low';

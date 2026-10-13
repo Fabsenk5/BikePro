@@ -11,6 +11,7 @@ import BikeFrontView from '@/components/BikeFrontView';
 import { theme } from '@/constants/Colors';
 import { showAlert } from '@/lib/dialog';
 import {
+    assumedSaddleSetback,
     BikeGeometry,
     computeContactGeometry,
     Discipline,
@@ -255,13 +256,24 @@ export default function GeometryScreen() {
 
     const geometry = useMemo(() => buildGeometryFromForm(form), [form]);
 
-    // Assumed saddle height (0.883 × inseam) when none is entered yet, so the
-    // model and sketches work before the tape measurement exists.
+    // Assumed saddle height (0.883 × inseam) and setback (from the seat-tube
+    // geometry) when none are entered yet — the model and sketches work before
+    // the tape measurement exists; both are offered as gray placeholders.
     const assumedSaddleHeight = rider.inseam ? saddleHeightTarget(rider.inseam) : null;
-    const displayGeometry = useMemo(() => {
-        if (geometry.fit?.saddleHeight != null || assumedSaddleHeight == null) return geometry;
-        return { ...geometry, fit: { ...geometry.fit, saddleHeight: assumedSaddleHeight } };
+    const assumedSetback = useMemo(() => {
+        const height = geometry.fit?.saddleHeight ?? assumedSaddleHeight;
+        if (height == null) return null;
+        return assumedSaddleSetback(height, geometry.frame?.seatAngle ?? 75);
     }, [geometry, assumedSaddleHeight]);
+    const displayGeometry = useMemo(() => {
+        const fit = { ...geometry.fit };
+        if (fit.saddleHeight == null && assumedSaddleHeight != null) fit.saddleHeight = assumedSaddleHeight;
+        if (fit.saddleSetback == null && assumedSetback != null) fit.saddleSetback = assumedSetback;
+        if (fit.saddleHeight === geometry.fit?.saddleHeight && fit.saddleSetback === geometry.fit?.saddleSetback) {
+            return geometry;
+        }
+        return { ...geometry, fit };
+    }, [geometry, assumedSaddleHeight, assumedSetback]);
 
     const derived = useMemo(() => computeContactGeometry(displayGeometry), [displayGeometry]);
 
@@ -479,6 +491,8 @@ export default function GeometryScreen() {
                                     torsoLength={rider.torsoLength}
                                     riderMode={riderMode}
                                     dropperTravel={dropperTravel}
+                                    crankMode={crankMode}
+                                    crankLength={toNum(form.crankLength)}
                                     width={viewWidth}
                                 />
                             )}
@@ -646,9 +660,28 @@ export default function GeometryScreen() {
                             {field('crankLength', 'geometry.field_crank_length')}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: rider.inseam ? String(saddleHeightTarget(rider.inseam)) : '—' })}
-                            {field('saddleSetback', 'geometry.field_saddle_setback')}
+                            {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: assumedSaddleHeight != null ? String(assumedSaddleHeight) : '—' })}
+                            {field('saddleSetback', 'geometry.field_saddle_setback', { placeholder: assumedSetback != null ? String(assumedSetback) : '—' })}
                         </View>
+                        {(assumedSaddleHeight != null || assumedSetback != null) && (
+                            <BPButton
+                                title={t('geometry.cockpit_apply', {
+                                    height: assumedSaddleHeight ?? '—',
+                                    setback: assumedSetback ?? '—',
+                                })}
+                                onPress={() => setForm(prev => ({
+                                    ...prev,
+                                    saddleHeight: prev.saddleHeight
+                                        || (assumedSaddleHeight != null ? numStr(assumedSaddleHeight, i18n.language) : ''),
+                                    saddleSetback: prev.saddleSetback
+                                        || (assumedSetback != null ? numStr(assumedSetback, i18n.language) : ''),
+                                }))}
+                                variant="secondary"
+                                color={ACCENT}
+                                size="sm"
+                                style={{ marginTop: theme.spacing.sm }}
+                            />
+                        )}
                     </BPCard>
                 )}
 

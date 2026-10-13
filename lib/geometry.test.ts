@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    assumedSaddleSetback,
     BikeGeometry,
     computeContactGeometry,
     evaluateFit,
@@ -95,6 +96,16 @@ describe('evaluateFit', () => {
         const geo = { ...sample, fit: { ...sample.fit, saddleHeight: target + 25 } };
         const checks = evaluateFit(geo, computeContactGeometry(geo), DISCIPLINE_REFERENCES.enduro, { inseam: 840 });
         expect(checks.find(c => c.id === 'saddleHeight')).toMatchObject({ status: 'high' });
+    });
+
+    it('assumes a saddle setback from the seat-tube geometry', () => {
+        // 777 × cos 78° − 110 ≈ 52 mm; steep seat angles need less setback
+        expect(assumedSaddleSetback(777, 78)).toBe(52);
+        // 740 × cos 74° − 110 ≈ 94 mm for a classic trail seat angle
+        expect(assumedSaddleSetback(740, 74)).toBe(94);
+        // clamped to a realistic band
+        expect(assumedSaddleSetback(600, 80)).toBe(20);
+        expect(assumedSaddleSetback(900, 60)).toBe(120);
     });
 });
 

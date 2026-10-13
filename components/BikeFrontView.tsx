@@ -4,7 +4,7 @@
  * Same rider modes, springs and fixed zoom behaviour as the side view.
  */
 import { theme } from '@/constants/Colors';
-import { buildFrontSketch, FrontSketch, RiderMode, SketchPoint, springPoints } from '@/lib/bikeSketch';
+import { buildFrontSketch, CrankMode, FrontSketch, RiderMode, SketchPoint, springPoints } from '@/lib/bikeSketch';
 import { BikeGeometry, ContactGeometry } from '@/lib/geometry';
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +24,8 @@ interface Props {
     torsoLength?: number | null;
     riderMode: RiderMode;
     dropperTravel?: number | null;
+    crankMode?: CrankMode;
+    crankLength?: number | null;
     width: number;
 }
 
@@ -38,25 +40,29 @@ export default function BikeFrontView({
     torsoLength,
     riderMode,
     dropperTravel,
+    crankMode,
+    crankLength,
     width,
 }: Props) {
     const { t } = useTranslation();
 
     const sketch = useMemo(
         () => buildFrontSketch(geometry, derived, {
-            shoulderWidth, sagPercent, forkTravel, shockStroke, tireWidthMm, torsoLength, riderMode, dropperTravel,
+            shoulderWidth, sagPercent, forkTravel, shockStroke, tireWidthMm, torsoLength,
+            riderMode, dropperTravel, crankMode, crankLength,
         }),
-        [geometry, derived, shoulderWidth, sagPercent, forkTravel, shockStroke, tireWidthMm, torsoLength, riderMode, dropperTravel],
+        [geometry, derived, shoulderWidth, sagPercent, forkTravel, shockStroke, tireWidthMm, torsoLength, riderMode, dropperTravel, crankMode, crankLength],
     );
     // Bounds from the un-sagged sketches of both rider modes: the zoom stays
     // fixed while sag and pose change (side and front view behave the same).
     const baseSketches = useMemo(
         () => (['seated', 'standing'] as RiderMode[])
             .map(mode => buildFrontSketch(geometry, derived, {
-                shoulderWidth, sagPercent: 0, forkTravel, shockStroke, tireWidthMm, torsoLength, riderMode: mode, dropperTravel,
+                shoulderWidth, sagPercent: 0, forkTravel, shockStroke, tireWidthMm, torsoLength,
+                riderMode: mode, dropperTravel, crankMode, crankLength,
             }))
             .filter((s): s is FrontSketch => s != null),
-        [geometry, derived, shoulderWidth, forkTravel, shockStroke, tireWidthMm, torsoLength, dropperTravel],
+        [geometry, derived, shoulderWidth, forkTravel, shockStroke, tireWidthMm, torsoLength, dropperTravel, crankMode, crankLength],
     );
     if (!sketch || !baseSketches.length) {
         return <Text style={styles.hint}>{t('geometry.view_no_data')}</Text>;
@@ -91,9 +97,9 @@ export default function BikeFrontView({
     const frameColor = theme.colors.text;
     const wheelColor = theme.colors.textMuted;
 
-    // Zigzag spring: coil over the current length, orange bar = used travel
-    const spring = (top: SketchPoint, bottom: SketchPoint, used: number) => {
-        const { coil, bar } = springPoints(top, bottom, used);
+    // Zigzag spring: coil over the travel, solid line for the rest
+    const spring = (top: SketchPoint, bottom: SketchPoint, used: number, travel: number) => {
+        const { coil, solid } = springPoints(top, bottom, used, travel);
         return (
             <>
                 <Polyline
@@ -101,12 +107,7 @@ export default function BikeFrontView({
                     fill="none" stroke={frameColor} strokeWidth={2}
                     strokeLinejoin="round" strokeLinecap="round"
                 />
-                {used > 1 && (
-                    <Line
-                        x1={tx(bar[0].x)} y1={ty(bar[0].y)} x2={tx(bar[1].x)} y2={ty(bar[1].y)}
-                        stroke={theme.colors.accentOrange} strokeWidth={5} strokeLinecap="round"
-                    />
-                )}
+                {line(solid[0].x, solid[0].y, solid[1].x, solid[1].y, frameColor, 2)}
             </>
         );
     };
@@ -123,8 +124,8 @@ export default function BikeFrontView({
                 />
                 <Circle cx={tx(0)} cy={ty(sketch.wheelRadius)} r={Math.max(3, 16 * scale)} stroke={wheelColor} strokeWidth={2} fill="none" />
                 {/* fork legs as springs + crown + steerer */}
-                {spring({ x: -20, y: crownY }, { x: -legX, y: sketch.wheelRadius }, sketch.forkUsed)}
-                {spring({ x: 20, y: crownY }, { x: legX, y: sketch.wheelRadius }, sketch.forkUsed)}
+                {spring({ x: -20, y: crownY }, { x: -legX, y: sketch.wheelRadius }, sketch.forkUsed, sketch.forkTravel)}
+                {spring({ x: 20, y: crownY }, { x: legX, y: sketch.wheelRadius }, sketch.forkUsed, sketch.forkTravel)}
                 {line(-26, crownY, 26, crownY, frameColor, 4)}
                 {line(0, crownY, 0, sketch.barGroundY, frameColor, 3)}
                 {/* bar + grips */}
@@ -134,7 +135,15 @@ export default function BikeFrontView({
                 {/* saddle + dropper post (seated: extended, standing: compressed) */}
                 {line(0, sketch.saddleGroundY - 6, 0, sketch.saddleGroundY - 6 - postLength, frameColor, 3)}
                 {line(-45, sketch.saddleGroundY, 45, sketch.saddleGroundY, theme.colors.accentOrange, 4)}
-                {/* rider: shoulders + bent arms to the grips */}
+                {/* rider: legs, hips, torso and bent arms */}
+                {sketch.legs.map((leg, i) => (
+                    <React.Fragment key={i}>
+                        {line(leg.hip.x, leg.hip.y, leg.knee.x, leg.knee.y, ACCENT, 2)}
+                        {line(leg.knee.x, leg.knee.y, leg.foot.x, leg.foot.y, ACCENT, 2)}
+                        <Circle cx={tx(leg.foot.x)} cy={ty(leg.foot.y)} r={Math.max(2, 18 * scale)} fill={ACCENT} />
+                    </React.Fragment>
+                ))}
+                {line(-sketch.legs[0].hip.x, sketch.hipY, sketch.legs[0].hip.x, sketch.hipY, ACCENT, 3)}
                 {line(0, sketch.hipY, 0, sketch.shoulderY, ACCENT, 3)}
                 {line(-shoulderHalf, sketch.shoulderY, shoulderHalf, sketch.shoulderY, ACCENT, 3)}
                 {line(-shoulderHalf, sketch.shoulderY, -elbowX, elbowY, ACCENT, 2)}
@@ -158,7 +167,7 @@ export default function BikeFrontView({
                 <Text style={styles.hint}>{t('geometry.view_front_no_shoulder')}</Text>
             )}
             <Text style={styles.hint}>
-                {t('geometry.springs_legend_front', { fork: Math.round(forkTravel * sagPercent / 100) })}
+                {t('geometry.springs_legend_front', { fork: Math.round(forkTravel) })}
             </Text>
             <Text style={styles.hint}>{t('geometry.view_front_hint')}</Text>
         </View>

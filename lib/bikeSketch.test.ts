@@ -116,19 +116,30 @@ describe('rider mode and springs', () => {
     it('seated keeps the dropper extended, standing compresses it', () => {
         const seated = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'seated' })!;
         const standing = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, riderMode: 'standing', dropperTravel: 170 })!;
-        // seated: saddle at the fit height, hip on the saddle
+        // seated: saddle at the fit height, hip above the rail clamp
         expect(seated.saddle.y).toBeCloseTo(741, 6);
         expect(seated.riderHip.y).toBeCloseTo(741 + 60, 6);
+        expect(seated.riderHip.x).toBeCloseTo(-60 - 60, 6);
         // standing: saddle slid down the seat axis by the dropper travel
         const seatRad = (78 * Math.PI) / 180;
         expect(standing.saddle.y).toBeCloseTo(741 - 170 * Math.sin(seatRad), 0);
         expect(standing.saddle.x).toBeCloseTo(-60 + 170 * Math.cos(seatRad), 0);
-        // standing hip sits above the compressed saddle
+        // standing hip sits above the compressed saddle and leans back more
         expect(standing.riderHip.y).toBeGreaterThan(standing.saddle.y + 100);
-        expect(standing.riderHip.y).toBeCloseTo(seated.riderHip.y + 40, 6);
+        expect(standing.riderHip.y).toBeCloseTo(seated.riderHip.y + 60, 6);
+        expect(standing.riderShoulder.y - standing.riderHip.y)
+            .toBeGreaterThan(seated.riderShoulder.y - seated.riderHip.y);
         // the standing rider still reaches the pedal
         expect(standing.riderKnee).not.toBeNull();
         expect(standing.kneeBendDeg!).toBeGreaterThan(20);
+    });
+
+    it('assumes the saddle setback when only the saddle height is known', () => {
+        const noSetback = { ...geo, fit: { saddleHeight: 741 } };
+        const s = buildBikeSketch(noSetback, computeContactGeometry(noSetback), { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        // seat angle 78° → 741 × cos 78° − 110 ≈ 44 mm setback
+        expect(s.saddle.x).toBeCloseTo(-44, 0);
+        expect(s.saddle.y).toBeCloseTo(741, 6);
     });
 
     it('clamps the compressed saddle above the seat cluster', () => {
@@ -137,17 +148,20 @@ describe('rider mode and springs', () => {
         expect(s.saddle.y).toBeGreaterThanOrEqual(seatClusterY + 60);
     });
 
-    it('springs shorten with sag and mark the used travel', () => {
+    it('springs shorten with sag and carry the component travel', () => {
         const noSag = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose })!;
         const sagged = buildBikeSketch(geo, derived, { sagPercent: 20, forkTravel: 170, shockStroke: 60, ...pose })!;
-        // no sag → no used travel, full coil length
+        // no sag → no used travel
         expect(noSag.forkSpring.used).toBeCloseTo(0, 6);
         expect(noSag.shockSpring.used).toBeCloseTo(0, 6);
         // sag → fork uses part of its travel, shock exactly its sag
         expect(sagged.forkSpring.used).toBeGreaterThan(20);
         expect(sagged.forkSpring.used).toBeLessThan(34);
         expect(sagged.shockSpring.used).toBeCloseTo(12, 6);
-        // coil + used bar reconstruct the un-sagged spring line
+        // travel carried for the coil length
+        expect(sagged.forkSpring.travel).toBe(170);
+        expect(sagged.shockSpring.travel).toBe(60);
+        // coil + solid reconstruct the un-sagged spring line
         const len = (p: { top: { x: number; y: number }; bottom: { x: number; y: number } }) =>
             Math.hypot(p.bottom.x - p.top.x, p.bottom.y - p.top.y);
         expect(len(sagged.forkSpring) + sagged.forkSpring.used).toBeCloseTo(len(noSag.forkSpring), 6);
@@ -156,19 +170,24 @@ describe('rider mode and springs', () => {
 });
 
 describe('springPoints', () => {
-    it('zigzags between the ends and extends the used bar beyond the top', () => {
+    it('draws the coil over the travel and the rest as a solid line', () => {
         const a = { x: 0, y: 100 };
         const b = { x: 0, y: 0 };
-        const { coil, bar } = springPoints(a, b, 20);
+        const { coil, solid } = springPoints(a, { x: 0, y: 20 }, 20, 60);
+        // coil covers travel − used = 40 mm, starting at the frame side
         expect(coil[0]).toEqual(a);
-        expect(coil[coil.length - 1]).toEqual(b);
-        expect(coil.length).toBeGreaterThanOrEqual(9);
+        expect(coil[coil.length - 1]).toEqual({ x: 0, y: 60 });
+        expect(coil.length).toBeGreaterThanOrEqual(7);
         // interior points alternate around the axis
         const xs = coil.slice(1, -1).map(p => p.x);
         expect(Math.max(...xs)).toBeGreaterThan(0);
         expect(Math.min(...xs)).toBeLessThan(0);
-        // the used bar extends upward from the frame-side end
-        expect(bar[0]).toEqual(a);
-        expect(bar[1]).toEqual({ x: 0, y: 120 });
+        // solid line continues to the wheel side …
+        expect(solid[0]).toEqual({ x: 0, y: 60 });
+        expect(solid[1]).toEqual({ x: 0, y: 20 });
+        // … and keeps its length while sag grows
+        const { solid: solidNoSag } = springPoints(a, b, 0, 60);
+        expect(solidNoSag[0]).toEqual({ x: 0, y: 40 });
+        expect(solid[0].y - solid[1].y).toBeCloseTo(solidNoSag[0].y - solidNoSag[1].y, 6);
     });
 });
