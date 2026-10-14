@@ -56,7 +56,7 @@ describe('geometry scenario matrix (plausibility guard)', () => {
             derived,
             enduro.rider,
         );
-        expect(advice.too_long[0].key).toBe('geometry.advice.shorter_stem');
-        expect(advice.unsafe_descending.map(a => a.key)).toContain('geometry.advice.higher_bar');
+        expect(advice.too_long[0].key).toBe('geometry.advice_shorter_stem');
+        expect(advice.unsafe_descending.map(a => a.key)).toContain('geometry.advice_higher_bar');
     });
 });

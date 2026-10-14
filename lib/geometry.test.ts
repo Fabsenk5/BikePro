@@ -294,19 +294,19 @@ describe('recommendForSymptoms', () => {
     it('suggests a shorter stem for "too long"', () => {
         const d = computeContactGeometry(sample);
         const advice = recommendForSymptoms(['too_long'], sample, d, { inseam: 840 });
-        expect(advice.too_long[0].key).toBe('geometry.advice.shorter_stem');
+        expect(advice.too_long[0].key).toBe('geometry.advice_shorter_stem');
     });
 
     it('includes the saddle height target for knee pain', () => {
         const d = computeContactGeometry(sample);
         const advice = recommendForSymptoms(['knee_front'], sample, d, { inseam: 840 });
-        expect(advice.knee_front[0]).toMatchObject({ key: 'geometry.advice.raise_saddle', params: { target: 742 } });
+        expect(advice.knee_front[0]).toMatchObject({ key: 'geometry.advice_raise_saddle', params: { target: 742 } });
     });
 
     it('mentions the current RAD for pop issues', () => {
         const d = computeContactGeometry(sample);
         const advice = recommendForSymptoms(['no_pop'], sample, d, { inseam: 840 });
-        expect(advice.no_pop.some(a => a.key === 'geometry.advice.check_rad')).toBe(true);
+        expect(advice.no_pop.some(a => a.key === 'geometry.advice_check_rad')).toBe(true);
     });
 
     it('withholds shorter-stem advice when the stem is already stubby', () => {
@@ -344,9 +344,9 @@ describe('recommendForSymptoms', () => {
         expect(both.unsafe_descending).toEqual(
             recommendForSymptoms(['unsafe_descending'], sample, d, rider).unsafe_descending,
         );
-        expect(both.unsafe_descending.map(a => a.key)).toContain('geometry.advice.higher_bar');
+        expect(both.unsafe_descending.map(a => a.key)).toContain('geometry.advice_higher_bar');
         // … and the conflict is noted on the longer-stem side
-        expect(both.too_short.map(a => a.key)).toContain('geometry.advice.conflict_short_unsafe');
+        expect(both.too_short.map(a => a.key)).toContain('geometry.advice_conflict_short_unsafe');
     });
 });
 

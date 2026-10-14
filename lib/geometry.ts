@@ -591,7 +591,7 @@ export const SYMPTOMS: SymptomId[] = [
 ];
 
 export interface Advice {
-    /** i18n key under geometry.advice.* */
+    /** i18n key under geometry.advice_* */
     key: string;
     params?: Record<string, string | number>;
 }
@@ -621,32 +621,32 @@ export function recommendForSymptoms(
                 const stem = geo.cockpit?.stemLength;
                 result[symptom] = stem == null || stem > 35
                     ? [
-                        { key: 'geometry.advice.shorter_stem', params: { mm: '10–20' } },
-                        { key: 'geometry.advice.more_backsweep' },
-                        { key: 'geometry.advice.saddle_forward', params: { mm: '5–10' } },
+                        { key: 'geometry.advice_shorter_stem', params: { mm: '10–20' } },
+                        { key: 'geometry.advice_more_backsweep' },
+                        { key: 'geometry.advice_saddle_forward', params: { mm: '5–10' } },
                     ]
                     : [];
                 break;
             }
             case 'too_short':
                 result[symptom] = [
-                    { key: 'geometry.advice.longer_stem', params: { mm: '10–20' } },
-                    { key: 'geometry.advice.saddle_back', params: { mm: '5–10' } },
+                    { key: 'geometry.advice_longer_stem', params: { mm: '10–20' } },
+                    { key: 'geometry.advice_saddle_back', params: { mm: '5–10' } },
                     // Conflict: a longer stem fights descending safety — the
                     // unsafe_descending advice below is kept as-is (safety
                     // wins) and the conflict is noted here. Fits the Advice
                     // type (key-only entry); the locale string is owned by
                     // the UI layer.
                     ...(symptoms.includes('unsafe_descending')
-                        ? [{ key: 'geometry.advice.conflict_short_unsafe' }]
+                        ? [{ key: 'geometry.advice_conflict_short_unsafe' }]
                         : []),
                 ];
                 break;
             case 'hand_pressure':
                 result[symptom] = [
-                    { key: 'geometry.advice.more_spacers', params: { mm: '10–20' } },
-                    { key: 'geometry.advice.higher_rise_bar', params: { mm: '20–30' } },
-                    { key: 'geometry.advice.shorter_stem', params: { mm: '10' } },
+                    { key: 'geometry.advice_more_spacers', params: { mm: '10–20' } },
+                    { key: 'geometry.advice_higher_rise_bar', params: { mm: '20–30' } },
+                    { key: 'geometry.advice_shorter_stem', params: { mm: '10' } },
                 ];
                 break;
             case 'bar_too_high': {
@@ -657,36 +657,36 @@ export function recommendForSymptoms(
                 const lowerable = spacers > 0 || (rise != null && rise > MAX_RISE_CEILING);
                 result[symptom] = lowerable
                     ? [
-                        { key: 'geometry.advice.fewer_spacers', params: { mm: '10–20' } },
-                        { key: 'geometry.advice.lower_rise_bar', params: { mm: '10–20' } },
+                        { key: 'geometry.advice_fewer_spacers', params: { mm: '10–20' } },
+                        { key: 'geometry.advice_lower_rise_bar', params: { mm: '10–20' } },
                     ]
                     : [];
                 break;
             }
             case 'no_pop':
                 result[symptom] = [
-                    { key: 'geometry.advice.shorter_stem', params: { mm: '10–20' } },
-                    { key: 'geometry.advice.higher_bar', params: { mm: '10–20' } },
-                    ...(rad != null ? [{ key: 'geometry.advice.check_rad', params: { rad } }] : []),
+                    { key: 'geometry.advice_shorter_stem', params: { mm: '10–20' } },
+                    { key: 'geometry.advice_higher_bar', params: { mm: '10–20' } },
+                    ...(rad != null ? [{ key: 'geometry.advice_check_rad', params: { rad } }] : []),
                 ];
                 break;
             case 'knee_front':
                 result[symptom] = [
-                    ...(target != null ? [{ key: 'geometry.advice.raise_saddle', params: { target } }] : []),
-                    { key: 'geometry.advice.saddle_steps', params: { mm: '5' } },
+                    ...(target != null ? [{ key: 'geometry.advice_raise_saddle', params: { target } }] : []),
+                    { key: 'geometry.advice_saddle_steps', params: { mm: '5' } },
                 ];
                 break;
             case 'neck_back':
                 result[symptom] = [
-                    { key: 'geometry.advice.higher_bar', params: { mm: '20–30' } },
-                    { key: 'geometry.advice.shorter_stem', params: { mm: '10–20' } },
+                    { key: 'geometry.advice_higher_bar', params: { mm: '20–30' } },
+                    { key: 'geometry.advice_shorter_stem', params: { mm: '10–20' } },
                 ];
                 break;
             case 'unsafe_descending':
                 result[symptom] = [
-                    { key: 'geometry.advice.higher_bar', params: { mm: '10–20' } },
-                    { key: 'geometry.advice.wider_bar' },
-                    { key: 'geometry.advice.shorter_stem', params: { mm: '10' } },
+                    { key: 'geometry.advice_higher_bar', params: { mm: '10–20' } },
+                    { key: 'geometry.advice_wider_bar' },
+                    { key: 'geometry.advice_shorter_stem', params: { mm: '10' } },
                 ];
                 break;
         }

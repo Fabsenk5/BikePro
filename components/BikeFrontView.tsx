@@ -125,6 +125,21 @@ export default function BikeFrontView({
             >
                 {/* ground */}
                 <Line x1={pad} y1={ty(0)} x2={width - pad} y2={ty(0)} stroke={theme.colors.border} strokeWidth={1} />
+                {/* 10 cm grid like the side view, origin at the ground centre */}
+                {Array.from({ length: 11 }, (_, i) => (i - 5) * 100).map(x => (
+                    <Line
+                        key={`gx-${x}`} x1={tx(x)} y1={ty(0)} x2={tx(x)} y2={ty(VIEW_TOP)}
+                        stroke={theme.colors.border} strokeWidth={x === 0 ? 1.5 : 0.7}
+                        opacity={x === 0 ? 0.9 : 0.35}
+                    />
+                ))}
+                {Array.from({ length: 20 }, (_, i) => i * 100).map(y => (
+                    <Line
+                        key={`gy-${y}`} x1={tx(-VIEW_HALF)} y1={ty(y)} x2={tx(VIEW_HALF)} y2={ty(y)}
+                        stroke={theme.colors.border} strokeWidth={y === 0 ? 1.5 : 0.7}
+                        opacity={y === 0 ? 0.9 : 0.35}
+                    />
+                ))}
                 {/* front wheel seen head-on: tire width + hub */}
                 <Line
                     x1={tx(0)} y1={ty(0)} x2={tx(0)} y2={ty(sketch.wheelRadius * 2)}
