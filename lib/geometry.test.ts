@@ -200,6 +200,21 @@ describe('evaluateFit', () => {
         expect(DISCIPLINE_REFERENCES.enduro.saddleToBarDrop.min).toBe(0);
     });
 
+    it('caps DH bar width at real-world 805 and adds a compact bikepark reference', () => {
+        expect(DISCIPLINE_REFERENCES.dh.barWidth).toEqual({ min: 760, max: 805 });
+        expect(DISCIPLINE_REFERENCES.bikepark.radRatio).toEqual({ min: 0.95, max: 1.05 });
+        const d = computeContactGeometry(sample);
+        // 780 bar is fine in both gravity references
+        for (const r of [DISCIPLINE_REFERENCES.dh, DISCIPLINE_REFERENCES.bikepark]) {
+            const checks = evaluateFit(sample, d, r, { inseam: 840 });
+            expect(checks.find(c => c.id === 'barWidth')).toMatchObject({ status: 'ok' });
+        }
+        // 815 de facto doesn't exist → high in DH
+        const wide = { ...sample, cockpit: { ...sample.cockpit, barWidth: 815 } };
+        const dw = computeContactGeometry(wide);
+        expect(evaluateFit(wide, dw, DISCIPLINE_REFERENCES.dh, { inseam: 840 }).find(c => c.id === 'barWidth')).toMatchObject({ status: 'high' });
+    });
+
     it('stays backward compatible without the assumed set', () => {
         const d = computeContactGeometry(sample);
         const ref = DISCIPLINE_REFERENCES.enduro;

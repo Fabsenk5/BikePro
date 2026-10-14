@@ -344,7 +344,7 @@ export function stripComputedMeasured(
 
 // ─── Discipline references (heuristic bands, test-guarded) ───
 
-export type Discipline = 'tour' | 'trail' | 'enduro' | 'dh';
+export type Discipline = 'tour' | 'trail' | 'enduro' | 'dh' | 'bikepark';
 
 export interface ReferenceBand {
     min: number;
@@ -389,8 +389,19 @@ export const DISCIPLINE_REFERENCES: Record<Discipline, DisciplineReference> = {
         saddleToBarDrop: { min: 20, max: 80 },
         stemLength: { min: 30, max: 45 },
         barRise: { min: 25, max: 50 },
-        barWidth: { min: 780, max: 820 },
+        // real bars top out around 805 mm and the trend goes narrower
+        // (shoulder-dependent) — 760–805 is the sensible DH window
+        barWidth: { min: 760, max: 805 },
         radRatio: { min: 0.98, max: 1.08 },
+    },
+    bikepark: {
+        // Jump/flow-oriented: compact RAD for agility on flow and jump lines
+        // (vs. the longer DH race setup for steep, fast tracks)
+        saddleToBarDrop: { min: 20, max: 80 },
+        stemLength: { min: 30, max: 45 },
+        barRise: { min: 30, max: 50 },
+        barWidth: { min: 760, max: 800 },
+        radRatio: { min: 0.95, max: 1.05 },
     },
 };
 

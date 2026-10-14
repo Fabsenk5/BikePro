@@ -1093,6 +1093,7 @@
         "discipline_trail": "Trail",
         "discipline_enduro": "Enduro",
         "discipline_dh": "Downhill/Freeride",
+        "discipline_bikepark": "Bike park",
         "checks_title": "Fit check",
         "band": "Target {{min}}–{{max}}",
         "check_radRatio": "RAD / inseam",

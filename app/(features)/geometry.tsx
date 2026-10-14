@@ -729,6 +729,7 @@ export default function GeometryScreen() {
                                 { label: t('geometry.discipline_trail'), value: 'trail' },
                                 { label: t('geometry.discipline_enduro'), value: 'enduro' },
                                 { label: t('geometry.discipline_dh'), value: 'dh' },
+                                { label: t('geometry.discipline_bikepark'), value: 'bikepark' },
                             ]}
                             value={discipline}
                             onValueChange={(v) => setDiscipline(v as Discipline)}
