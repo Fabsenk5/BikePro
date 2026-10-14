@@ -739,9 +739,12 @@ export default function GeometryScreen() {
                             <Text style={styles.cardTitle}>🎯 {t('geometry.checks_title')}</Text>
                             {checks.map(check => (
                                 <View key={check.id} style={styles.checkRow}>
-                                    <Text style={styles.checkLabel}>
-                                        {statusIcon(check.status)} {t(`geometry.check_${check.id}`)}
-                                    </Text>
+                                    <View style={styles.checkLabelCol}>
+                                        <Text style={styles.checkLabel}>
+                                            {statusIcon(check.status)} {t(`geometry.check_${check.id}`)}
+                                        </Text>
+                                        <Text style={styles.checkHint}>{t(`geometry.check_${check.id}_hint`)}</Text>
+                                    </View>
                                     <Text style={styles.checkValue}>
                                         {fmtCheck(check)}
                                         {check.band
@@ -1006,6 +1009,8 @@ const styles = StyleSheet.create({
         paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: theme.colors.border + '60',
     },
     checkLabel: { color: theme.colors.textSecondary, fontSize: 13, fontWeight: '600' },
+    checkLabelCol: { flex: 1, paddingRight: 8 },
+    checkHint: { color: theme.colors.textMuted, fontSize: 11, lineHeight: 15, marginTop: 1 },
     checkValue: { color: theme.colors.text, fontSize: 12, fontWeight: '600' },
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     adviceBlock: { marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border + '60' },
