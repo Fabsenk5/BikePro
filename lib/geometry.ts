@@ -382,7 +382,8 @@ export const DISCIPLINE_REFERENCES: Record<Discipline, DisciplineReference> = {
         saddleToBarDrop: { min: 0, max: 90 },
         stemLength: { min: 35, max: 50 },
         barRise: { min: 25, max: 40 },
-        barWidth: { min: 780, max: 810 },
+        // 800 mm is the real-world ceiling (no 810 bars exist)
+        barWidth: { min: 780, max: 800 },
         radRatio: { min: 1.0, max: 1.1 },
     },
     dh: {
