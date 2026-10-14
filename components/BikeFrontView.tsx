@@ -163,11 +163,22 @@ export default function BikeFrontView({
                 {spring({ x: -20, y: crownY }, { x: -legX, y: sketch.wheelRadius }, sketch.forkUsed, sketch.forkTravel)}
                 {spring({ x: 20, y: crownY }, { x: legX, y: sketch.wheelRadius }, sketch.forkUsed, sketch.forkTravel)}
                 {line(-26, crownY, 26, crownY, frameColor, 4)}
-                {line(0, crownY, 0, sketch.barGroundY, frameColor, 3)}
-                {/* bar + grips */}
+                {sketch.headTopGroundY != null && sketch.clampGroundY != null ? (
+                    <>
+                        {line(0, crownY, 0, sketch.headTopGroundY, frameColor, 3)}
+                        {line(0, sketch.headTopGroundY, 0, sketch.headTopGroundY + sketch.spacersMm, frameColor, 4)}
+                        {line(0, sketch.headTopGroundY + sketch.spacersMm, 0, sketch.clampGroundY, frameColor, 4)}
+                        {line(0, sketch.clampGroundY, 0, sketch.barGroundY, frameColor, 3)}
+                    </>
+                ) : (
+                    line(0, crownY, 0, sketch.barGroundY, frameColor, 3)
+                )}
+                {/* bar + grips (orange like the saddle); grips sit a grip-rise
+                    above the bar line through the upsweep, backsweep only shows
+                    in the side view */}
                 {line(-sketch.barWidth / 2, sketch.barGroundY, sketch.barWidth / 2, sketch.barGroundY, frameColor, 4)}
-                <Circle cx={tx(-sketch.gripHalfSpan)} cy={ty(sketch.barGroundY)} r={22 * scale} fill={ACCENT} />
-                <Circle cx={tx(sketch.gripHalfSpan)} cy={ty(sketch.barGroundY)} r={22 * scale} fill={ACCENT} />
+                <Circle cx={tx(-sketch.gripHalfSpan)} cy={ty(sketch.barGroundY + sketch.gripRise)} r={22 * scale} fill={theme.colors.accentOrange} />
+                <Circle cx={tx(sketch.gripHalfSpan)} cy={ty(sketch.barGroundY + sketch.gripRise)} r={22 * scale} fill={theme.colors.accentOrange} />
                 {/* saddle + dropper post (seated: extended, standing: compressed) */}
                 {line(0, sketch.saddleGroundY - 6, 0, sketch.saddleGroundY - 6 - postLength, frameColor, 3)}
                 {line(-45, sketch.saddleGroundY, 45, sketch.saddleGroundY, theme.colors.accentOrange, 4)}

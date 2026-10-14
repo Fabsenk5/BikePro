@@ -360,6 +360,74 @@ describe('animation frame (rocks)', () => {
     });
 });
 
+describe('cockpit detail', () => {
+    it('splits spacers, stem, rise and swept bar exactly like the contact model', () => {
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s.steererTop).not.toBeNull();
+        expect(s.stemEnd).not.toBeNull();
+        // spacer tower along the steerer: 15 mm pull the clamp rearward/up
+        expect(s.steererTop!.x).toBeCloseTo(480 - 15 * Math.cos((63.5 * Math.PI) / 180), 6);
+        expect(s.steererTop!.y).toBeCloseTo(630 + 15 * Math.sin((63.5 * Math.PI) / 180), 6);
+        // stem 40 mm at 0°: straight forward
+        expect(s.stemEnd!.x).toBeCloseTo(s.steererTop!.x + 40, 6);
+        expect(s.stemEnd!.y).toBeCloseTo(s.steererTop!.y, 6);
+        // rise + swept bar land exactly on the derived points
+        expect(s.bar.x).toBeCloseTo(s.stemEnd!.x, 6);
+        expect(s.bar.y).toBeCloseTo(s.stemEnd!.y + 30, 6);
+        expect(s.hand.x).toBeCloseTo(derived.handX!, 6);
+        expect(s.hand.y).toBeCloseTo(derived.handY!, 6);
+    });
+
+    it('falls back to the simple stem line without stem data or with a measured bar', () => {
+        const { stemLength: _stem, ...cockpitNoStem } = geo.cockpit;
+        const noStem = { ...geo, cockpit: cockpitNoStem };
+        const s1 = buildBikeSketch(noStem, computeContactGeometry(noStem), { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s1.steererTop).toBeNull();
+        expect(s1.stemEnd).toBeNull();
+        const measured = { ...geo, measured: { barX: 999, barY: 999 } };
+        const s2 = buildBikeSketch(measured, computeContactGeometry(measured), { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s2.steererTop).toBeNull();
+        expect(s2.stemEnd).toBeNull();
+    });
+
+    it('offsets the far arm for depth', () => {
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s.riderElbowFar.x).toBeCloseTo(s.riderElbow.x - 18, 6);
+        expect(s.riderElbowFar.y).toBeCloseTo(s.riderElbow.y - 28, 6);
+        expect(s.riderHandFar.x).toBeCloseTo(s.hand.x - 18, 6);
+        expect(s.riderHandFar.y).toBeCloseTo(s.hand.y - 28, 6);
+    });
+
+    it('exposes front cockpit heights (clamp, steerer top, grip rise)', () => {
+        const f = buildFrontSketch(geo, derived, { sagPercent: 0, forkTravel: 170 })!;
+        // grip rise from the upsweep: (780/2 − 40) · sin 5°
+        expect(f.gripRise).toBeCloseTo(350 * Math.sin((5 * Math.PI) / 180), 6);
+        // clamp = bar centre minus rise
+        expect(f.clampGroundY).toBeCloseTo(f.barGroundY - 30, 6);
+        // steerer top = stack height above ground at rest
+        expect(f.headTopGroundY).toBeCloseTo(f.bbGroundY + 630, 6);
+        expect(f.spacersMm).toBe(15);
+    });
+
+    it('front cockpit falls back without stack or rise', () => {
+        // without a stack the steerer top is unknown — reachable with a
+        // measured bar override (otherwise barY itself is already null)
+        const { stack: _stack, ...frameNoStack } = geo.frame;
+        const noStack = { ...geo, frame: frameNoStack, measured: { barX: 520, barY: 675 } };
+        const f1 = buildFrontSketch(noStack, computeContactGeometry(noStack), { sagPercent: 0, forkTravel: 170 })!;
+        expect(f1.headTopGroundY).toBeNull();
+        const { barRise: _rise, ...cockpitNoRise } = geo.cockpit;
+        const noRise = { ...geo, cockpit: cockpitNoRise };
+        const f2 = buildFrontSketch(noRise, computeContactGeometry(noRise), { sagPercent: 0, forkTravel: 170 })!;
+        expect(f2.clampGroundY).toBeNull();
+        const { upsweep: _sweep, ...cockpitNoSweep } = geo.cockpit;
+        const noSweep = { ...geo, cockpit: cockpitNoSweep };
+        const f3 = buildFrontSketch(noSweep, computeContactGeometry(noSweep), { sagPercent: 0, forkTravel: 170 })!;
+        // grips still sit at the bar line without upsweep data
+        expect(f3.gripRise).toBe(0);
+    });
+});
+
 describe('springPoints', () => {
     it('draws the coil over the travel between solid body and rest', () => {
         const a = { x: 0, y: 200 };

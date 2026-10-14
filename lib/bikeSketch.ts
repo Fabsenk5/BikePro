@@ -25,6 +25,10 @@ export interface BikeSketch {
     saddle: SketchPoint;
     bar: SketchPoint;
     hand: SketchPoint;
+    /** steerer top (head tube + spacers along the steerer), null without complete cockpit data */
+    steererTop: SketchPoint | null;
+    /** stem end (null = draw the simple stem line instead) */
+    stemEnd: SketchPoint | null;
     riderHip: SketchPoint;
     riderShoulder: SketchPoint;
     riderHead: SketchPoint;
@@ -35,6 +39,9 @@ export interface BikeSketch {
     torsoAngleSource: TorsoAngleSource;
     /** elbow of the bent arm (shoulder → elbow → hand) */
     riderElbow: SketchPoint;
+    /** far-side elbow/hand (depth cue, drawn dimmed and slightly offset) */
+    riderElbowFar: SketchPoint;
+    riderHandFar: SketchPoint;
     /** knee of the near leg (null when no inseam is known) */
     riderKnee: SketchPoint | null;
     /** pedal of the near leg (forward / bottom) */
@@ -174,6 +181,11 @@ const ARM_BEND_FACTOR = 0.97;
 const UPPER_ARM_RATIO = 0.48;
 /** Fallback arm length (shoulder → wrist) when the profile has none. */
 export const DEFAULT_ARM = 640;
+/**
+ * Far-arm depth cue in side projection: the off-side arm reads slightly
+ * behind and below the near arm.
+ */
+const FAR_ARM_OFFSET = { x: -18, y: -28 };
 
 /**
  * Shoulder from the torso + arm reach to the bar: two-bone IK between the hip
@@ -353,6 +365,14 @@ export interface FrontSketch {
     forkTravel: number;
     /** BB height above the ground (front leg origin) */
     bbGroundY: number;
+    /** grip height above the bar centre (upsweep), so grips sit off the bar line */
+    gripRise: number;
+    /** stem clamp height above the ground (bar centre minus rise), null if rise unknown */
+    clampGroundY: number | null;
+    /** steerer/head-tube top height above the ground, null without stack */
+    headTopGroundY: number | null;
+    /** visible spacer stack above the head tube (mm, 0 when unknown like the model) */
+    spacersMm: number;
     /** head tube length — crown sits this far below the bar */
     headTubeLength: number;
     /**
@@ -396,6 +416,11 @@ export function buildFrontSketch(
     const sagShock = Math.max(0, ((opts.shockStroke ?? 0) * opts.sagPercent) / 100);
     const barGroundY = bbHeight + derived.barY - sagFork;
     const gripHalfSpan = Math.max(0, cockpit.barWidth / 2 - GRIP_INSET_MM);
+    const barRiseMm = cockpit.barRise ?? 0;
+    const gripRise = gripHalfSpan * Math.sin(((cockpit.upsweep ?? 0) * Math.PI) / 180);
+    const clampGroundY = cockpit.barRise != null ? barGroundY - barRiseMm : null;
+    const headTopGroundY = frame.stack != null ? bbHeight + frame.stack - sagFork : null;
+    const spacersMm = cockpit.spacers ?? 0;
     const shoulderHalfWidth = opts.shoulderWidth != null && opts.shoulderWidth > 0
         ? opts.shoulderWidth / 2
         : null;
@@ -472,6 +497,10 @@ export function buildFrontSketch(
         forkUsed: sagFork,
         forkTravel: opts.forkTravel,
         bbGroundY: bbHeight,
+        gripRise,
+        clampGroundY,
+        headTopGroundY,
+        spacersMm,
         headTubeLength: frame.headTube ?? HEAD_TUBE_LENGTH,
         crownGroundY,
         legs,
@@ -571,6 +600,38 @@ export function buildBikeSketch(
         ? { x: derived.handX, y: derived.handY }
         : bar;
 
+    // Cockpit detail chain (mirrors computeContactGeometry exactly):
+    // headTop → steererTop (spacers along the steerer) → stemEnd → bar
+    // (rise). Only used when the recomputed bar matches the derived one —
+    // a measured bar override can't be split into parts, so we fall back
+    // to the simple stem line then.
+    const cockpit = geo.cockpit ?? {};
+    const stemLength = cockpit.stemLength;
+    const stemAngle = (cockpit.stemAngle ?? 0) * Math.PI / 180;
+    const spacersMm = cockpit.spacers ?? 0;
+    const barRiseMm = cockpit.barRise ?? 0;
+    let steererTop: SketchPoint | null = null;
+    let stemEnd: SketchPoint | null = null;
+    if (stemLength != null && frame.headAngle != null) {
+        const headRad2 = (frame.headAngle * Math.PI) / 180;
+        const top: SketchPoint = {
+            x: headTop.x - spacersMm * Math.cos(headRad2),
+            y: headTop.y + spacersMm * Math.sin(headRad2),
+        };
+        const end: SketchPoint = {
+            x: top.x + stemLength * Math.cos(stemAngle),
+            y: top.y + stemLength * Math.sin(stemAngle),
+        };
+        if (
+            derived.barX != null && derived.barY != null
+            && Math.abs(end.x - derived.barX) < 1
+            && Math.abs(end.y + barRiseMm - derived.barY) < 1
+        ) {
+            steererTop = top;
+            stemEnd = end;
+        }
+    }
+
     // Rail clamp sits on the seat-tube axis (never behind the drawn rails):
     // this is what keeps the dropper post parallel to the seat angle.
     const clampY = saddle.y - 10;
@@ -617,6 +678,8 @@ export function buildBikeSketch(
     // Elbow: two-bone arm IK from the shoulder to the hand, bowing backward
     const upperArm = arm * UPPER_ARM_RATIO;
     const elbow = twoBoneIK(shoulder, hand, upperArm, arm - upperArm, 'back');
+    const riderElbowFar: SketchPoint = { x: elbow.x + FAR_ARM_OFFSET.x, y: elbow.y + FAR_ARM_OFFSET.y };
+    const riderHandFar: SketchPoint = { x: hand.x + FAR_ARM_OFFSET.x, y: hand.y + FAR_ARM_OFFSET.y };
 
     // Legs: two-bone IK from hip to pedal, knee forward of the hip–pedal line.
     // Both cranks are drawn — near leg on the forward/bottom pedal, far leg opposite.
@@ -700,6 +763,8 @@ export function buildBikeSketch(
         saddle: drop(saddle),
         bar: drop(bar),
         hand: drop(hand),
+        steererTop: steererTop ? drop(steererTop) : null,
+        stemEnd: stemEnd ? drop(stemEnd) : null,
         riderHip: drop(hip),
         riderShoulder: drop(shoulder),
         riderHead: drop(head),
@@ -707,6 +772,8 @@ export function buildBikeSketch(
         torsoAngleDeg,
         torsoAngleSource: barReach ? 'ik' : 'fallback',
         riderElbow: drop(elbow),
+        riderElbowFar: drop(riderElbowFar),
+        riderHandFar: drop(riderHandFar),
         riderKnee: knee ? drop(knee) : null,
         riderPedal: drop(pedal),
         riderLegs: riderLegs.map(leg => ({

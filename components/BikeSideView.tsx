@@ -293,12 +293,29 @@ export default function BikeSideView({
                 {shockStroke > 0
                     ? spring(sketch.shockSpring, frameColor)
                     : tube(sketch.shockSpring.top, sketch.shockSpring.bottom, frameColor, 2)}
-                {/* stem + bar */}
-                {tube(sketch.headTop, sketch.bar, frameColor, 3)}
-                {tube(
-                    { x: sketch.bar.x - 45, y: sketch.bar.y + 10 },
-                    { x: sketch.bar.x + 45, y: sketch.bar.y - 10 },
-                    frameColor, 4,
+                {/* cockpit, split exactly like the contact model: spacers along
+                    the steerer, stem, rise, then the bar sweeping back/up to
+                    the grip. Without complete data the simple stem line stays. */}
+                {sketch.steererTop && sketch.stemEnd ? (
+                    <>
+                        {tube(sketch.headTop, sketch.steererTop, frameColor, 3)}
+                        {tube(sketch.steererTop, sketch.stemEnd, frameColor, 4)}
+                        {tube(sketch.stemEnd, sketch.bar, frameColor, 3)}
+                        {tube(sketch.bar, sketch.hand, frameColor, 3)}
+                        <Circle
+                            cx={tx(sketch.hand.x)} cy={ty(sketch.hand.y)}
+                            r={Math.max(2, 16 * scale)} fill={theme.colors.accentOrange}
+                        />
+                    </>
+                ) : (
+                    <>
+                        {tube(sketch.headTop, sketch.bar, frameColor, 3)}
+                        {tube(
+                            { x: sketch.bar.x - 45, y: sketch.bar.y + 10 },
+                            { x: sketch.bar.x + 45, y: sketch.bar.y - 10 },
+                            frameColor, 4,
+                        )}
+                    </>
                 )}
                 {/* seatpost (along the seat angle) + saddle (nose forward) */}
                 {tube(sketch.seatCluster, sketch.saddleClamp, frameColor, 2)}
@@ -310,8 +327,13 @@ export default function BikeSideView({
                     ].join(' ')}
                     fill={theme.colors.accentOrange}
                 />
-                {/* rider: torso from the hip (rotation point), bent arms and legs */}
+                {/* rider: torso from the hip (rotation point), bent arms and legs.
+                    Far-side arm and leg are dimmed depth cues, like the legs. */}
                 {tube(sketch.riderHip, sketch.riderShoulder, ACCENT, 3)}
+                <G opacity={0.45}>
+                    {tube(sketch.riderShoulder, sketch.riderElbowFar, ACCENT, 2)}
+                    {tube(sketch.riderElbowFar, sketch.riderHandFar, ACCENT, 2)}
+                </G>
                 {tube(sketch.riderShoulder, sketch.riderElbow, ACCENT, 2)}
                 {tube(sketch.riderElbow, sketch.hand, ACCENT, 2)}
                 {sketch.riderLegs.filter(leg => !leg.near).map((leg, i) => (
