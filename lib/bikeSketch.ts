@@ -31,6 +31,8 @@ export interface BikeSketch {
     riderHeadRadius: number;
     /** derived back angle (hip → shoulder) in degrees from horizontal */
     torsoAngleDeg: number;
+    /** whether the back angle came from the torso+arm IK ('ik') or the lean fallback */
+    torsoAngleSource: TorsoAngleSource;
     /** elbow of the bent arm (shoulder → elbow → hand) */
     riderElbow: SketchPoint;
     /** knee of the near leg (null when no inseam is known) */
@@ -106,6 +108,8 @@ const FRONT_PEDAL_HALF = 80;
 
 export type CrankMode = 'horizontal' | 'vertical';
 export type RiderMode = 'seated' | 'standing' | 'attack-flat' | 'attack-steep';
+/** Where the side-view back angle comes from: the torso+arm IK or the lean fallback. */
+export type TorsoAngleSource = 'ik' | 'fallback';
 
 /** Hip offset behind the BB and above the seated hip for a rider mode. */
 function riderHipOffset(mode: RiderMode): { back: number; rise: number } {
@@ -262,7 +266,8 @@ export function buildAnimationFrame(params: {
     );
     const sagFork = (forkTravel * sagPercent) / 100;
     const sagShock = (shockStroke * sagPercent) / 100;
-    const rearSagWheel = rearTravel > 0 ? (sagShock * rearTravel) / shockStroke : sagShock;
+    // No shock (hardtail, stroke 0) → no leverage ratio, the wheel sag is 0.
+    const rearSagWheel = rearTravel > 0 && shockStroke > 0 ? (sagShock * rearTravel) / shockStroke : sagShock;
     return {
         rockHeight,
         rockX,
@@ -350,8 +355,14 @@ export interface FrontSketch {
     bbGroundY: number;
     /** head tube length — crown sits this far below the bar */
     headTubeLength: number;
+    /**
+     * crown (fork top) height above the ground — same head-tube geometry as
+     * the side view (reach/stack/head angle/head tube), falling back to the
+     * bar height minus the head tube when the frame data is incomplete
+     */
+    crownGroundY: number;
     /** both legs hip → knee → pedal (front view, feet per crank position) */
-    legs: { hip: SketchPoint; knee: SketchPoint; foot: SketchPoint }[];
+    legs: { hip: SketchPoint; knee: SketchPoint | null; foot: SketchPoint }[];
 }
 
 export function buildFrontSketch(
@@ -369,6 +380,7 @@ export function buildFrontSketch(
         armLength?: number | null;
         crankMode?: CrankMode;
         crankLength?: number | null;
+        inseam?: number | null;
     },
 ): FrontSketch | null {
     const frame = geo.frame ?? {};
@@ -415,9 +427,11 @@ export function buildFrontSketch(
     const fallbackAngle = fallbackTorsoAngle(riderMode);
     const shoulderY = reach?.shoulder.y ?? hipY + torso * Math.sin(fallbackAngle);
 
-    // Legs seen from the front: hip → knee → pedal, feet per crank position
+    // Legs seen from the front: hip → knee → pedal, feet per crank position.
+    // Without an inseam the legs are drawn straight hip → foot (knee null).
     const crank = opts.crankLength ?? geo.cockpit?.crankLength ?? 170;
     const crankMode = opts.crankMode ?? 'horizontal';
+    const inseam = opts.inseam != null && opts.inseam > 0 ? opts.inseam : null;
     const footY = (side: number) => crankMode === 'vertical'
         ? bbHeight + side * crank
         : bbHeight;
@@ -427,12 +441,21 @@ export function buildFrontSketch(
         return {
             hip,
             foot,
-            knee: {
+            knee: inseam ? {
                 x: side * (FRONT_HIP_HALF + FRONT_PEDAL_HALF) / 2 + side * 10,
                 y: (hipY + foot.y) / 2 + 25,
-            },
+            } : null,
         };
     });
+
+    // Crown: same head-tube bottom as the side view (head tube leaning back
+    // from the stack/reach point), converted to a height above the ground;
+    // without stack/reach the head tube hangs below the bar instead.
+    const headTubeLength = frame.headTube ?? HEAD_TUBE_LENGTH;
+    const headAngle = frame.headAngle ?? 65;
+    const crownGroundY = frame.stack != null && frame.reach != null
+        ? bbHeight + (frame.stack - headTubeLength * Math.sin((headAngle * Math.PI) / 180)) - sagFork
+        : barGroundY - headTubeLength;
 
     return {
         wheelRadius: radii.front,
@@ -450,6 +473,7 @@ export function buildFrontSketch(
         forkTravel: opts.forkTravel,
         bbGroundY: bbHeight,
         headTubeLength: frame.headTube ?? HEAD_TUBE_LENGTH,
+        crownGroundY,
         legs,
     };
 }
@@ -681,6 +705,7 @@ export function buildBikeSketch(
         riderHead: drop(head),
         riderHeadRadius: 60,
         torsoAngleDeg,
+        torsoAngleSource: barReach ? 'ik' : 'fallback',
         riderElbow: drop(elbow),
         riderKnee: knee ? drop(knee) : null,
         riderPedal: drop(pedal),

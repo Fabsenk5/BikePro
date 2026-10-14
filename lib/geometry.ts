@@ -35,8 +35,21 @@ export interface GeometryCockpit {
     upsweep?: number;
     barWidth?: number;
     stemLength?: number;
+    /**
+     * Stem angle in degrees, relative to horizontal (0 = level stem,
+     * positive = rise, negative = drop) — NOT relative to the steerer tube.
+     */
     stemAngle?: number;
+    /**
+     * Spacer stack below the stem (mm), measured along the steerer tube.
+     * The model projects it: vertical += spacers·sin(headAngle),
+     * horizontal −= spacers·cos(headAngle) (bar moves rearward).
+     */
     spacers?: number;
+    /**
+     * Crank length (mm). Sketch-only: the front-view leg sketch uses it as a
+     * fallback; the contact-point model ignores it.
+     */
     crankLength?: number;
     /** dropper post travel (Hub) in mm — overrides the tracker value */
     dropperTravel?: number;
@@ -62,8 +75,15 @@ export interface GeometryMeasured {
     saddleToHand?: number;
     saddleToBarDrop?: number;
     bbHeight?: number;
-    /** optional: measured with rider on the bike (sagged) */
+    /**
+     * Reserved: sagged bar height with rider on the bike. Parsed and kept,
+     * but not consumed by the contact-point model yet.
+     */
     riderBarY?: number;
+    /**
+     * Reserved: sagged saddle height with rider on the bike. Parsed and kept,
+     * but not consumed by the contact-point model yet.
+     */
     riderSaddleHeight?: number;
 }
 
@@ -76,18 +96,59 @@ export interface BikeGeometry {
 }
 
 // ─── Sanitizing (form/JSONB → stored shape) ───
+//
+// Absurd values are dropped to undefined (not clamped, not an error):
+// - lengths: 0–3000 mm
+// - angles: 0–180°
+// - fit.saddleHeight (along-tube): 400–1100 mm
+// - cockpit.crankLength: 100–220 mm
 
-const FRAME_NUMBERS: (keyof GeometryFrame)[] = [
-    'stack', 'reach', 'headAngle', 'seatAngle', 'chainstay', 'wheelbase', 'bbDrop', 'seatTube', 'headTube',
-];
-const COCKPIT_NUMBERS: (keyof GeometryCockpit)[] = [
-    'barRise', 'backsweep', 'upsweep', 'barWidth', 'stemLength', 'stemAngle', 'spacers', 'crankLength',
-    'dropperTravel', 'seatpostExposed',
-];
-const FIT_NUMBERS: (keyof GeometryFit)[] = ['saddleHeight', 'saddleSetback'];
-const MEASURED_NUMBERS: (keyof GeometryMeasured)[] = [
-    'barX', 'barY', 'seatedReach', 'saddleToHand', 'saddleToBarDrop', 'bbHeight', 'riderBarY', 'riderSaddleHeight',
-];
+type NumRange = readonly [number, number];
+const LENGTH: NumRange = [0, 3000];
+const ANGLE: NumRange = [0, 180];
+
+const FRAME_RANGES: Record<keyof Omit<GeometryFrame, 'size' | 'wheelSize'>, NumRange> = {
+    stack: LENGTH,
+    reach: LENGTH,
+    headAngle: ANGLE,
+    seatAngle: ANGLE,
+    chainstay: LENGTH,
+    wheelbase: LENGTH,
+    bbDrop: LENGTH,
+    seatTube: LENGTH,
+    headTube: LENGTH,
+};
+const COCKPIT_RANGES: Record<keyof GeometryCockpit, NumRange> = {
+    barRise: LENGTH,
+    backsweep: ANGLE,
+    upsweep: ANGLE,
+    barWidth: LENGTH,
+    stemLength: LENGTH,
+    stemAngle: ANGLE,
+    spacers: LENGTH,
+    crankLength: [100, 220],
+    dropperTravel: LENGTH,
+    seatpostExposed: LENGTH,
+};
+const FIT_RANGES: Record<keyof GeometryFit, NumRange> = {
+    saddleHeight: [400, 1100],
+    saddleSetback: LENGTH,
+};
+const MEASURED_RANGES: Record<keyof GeometryMeasured, NumRange> = {
+    barX: LENGTH,
+    barY: LENGTH,
+    seatedReach: LENGTH,
+    saddleToHand: LENGTH,
+    saddleToBarDrop: LENGTH,
+    bbHeight: LENGTH,
+    riderBarY: LENGTH,
+    riderSaddleHeight: LENGTH,
+};
+
+const FRAME_NUMBERS = Object.keys(FRAME_RANGES) as (keyof typeof FRAME_RANGES)[];
+const COCKPIT_NUMBERS = Object.keys(COCKPIT_RANGES) as (keyof typeof COCKPIT_RANGES)[];
+const FIT_NUMBERS = Object.keys(FIT_RANGES) as (keyof typeof FIT_RANGES)[];
+const MEASURED_NUMBERS = Object.keys(MEASURED_RANGES) as (keyof typeof MEASURED_RANGES)[];
 
 const toNumber = (value: unknown): number | undefined => {
     if (value === null || value === undefined || value === '') return undefined;
@@ -101,6 +162,14 @@ const toString = (value: unknown): string | undefined => {
     return s ? s : undefined;
 };
 
+/** Parse a number and drop it when outside its plausible range. */
+const toRangedNumber = (value: unknown, range: NumRange): number | undefined => {
+    const n = toNumber(value);
+    if (n === undefined) return undefined;
+    const [min, max] = range;
+    return n >= min && n <= max ? n : undefined;
+};
+
 export function sanitizeGeometry(raw: unknown): BikeGeometry | undefined {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
     const input = raw as Record<string, any>;
@@ -109,7 +178,7 @@ export function sanitizeGeometry(raw: unknown): BikeGeometry | undefined {
     const frameInput = input.frame ?? {};
     const frame: GeometryFrame = {};
     for (const key of FRAME_NUMBERS) {
-        const value = toNumber(frameInput[key]);
+        const value = toRangedNumber(frameInput[key], FRAME_RANGES[key]);
         if (value !== undefined) (frame as any)[key] = value;
     }
     const size = toString(frameInput.size);
@@ -121,7 +190,7 @@ export function sanitizeGeometry(raw: unknown): BikeGeometry | undefined {
     const cockpitInput = input.cockpit ?? {};
     const cockpit: GeometryCockpit = {};
     for (const key of COCKPIT_NUMBERS) {
-        const value = toNumber(cockpitInput[key]);
+        const value = toRangedNumber(cockpitInput[key], COCKPIT_RANGES[key]);
         if (value !== undefined) (cockpit as any)[key] = value;
     }
     if (Object.keys(cockpit).length > 0) out.cockpit = cockpit;
@@ -129,7 +198,7 @@ export function sanitizeGeometry(raw: unknown): BikeGeometry | undefined {
     const fitInput = input.fit ?? {};
     const fit: GeometryFit = {};
     for (const key of FIT_NUMBERS) {
-        const value = toNumber(fitInput[key]);
+        const value = toRangedNumber(fitInput[key], FIT_RANGES[key]);
         if (value !== undefined) (fit as any)[key] = value;
     }
     if (Object.keys(fit).length > 0) out.fit = fit;
@@ -137,7 +206,7 @@ export function sanitizeGeometry(raw: unknown): BikeGeometry | undefined {
     const measuredInput = input.measured ?? {};
     const measured: GeometryMeasured = {};
     for (const key of MEASURED_NUMBERS) {
-        const value = toNumber(measuredInput[key]);
+        const value = toRangedNumber(measuredInput[key], MEASURED_RANGES[key]);
         if (value !== undefined) (measured as any)[key] = value;
     }
     if (Object.keys(measured).length > 0) out.measured = measured;
@@ -172,26 +241,41 @@ export function computeContactGeometry(geo: BikeGeometry): ContactGeometry {
     const fit = geo.fit ?? {};
     const measured = geo.measured ?? {};
 
+    // stemAngle is relative to horizontal (0 = level, positive = rise).
     const stemLength = cockpit.stemLength ?? null;
     const stemAngle = cockpit.stemAngle ?? 0;
+    const spacers = cockpit.spacers ?? 0;
+
+    // Spacer tower runs along the steerer tube: it lifts the bar by
+    // spacers·sin(headAngle) and pulls it rearward by spacers·cos(headAngle).
+    // Without a head angle the tower cannot be projected — fall back to the
+    // legacy vertical stack so bare frame data keeps working.
+    const headAngle = frame.headAngle ?? null;
+    const spacerLift = headAngle != null ? spacers * Math.sin(deg(headAngle)) : spacers;
+    const spacerPullback = headAngle != null ? spacers * Math.cos(deg(headAngle)) : 0;
 
     let barX: number | null = measured.barX ?? null;
     if (barX === null && frame.reach != null && stemLength != null) {
-        barX = frame.reach + stemLength * Math.cos(deg(stemAngle));
+        barX = frame.reach + stemLength * Math.cos(deg(stemAngle)) - spacerPullback;
     }
     let barY: number | null = measured.barY ?? null;
     if (barY === null && frame.stack != null) {
         barY = frame.stack
-            + (cockpit.spacers ?? 0)
+            + spacerLift
             + (stemLength != null ? stemLength * Math.sin(deg(stemAngle)) : 0)
             + (cockpit.barRise ?? 0);
     }
 
-    const sweepSpan = cockpit.barWidth != null ? Math.max(0, cockpit.barWidth / 2 - GRIP_INSET_MM) : 0;
-    const handX = barX != null ? barX - sweepSpan * Math.sin(deg(cockpit.backsweep ?? 0)) : null;
-    const handY = barY != null ? barY + sweepSpan * Math.sin(deg(cockpit.upsweep ?? 0)) : null;
+    // Without a bar width the grip position is unknown — no center fallback,
+    // so RAD stays unknown instead of silently measuring to the bar centre.
+    const hasWidth = cockpit.barWidth != null;
+    const sweepSpan = hasWidth ? Math.max(0, cockpit.barWidth! / 2 - GRIP_INSET_MM) : 0;
+    const handX = barX != null && hasWidth ? barX - sweepSpan * Math.sin(deg(cockpit.backsweep ?? 0)) : null;
+    const handY = barY != null && hasWidth ? barY + sweepSpan * Math.sin(deg(cockpit.upsweep ?? 0)) : null;
 
-    // Saddle height is measured along the seat tube → project to vertical
+    // Saddle height is stored along the seat tube (tape along the tube, LeMond
+    // 0.883 convention) → project to the BB-vertical with ×sin(seatAngle).
+    // Default 75° keeps bare frames computable.
     const seatAngle = frame.seatAngle ?? 75;
     const saddleY = fit.saddleHeight != null ? fit.saddleHeight * Math.sin(deg(seatAngle)) : null;
     const saddleX = fit.saddleSetback != null ? -fit.saddleSetback : null;
@@ -225,6 +309,13 @@ export function computeContactGeometry(geo: BikeGeometry): ContactGeometry {
  * Remove measured values that match the computed model (within tolerance) so
  * the model keeps tracking frame/cockpit changes. Only real tape deviations
  * persist as overrides.
+ *
+ * NOTE for callers: `auto` must be computed from the RAW user-entered model
+ * (no assumed/default-filled display values). Comparing tape measurements
+ * against an assumed-filled model would erase real deviations — or keep
+ * assumed values as fake overrides. The caller owns that distinction; this
+ * function only compares numbers. (Caller change is handled outside this
+ * module.)
  */
 export function stripComputedMeasured(
     measured: GeometryMeasured | undefined,
@@ -286,7 +377,9 @@ export const DISCIPLINE_REFERENCES: Record<Discipline, DisciplineReference> = {
         radRatio: { min: 0.98, max: 1.08 },
     },
     enduro: {
-        saddleToBarDrop: { min: 20, max: 90 },
+        // modern enduro cockpits run near saddle height — the drop band
+        // starts at 0 so level bar/saddle setups still score 'ok'
+        saddleToBarDrop: { min: 0, max: 90 },
         stemLength: { min: 35, max: 50 },
         barRise: { min: 25, max: 40 },
         barWidth: { min: 780, max: 810 },
@@ -319,7 +412,12 @@ export interface RiderBody {
     shoulderWidth?: number | null;
 }
 
-/** LeMond-style saddle height target (vertical BB → saddle top). */
+/**
+ * LeMond-style saddle height target (0.883 × inseam), measured ALONG the seat
+ * tube (BB centre → saddle top) — the same along-tube convention as the
+ * saddle-height field, so target and value compare directly. The contact
+ * model projects both to the vertical internally (×sin(seatAngle)).
+ */
 export function saddleHeightTarget(inseam: number): number {
     return Math.round(0.883 * inseam);
 }
@@ -329,9 +427,12 @@ const SADDLE_NOSE_OFFSET = 110;
 
 /**
  * Assumed saddle setback (nose behind the BB) when the rider has not measured
- * it: `saddleHeight` is the along-the-seat-tube value (field convention), the
- * horizontal distance to the saddle top is its cosine projection minus a
- * typical saddle nose offset, clamped to a realistic band.
+ * it.
+ *
+ * @param saddleHeight along-tube value (field convention: BB → saddle top
+ * along the seat tube, e.g. the LeMond target or the seatpost estimate) — NOT
+ * the vertical height. The horizontal distance to the saddle top is its cosine
+ * projection minus a typical saddle nose offset, clamped to a realistic band.
  */
 export function assumedSaddleSetback(saddleHeight: number, seatAngle: number): number {
     const alongTube = saddleHeight * Math.cos((seatAngle * Math.PI) / 180);
@@ -384,10 +485,11 @@ export function seatpostSaddleHeight(
     seatTube: number | null | undefined,
     exposed: number | null | undefined,
     hub: number | null | undefined,
-    seatAngle: number,
+    // Kept for API compatibility; the hardware sum is along-tube by
+    // construction, so no angle projection is needed here.
+    _seatAngle: number,
 ): number | null {
     if (seatTube == null || exposed == null || hub == null) return null;
-    void seatAngle;
     return Math.round(seatTube + exposed + hub + SADDLE_STACK);
 }
 
@@ -398,27 +500,52 @@ const bandStatus = (value: number | null | undefined, band: ReferenceBand): Chec
     return 'ok';
 };
 
+/**
+ * Keys the caller may flag as assumed (default-filled, not measured/entered).
+ * The caller builds this set from the same fill logic as the display model;
+ * any fit check whose inputs contain an assumed key reports 'unknown'.
+ */
+export type AssumedKey =
+    | 'cockpit.stemLength'
+    | 'cockpit.barRise'
+    | 'cockpit.barWidth'
+    | 'cockpit.stemAngle'
+    | 'cockpit.spacers'
+    | 'fit.saddleHeight'
+    | 'fit.saddleSetback'
+    | 'rider.inseam';
+
 export function evaluateFit(
     geo: BikeGeometry,
     derived: ContactGeometry,
     reference: DisciplineReference,
     rider: RiderBody,
+    assumed?: Set<string>,
 ): FitCheck[] {
     const cockpit = geo.cockpit ?? {};
     const checks: FitCheck[] = [];
+    const isAssumed = (...keys: AssumedKey[]) => keys.some(k => assumed?.has(k));
+    // Unknown when assumed: the value is a placeholder, not a measurement.
+    // Value + band are still reported so the UI can show the placeholder.
+    const guarded = (id: FitCheck['id'], value: number | null, band: ReferenceBand | undefined, keys: AssumedKey[]): FitCheck => ({
+        id,
+        status: isAssumed(...keys) ? 'unknown' : band ? bandStatus(value, band) : 'unknown',
+        value,
+        ...(band ? { band } : {}),
+    });
 
     const radRatio = derived.rad != null && rider.inseam ? derived.rad / rider.inseam : null;
-    checks.push({ id: 'radRatio', status: bandStatus(radRatio, reference.radRatio), value: radRatio, band: reference.radRatio });
+    // RAD runs through the hand position: bar width, stem, spacers and rise
+    // all feed it, plus the inseam denominator.
+    checks.push(guarded('radRatio', radRatio, reference.radRatio,
+        ['rider.inseam', 'cockpit.barWidth', 'cockpit.stemLength', 'cockpit.stemAngle', 'cockpit.spacers', 'cockpit.barRise']));
 
-    checks.push({
-        id: 'saddleToBarDrop',
-        status: bandStatus(derived.saddleToBarDrop, reference.saddleToBarDrop),
-        value: derived.saddleToBarDrop,
-        band: reference.saddleToBarDrop,
-    });
-    checks.push({ id: 'stemLength', status: bandStatus(cockpit.stemLength, reference.stemLength), value: cockpit.stemLength ?? null, band: reference.stemLength });
-    checks.push({ id: 'barRise', status: bandStatus(cockpit.barRise, reference.barRise), value: cockpit.barRise ?? null, band: reference.barRise });
-    checks.push({ id: 'barWidth', status: bandStatus(cockpit.barWidth, reference.barWidth), value: cockpit.barWidth ?? null, band: reference.barWidth });
+    // Drop runs through saddle height (along-tube) and the bar-height path.
+    checks.push(guarded('saddleToBarDrop', derived.saddleToBarDrop, reference.saddleToBarDrop,
+        ['fit.saddleHeight', 'cockpit.spacers', 'cockpit.stemAngle', 'cockpit.stemLength', 'cockpit.barRise']));
+    checks.push(guarded('stemLength', cockpit.stemLength ?? null, reference.stemLength, ['cockpit.stemLength']));
+    checks.push(guarded('barRise', cockpit.barRise ?? null, reference.barRise, ['cockpit.barRise']));
+    checks.push(guarded('barWidth', cockpit.barWidth ?? null, reference.barWidth, ['cockpit.barWidth']));
 
     const saddleTarget = rider.inseam ? saddleHeightTarget(rider.inseam) : null;
     const saddleValue = geo.fit?.saddleHeight ?? null;
@@ -428,6 +555,7 @@ export function evaluateFit(
         else if (saddleValue > saddleTarget + 10) saddleStatus = 'high';
         else saddleStatus = 'ok';
     }
+    if (isAssumed('fit.saddleHeight', 'rider.inseam')) saddleStatus = 'unknown';
     checks.push({
         id: 'saddleHeight',
         status: saddleStatus,
@@ -435,10 +563,17 @@ export function evaluateFit(
         band: saddleTarget != null ? { min: saddleTarget - 10, max: saddleTarget + 10 } : undefined,
     });
 
+    // NOTE: 'fit.saddleSetback' is accepted but flips no check — no band
+    // check consumes setback today (seatedReach/saddleToHand are reported,
+    // not judged). Kept in the key union for forward compatibility.
+
     return checks;
 }
 
 // ─── Symptom advice ───
+//
+// The symptom engine only guards: advice that makes no sense for the current
+// build is withheld (empty list) instead of inventing alternatives.
 
 export type SymptomId =
     | 'too_long'
@@ -461,6 +596,13 @@ export interface Advice {
     params?: Record<string, string | number>;
 }
 
+/**
+ * Highest bar-rise ceiling across all discipline bands. recommendForSymptoms
+ * has no discipline context, so "rise over band" means: above every band —
+ * unambiguously high regardless of discipline.
+ */
+const MAX_RISE_CEILING = Math.max(...Object.values(DISCIPLINE_REFERENCES).map(r => r.barRise.max));
+
 export function recommendForSymptoms(
     symptoms: SymptomId[],
     geo: BikeGeometry,
@@ -473,17 +615,31 @@ export function recommendForSymptoms(
 
     for (const symptom of symptoms) {
         switch (symptom) {
-            case 'too_long':
-                result[symptom] = [
-                    { key: 'geometry.advice.shorter_stem', params: { mm: '10–20' } },
-                    { key: 'geometry.advice.more_backsweep' },
-                    { key: 'geometry.advice.saddle_forward', params: { mm: '5–10' } },
-                ];
+            case 'too_long': {
+                // Guard: with a stubby stem (≤ 35 mm) there is nothing left
+                // to sensibly shorten — withhold instead of advising.
+                const stem = geo.cockpit?.stemLength;
+                result[symptom] = stem == null || stem > 35
+                    ? [
+                        { key: 'geometry.advice.shorter_stem', params: { mm: '10–20' } },
+                        { key: 'geometry.advice.more_backsweep' },
+                        { key: 'geometry.advice.saddle_forward', params: { mm: '5–10' } },
+                    ]
+                    : [];
                 break;
+            }
             case 'too_short':
                 result[symptom] = [
                     { key: 'geometry.advice.longer_stem', params: { mm: '10–20' } },
                     { key: 'geometry.advice.saddle_back', params: { mm: '5–10' } },
+                    // Conflict: a longer stem fights descending safety — the
+                    // unsafe_descending advice below is kept as-is (safety
+                    // wins) and the conflict is noted here. Fits the Advice
+                    // type (key-only entry); the locale string is owned by
+                    // the UI layer.
+                    ...(symptoms.includes('unsafe_descending')
+                        ? [{ key: 'geometry.advice.conflict_short_unsafe' }]
+                        : []),
                 ];
                 break;
             case 'hand_pressure':
@@ -493,12 +649,20 @@ export function recommendForSymptoms(
                     { key: 'geometry.advice.shorter_stem', params: { mm: '10' } },
                 ];
                 break;
-            case 'bar_too_high':
-                result[symptom] = [
-                    { key: 'geometry.advice.fewer_spacers', params: { mm: '10–20' } },
-                    { key: 'geometry.advice.lower_rise_bar', params: { mm: '10–20' } },
-                ];
+            case 'bar_too_high': {
+                // Guard: lowering advice is only actionable when spacers can
+                // come out or the rise is over every discipline band.
+                const spacers = geo.cockpit?.spacers ?? 0;
+                const rise = geo.cockpit?.barRise;
+                const lowerable = spacers > 0 || (rise != null && rise > MAX_RISE_CEILING);
+                result[symptom] = lowerable
+                    ? [
+                        { key: 'geometry.advice.fewer_spacers', params: { mm: '10–20' } },
+                        { key: 'geometry.advice.lower_rise_bar', params: { mm: '10–20' } },
+                    ]
+                    : [];
                 break;
+            }
             case 'no_pop':
                 result[symptom] = [
                     { key: 'geometry.advice.shorter_stem', params: { mm: '10–20' } },

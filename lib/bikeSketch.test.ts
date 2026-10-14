@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAnimationFrame, buildBikeSketch, springPoints, wheelRadii } from './bikeSketch';
+import { buildAnimationFrame, buildBikeSketch, buildFrontSketch, springPoints, wheelRadii } from './bikeSketch';
 import { computeContactGeometry } from './geometry';
 
 const geo = {
@@ -29,8 +29,10 @@ describe('buildBikeSketch', () => {
         expect(s.frontAxle.x).toBeCloseTo(1284 - 445, 6);
         expect(s.frontAxle.y).toBeCloseTo(23, 6);
         expect(s.headTop).toEqual({ x: 480, y: 630 });
-        expect(s.bar.x).toBeCloseTo(520, 6);
-        expect(s.bar.y).toBeCloseTo(675, 6);
+        // spacer tower projected along the steerer: 15 mm pull the bar
+        // rearward (×cos 63.5°) and lift it (×sin 63.5°)
+        expect(s.bar.x).toBeCloseTo(480 + 40 - 15 * Math.cos((63.5 * Math.PI) / 180), 6);
+        expect(s.bar.y).toBeCloseTo(630 + 15 * Math.sin((63.5 * Math.PI) / 180) + 30, 6);
         expect(s.saddle.y).toBeCloseTo(741 * Math.sin((78 * Math.PI) / 180), 3);
         expect(s.riderHead.y).toBeGreaterThan(s.riderShoulder.y);
     });
@@ -381,5 +383,97 @@ describe('springPoints', () => {
         const noSag = springPoints(a, b, 0, 60, 60);
         expect(noSag.coil[noSag.coil.length - 1]).toEqual({ x: 0, y: 80 });
         expect(noSag.solids[1][1]).toEqual(b);
+    });
+});
+
+describe('torso angle source', () => {
+    it("reports 'ik' when the bar position is known", () => {
+        const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s.torsoAngleSource).toBe('ik');
+    });
+
+    it("reports 'fallback' without a hand position", () => {
+        const noHands = { ...derived, handX: null, handY: null };
+        const s = buildBikeSketch(geo, noHands, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
+        expect(s.torsoAngleSource).toBe('fallback');
+        expect(s.torsoAngleDeg).toBe(55); // seated lean fallback
+    });
+});
+
+describe('front sketch crown', () => {
+    it('places the crown from the head-tube geometry like the side view', () => {
+        const front = buildFrontSketch(geo, derived, { sagPercent: 20, forkTravel: 170, shockStroke: 60 })!;
+        // BB height = front radius − drop (no measured height), sag 20 % of 170
+        const expected = (374 - 23) + (630 - 110 * Math.sin((63.5 * Math.PI) / 180)) - 34;
+        expect(front.crownGroundY).toBeCloseTo(expected, 6);
+        expect(front.crownGroundY).toBeLessThan(front.barGroundY);
+        expect(front.crownGroundY).toBeGreaterThan(front.wheelRadius);
+    });
+
+    it('hangs the head tube below the bar without stack/reach', () => {
+        const minimal = {
+            frame: { bbDrop: 23, wheelSize: 'mullet', headTube: 120 },
+            cockpit: { barWidth: 780 },
+        };
+        const front = buildFrontSketch(minimal, derived, { sagPercent: 0, forkTravel: 170 })!;
+        expect(front.crownGroundY).toBeCloseTo(front.barGroundY - 120, 6);
+    });
+});
+
+describe('front sketch legs', () => {
+    it('draws straight legs without an inseam (knee null)', () => {
+        const front = buildFrontSketch(geo, derived, { sagPercent: 0, forkTravel: 170 })!;
+        expect(front.legs).toHaveLength(2);
+        for (const leg of front.legs) {
+            expect(leg.knee).toBeNull();
+            expect(leg.hip.y).toBeCloseTo(front.hipY, 6);
+        }
+    });
+
+    it('bends the knees when the inseam is known', () => {
+        const front = buildFrontSketch(geo, derived, {
+            sagPercent: 0, forkTravel: 170, inseam: 840, crankMode: 'vertical', crankLength: 170,
+        })!;
+        for (const leg of front.legs) {
+            expect(leg.knee).not.toBeNull();
+        }
+        // vertical: one foot above, one below the BB height (upper leg is dimmed)
+        expect(front.legs[0].foot.y).toBeGreaterThan(front.bbGroundY);
+        expect(front.legs[1].foot.y).toBeLessThan(front.bbGroundY);
+    });
+});
+
+describe('hardtail (no shock stroke)', () => {
+    it('side sketch stays finite and degenerates the shock to a solid line', () => {
+        const s = buildBikeSketch(geo, derived, { sagPercent: 20, forkTravel: 170, shockStroke: 0 })!;
+        expect(s.sagShock).toBe(0);
+        expect(s.shockSpring.used).toBe(0);
+        expect(s.forkSpring.used).toBeGreaterThan(0);
+        // degenerate damper: top meets bottom — the component draws only a line
+        expect(s.shockSpring.bottom).toEqual(s.shockSpring.top);
+        const nums = [
+            s.groundY, s.sagFork, s.sagShock,
+            s.headTop.x, s.headTop.y, s.headBottom.x, s.headBottom.y,
+            s.bar.x, s.bar.y, s.saddle.x, s.saddle.y,
+            s.riderHip.x, s.riderHip.y, s.riderShoulder.x, s.riderShoulder.y,
+            s.forkSpring.used, s.shockSpring.used,
+            s.shockSpring.top.x, s.shockSpring.top.y,
+        ];
+        for (const n of nums) expect(Number.isFinite(n)).toBe(true);
+    });
+
+    it('animation frame stays finite without a shock (no division by zero)', () => {
+        const params = {
+            frontAxleX: 839, rearAxleX: -445, frontRadius: 374, rearRadius: 355,
+            forkTravel: 180, shockStroke: 0, rearTravel: 0, sagPercent: 20,
+        };
+        for (let i = 0; i <= 20; i += 1) {
+            const f = buildAnimationFrame({ ...params, progress: i / 20 });
+            for (const n of [f.rockHeight, f.rockX, f.frontLift, f.rearLift, f.absorb]) {
+                expect(Number.isFinite(n), `progress ${i}`).toBe(true);
+            }
+            expect(f.frontLift + f.absorb, `front @${i}`).toBeGreaterThanOrEqual(-0.001);
+            expect(f.rearLift + f.absorb, `rear @${i}`).toBeGreaterThanOrEqual(-0.001);
+        }
     });
 });

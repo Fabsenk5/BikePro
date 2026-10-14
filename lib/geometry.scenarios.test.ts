@@ -15,7 +15,7 @@ describe('geometry scenario matrix (plausibility guard)', () => {
     for (const s of GEOMETRY_SCENARIOS) {
         it(`${s.name} — fit checks as expected`, () => {
             const derived = computeContactGeometry(s.geo);
-            const checks = evaluateFit(s.geo, derived, DISCIPLINE_REFERENCES[s.discipline], s.rider);
+            const checks = evaluateFit(s.geo, derived, DISCIPLINE_REFERENCES[s.discipline], s.rider, new Set(s.assumed ?? []));
             for (const [id, expected] of Object.entries(s.expected)) {
                 const check = checks.find(c => c.id === id);
                 expect(check, `${s.name}: missing check ${id}`).toBeDefined();

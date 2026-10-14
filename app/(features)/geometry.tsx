@@ -71,19 +71,19 @@ const toNum = (value: string): number | undefined => {
     return Number.isFinite(n) ? n : undefined;
 };
 
-const str = (value: number | string | undefined): string =>
-    value === undefined || value === null ? '' : String(value);
-
 /** Format a number for input fields using the locale decimal separator (63,5 in DE). */
 const numStr = (value: number, language: string): string => {
     const s = String(value);
     return language.startsWith('de') ? s.replace('.', ',') : s;
 };
 
-/** First non-empty setup value for one of the given keys. */
+/** First non-empty setup value for one of the given keys (case-insensitive). */
 const setupVal = (comp: any, keys: string[]): string | undefined => {
+    const list: any[] = comp?.setupValues ?? [];
     for (const key of keys) {
-        const value = comp?.setupValues?.find((s: any) => s.key === key)?.value;
+        const lower = key.toLowerCase();
+        const found = list.find((s: any) => typeof s?.key === 'string' && s.key.toLowerCase() === lower);
+        const value = found?.value;
         if (value !== undefined && String(value).trim() !== '') return String(value);
     }
     return undefined;
@@ -95,15 +95,50 @@ const disciplineForBikeType = (type?: string): Discipline => {
         case 'trail': return 'trail';
         case 'downhill':
         case 'dirt': return 'dh';
+        // E-MTBs ride like enduro bikes (weight aside) — explicit so the
+        // default below stays a deliberate fallback, not a silent catch-all.
+        case 'enduro':
+        case 'emtb':
+        case 'e-mtb': return 'enduro';
         default: return 'enduro';
     }
 };
 
-/** Spacer input is counted in pieces — one standard spacer is 10 mm. */
+/**
+ * Shared assumption layer for the main and the reference bike: missing
+ * cockpit values fall back to the discipline standards, the saddle height to
+ * the seatpost hardware (or the LeMond estimate) and the setback to the
+ * seat-tube geometry. Keeps the comparison consistent.
+ */
+const applyAssumptions = (geo: BikeGeometry, riderBody: RiderBody, bikeType?: string): BikeGeometry => {
+    const defaults = cockpitDefaults(bikeType);
+    const cockpit = { ...(geo.cockpit ?? {}) };
+    (Object.keys(defaults) as (keyof typeof defaults)[]).forEach(key => {
+        if ((cockpit as any)[key] == null) (cockpit as any)[key] = (defaults as any)[key];
+    });
+    const seatAngle = geo.frame?.seatAngle ?? 75;
+    const postHeight = seatpostSaddleHeight(
+        geo.frame?.seatTube,
+        geo.cockpit?.seatpostExposed,
+        geo.cockpit?.dropperTravel,
+        seatAngle,
+    );
+    const saddleAssumed = postHeight ?? (riderBody.inseam ? saddleHeightTarget(riderBody.inseam) : null);
+    const fit = { ...(geo.fit ?? {}) };
+    if (fit.saddleHeight == null && saddleAssumed != null) fit.saddleHeight = saddleAssumed;
+    if (fit.saddleSetback == null) {
+        const h = fit.saddleHeight ?? saddleAssumed;
+        if (h != null) fit.saddleSetback = assumedSaddleSetback(h, seatAngle);
+    }
+    return { ...geo, cockpit, fit };
+};
+
+/** Spacer input is counted in pieces — one standard spacer is 10 mm. Absurd counts are ignored. */
 const SPACER_MM = 10;
 const spacerPieces = (value: string): number | undefined => {
     const n = toNum(value);
-    return n != null ? n * SPACER_MM : undefined;
+    if (n == null || !Number.isFinite(n) || n < 0 || n > 10) return undefined;
+    return n * SPACER_MM;
 };
 
 const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
@@ -148,17 +183,19 @@ export default function GeometryScreen() {
 
     const forkTravel = useMemo(() => {
         const fork = selectedBike?.components.find(c => c.type === 'fork');
-        const value = parseFloat(fork?.setupValues?.find(s => s.key === 'travel')?.value ?? '');
+        const raw = setupVal(fork, ['travel', 'federweg']);
+        const value = raw ? parseFloat(raw.replace(',', '.')) : NaN;
         return Number.isFinite(value) && value > 0 ? value : travelStrokeDefaults(selectedBike?.type).travel;
     }, [selectedBike]);
 
     // Dropper hub for the standing pose: tracker value first, then a travel
     // number in the model name ("Dropper V3 210mm"); null → lib default.
+    // Seatpost = Hub/Verstellweg — never the shock stroke.
     const dropperTravel = useMemo(() => {
         const fromForm = toNum(form.dropperTravel);
         if (fromForm != null && fromForm >= 60 && fromForm <= 260) return Math.round(fromForm);
         const post = selectedBike?.components.find(c => c.type === 'seatpost');
-        const raw = setupVal(post, ['Hub', 'Travel', 'travel']);
+        const raw = setupVal(post, ['hub', 'verstellweg', 'travel']);
         const hub = raw ? parseFloat(raw.replace(',', '.')) : NaN;
         if (Number.isFinite(hub) && hub >= 60 && hub <= 260) return Math.round(hub);
         const matches = [...(post?.model ?? '').matchAll(/(\d{2,3})\s*mm/gi)];
@@ -166,17 +203,19 @@ export default function GeometryScreen() {
         return Number.isFinite(last) && last >= 60 && last <= 260 ? last : null;
     }, [selectedBike, form.dropperTravel]);
 
-    // Front tire width (mm) for the head-on sketch, from the wheel component
+    // Front tire width (mm) for the head-on sketch, from the wheel component.
+    // Only plausible inch values (1.0–5.0) are accepted.
     const frontTireWidthMm = useMemo(() => {
         const wheel = selectedBike?.components.find(c => c.type === 'wheel_front');
-        const raw = setupVal(wheel, ['width', 'Breite']);
+        const raw = setupVal(wheel, ['width', 'breite']);
         const inches = raw ? parseFloat(raw.replace(',', '.')) : NaN;
-        return Number.isFinite(inches) && inches > 0 ? Math.round(inches * 25.4) : null;
+        return Number.isFinite(inches) && inches >= 1.0 && inches <= 5.0 ? Math.round(inches * 25.4) : null;
     }, [selectedBike]);
 
     const shockStroke = useMemo(() => {
         const shock = selectedBike?.components.find(c => c.type === 'shock');
-        const value = parseFloat(shock?.setupValues?.find(s => s.key === 'stroke')?.value ?? '');
+        const raw = setupVal(shock, ['stroke']);
+        const value = raw ? parseFloat(raw.replace(',', '.')) : NaN;
         return Number.isFinite(value) && value > 0 ? value : travelStrokeDefaults(selectedBike?.type).stroke;
     }, [selectedBike]);
 
@@ -219,18 +258,40 @@ export default function GeometryScreen() {
         if (geo?.meta?.source) f.source = geo.meta.source;
 
         // Prefill still-empty cockpit/fit fields from the Component Tracker
+        // (keys matched case-insensitively; custom keys included).
         const bar = bike?.components.find(c => c.type === 'handlebar');
         const stem = bike?.components.find(c => c.type === 'stem');
         const saddle = bike?.components.find(c => c.type === 'saddle');
         const wheel = bike?.components.find(c => c.type === 'wheel_front');
-        if (!f.barRise) set('barRise', setupVal(bar, ['Rise']));
-        if (!f.backsweep) set('backsweep', setupVal(bar, ['Backsweep']));
-        if (!f.upsweep) set('upsweep', setupVal(bar, ['Upsweep']));
-        if (!f.barWidth) set('barWidth', setupVal(bar, ['Breite', 'width']));
-        if (!f.stemLength) set('stemLength', setupVal(stem, ['Länge']));
-        if (!f.stemAngle) set('stemAngle', setupVal(stem, ['Winkel']));
-        if (!f.saddleSetback) set('saddleSetback', setupVal(saddle, ['Setback']));
+        const seatpost = bike?.components.find(c => c.type === 'seatpost');
+        if (!f.barRise) set('barRise', setupVal(bar, ['rise']));
+        if (!f.backsweep) set('backsweep', setupVal(bar, ['backsweep']));
+        if (!f.upsweep) set('upsweep', setupVal(bar, ['upsweep']));
+        if (!f.barWidth) set('barWidth', setupVal(bar, ['breite', 'width']));
+        if (!f.stemLength) set('stemLength', setupVal(stem, ['länge', 'length']));
+        if (!f.stemAngle) set('stemAngle', setupVal(stem, ['winkel', 'angle']));
+        if (!f.saddleSetback) set('saddleSetback', setupVal(saddle, ['setback']));
         if (!f.wheelSize) set('wheelSize', setupVal(wheel, ['size']));
+        // Dropper-Verstellweg (Hub) from the seatpost — never the shock stroke.
+        if (!f.dropperTravel) set('dropperTravel', setupVal(seatpost, ['hub', 'verstellweg', 'travel']));
+        // Crank length: no dedicated tracker type — scan all components for custom keys.
+        if (!f.crankLength) {
+            for (const c of bike?.components ?? []) {
+                const v = setupVal(c, ['kurbellänge', 'kurbel', 'cranklength', 'crank']);
+                if (v) { set('crankLength', v); break; }
+            }
+        }
+        // Spacers: stem custom keys; tracker may hold mm (→ pieces) or pieces.
+        if (!f.spacers) {
+            const rawSpacer = setupVal(stem, ['spacer', 'spacers']);
+            if (rawSpacer) {
+                const n = parseFloat(rawSpacer.replace(',', '.'));
+                if (Number.isFinite(n)) {
+                    const pieces = n > 10 ? n / SPACER_MM : n;
+                    if (pieces >= 0 && pieces <= 10) set('spacers', numStr(pieces, i18n.language));
+                }
+            }
+        }
 
         setForm(f);
     }, [i18n.language]);
@@ -244,16 +305,19 @@ export default function GeometryScreen() {
         setBikes(bikesData);
         const preferred = (primaryId && bikesData.some(b => b.id === primaryId)) ? primaryId : (bikesData[0]?.id ?? '');
         setSelectedBikeId(prev => prev || preferred);
-        const toMm = (value?: string) => {
+        // Profile values are stored in cm — guard plausible ranges, else null.
+        const toMm = (value?: string, minCm?: number, maxCm?: number) => {
             const n = toNum(value ?? '');
-            return n !== null && n !== undefined ? n * 10 : null;
+            if (n == null || !Number.isFinite(n)) return null;
+            if (minCm != null && (n < minCm || (maxCm != null && n > maxCm))) return null;
+            return n * 10;
         };
         setRider({
-            height: toMm(profile.height),
-            inseam: toMm(profile.inseam),
-            armLength: toMm(profile.armLength),
-            torsoLength: toMm(profile.torsoLength),
-            shoulderWidth: toMm(profile.shoulderWidth),
+            height: toMm(profile.height, 100, 250),
+            inseam: toMm(profile.inseam, 30, 120),
+            armLength: toMm(profile.armLength, 20, 100),
+            torsoLength: toMm(profile.torsoLength, 20, 100),
+            shoulderWidth: toMm(profile.shoulderWidth, 25, 70),
         });
     }, []);
 
@@ -279,7 +343,7 @@ export default function GeometryScreen() {
     // them are offered as gray placeholders + apply option in the cockpit tab.
     const cockpitAssumed = useMemo(() => cockpitDefaults(selectedBike?.type), [selectedBike]);
     // Saddle height derived from the seatpost hardware (seat tube + Auszug +
-    // Hub + saddle stack) — preferred over the LeMond estimate when complete.
+    // Verstellweg + saddle stack) — preferred over the LeMond estimate when complete.
     const seatpostHeight = useMemo(() => seatpostSaddleHeight(
         geometry.frame?.seatTube,
         toNum(form.seatpostExposed),
@@ -295,18 +359,23 @@ export default function GeometryScreen() {
         if (height == null) return null;
         return assumedSaddleSetback(height, geometry.frame?.seatAngle ?? 75);
     }, [geometry, assumedSaddleHeight]);
-    const displayGeometry = useMemo(() => {
-        const cockpit = { ...geometry.cockpit };
-        (Object.keys(cockpitAssumed) as (keyof typeof cockpitAssumed)[]).forEach(key => {
-            if (cockpit[key] == null) cockpit[key] = cockpitAssumed[key];
-        });
-        const fit = { ...geometry.fit };
-        if (fit.saddleHeight == null && assumedSaddleHeight != null) fit.saddleHeight = assumedSaddleHeight;
-        if (fit.saddleSetback == null && assumedSetback != null) fit.saddleSetback = assumedSetback;
-        return { ...geometry, cockpit, fit };
-    }, [geometry, cockpitAssumed, assumedSaddleHeight, assumedSetback]);
+    // Main geometry with the shared assumption layer (tracker dropper injected
+    // so the seatpost-derived saddle height keeps working when the form is empty).
+    const geometryWithDropper = useMemo(() => {
+        if (geometry.cockpit?.dropperTravel == null && dropperTravel != null) {
+            return { ...geometry, cockpit: { ...geometry.cockpit, dropperTravel } };
+        }
+        return geometry;
+    }, [geometry, dropperTravel]);
+    const displayGeometry = useMemo(
+        () => applyAssumptions(geometryWithDropper, rider, selectedBike?.type),
+        [geometryWithDropper, rider, selectedBike],
+    );
 
     const derived = useMemo(() => computeContactGeometry(displayGeometry), [displayGeometry]);
+    // Raw model (no assumptions) — only used to decide which measured values
+    // are real tape deviations worth persisting.
+    const derivedRaw = useMemo(() => computeContactGeometry(geometry), [geometry]);
 
     // Model values for the measured fields: computed from frame + cockpit + fit.
     // Shown as gray placeholders and used by the model while the field is empty.
@@ -319,24 +388,77 @@ export default function GeometryScreen() {
             seatedReach: derived.seatedReach,
             saddleToHand: derived.saddleToHand,
             saddleToBarDrop: derived.saddleToBarDrop,
-            bbHeight: frontRadius - bbDrop,
+            bbHeight: geometry.frame?.wheelSize ? frontRadius - bbDrop : null,
         };
     }, [geometry, derived]);
+    // Strip reference from the RAW geometry so assumptions never leak into storage.
+    const stripAuto = useMemo(() => {
+        const frontRadius = wheelRadii(geometry.frame?.wheelSize).front;
+        const bbDrop = geometry.frame?.bbDrop ?? 30;
+        return {
+            barX: derivedRaw.barX,
+            barY: derivedRaw.barY,
+            seatedReach: derivedRaw.seatedReach,
+            saddleToHand: derivedRaw.saddleToHand,
+            saddleToBarDrop: derivedRaw.saddleToBarDrop,
+            bbHeight: geometry.frame?.wheelSize ? frontRadius - bbDrop : null,
+        };
+    }, [geometry, derivedRaw]);
+
+    // Which inputs are assumptions (raw null) + missing inseam — passed to the
+    // fit engine so it can down-weight assumed values (contract with lib/geometry).
+    const assumed = useMemo(() => {
+        const s = new Set<string>();
+        if (geometry.cockpit?.stemLength == null) s.add('cockpit.stemLength');
+        if (geometry.cockpit?.barRise == null) s.add('cockpit.barRise');
+        if (geometry.cockpit?.barWidth == null) s.add('cockpit.barWidth');
+        if (geometry.cockpit?.stemAngle == null) s.add('cockpit.stemAngle');
+        if (geometry.cockpit?.spacers == null) s.add('cockpit.spacers');
+        if (geometry.fit?.saddleHeight == null) s.add('fit.saddleHeight');
+        if (geometry.fit?.saddleSetback == null) s.add('fit.saddleSetback');
+        if (rider.inseam == null) s.add('rider.inseam');
+        return s;
+    }, [geometry, rider]);
 
     const autoStr = (value: number | null | undefined) =>
         value == null ? undefined : String(Math.round(value));
     const reference = DISCIPLINE_REFERENCES[discipline];
-    const checks = useMemo(() => evaluateFit(displayGeometry, derived, reference, rider), [displayGeometry, derived, reference, rider]);
-    const advice = useMemo(() => recommendForSymptoms(symptoms, displayGeometry, derived, rider), [symptoms, displayGeometry, derived, rider]);
+    const checks = useMemo(
+        () => evaluateFit(displayGeometry, derived, reference, rider, assumed),
+        [displayGeometry, derived, reference, rider, assumed],
+    );
+    const advice = useMemo(
+        () => recommendForSymptoms(symptoms, displayGeometry, derived, rider),
+        [symptoms, displayGeometry, derived, rider],
+    );
 
     const referenceBike = bikes.find(b => b.id === referenceBikeId);
+    // Reference dropper from its own tracker parts (Hub/Verstellweg, never stroke).
+    const refDropperTravel = useMemo(() => {
+        if (!referenceBike) return null;
+        if (referenceBike.geometry?.cockpit?.dropperTravel != null) return referenceBike.geometry.cockpit.dropperTravel;
+        const post = referenceBike.components.find(c => c.type === 'seatpost');
+        const raw = setupVal(post, ['hub', 'verstellweg', 'travel']);
+        const hub = raw ? parseFloat(raw.replace(',', '.')) : NaN;
+        if (Number.isFinite(hub) && hub >= 60 && hub <= 260) return Math.round(hub);
+        const matches = [...(post?.model ?? '').matchAll(/(\d{2,3})\s*mm/gi)];
+        const last = matches.length ? parseInt(matches[matches.length - 1][1], 10) : NaN;
+        return Number.isFinite(last) && last >= 60 && last <= 260 ? last : null;
+    }, [referenceBike]);
+    const refDisplayGeometry = useMemo(() => {
+        if (!referenceBike?.geometry) return null;
+        const geo = refDropperTravel != null && referenceBike.geometry.cockpit?.dropperTravel == null
+            ? { ...referenceBike.geometry, cockpit: { ...referenceBike.geometry.cockpit, dropperTravel: refDropperTravel } }
+            : referenceBike.geometry;
+        return applyAssumptions(geo, rider, referenceBike.type);
+    }, [referenceBike, refDropperTravel, rider]);
     const refDerived = useMemo(
-        () => (referenceBike?.geometry ? computeContactGeometry(referenceBike.geometry) : null),
-        [referenceBike],
+        () => (refDisplayGeometry ? computeContactGeometry(refDisplayGeometry) : null),
+        [refDisplayGeometry],
     );
     const compareRows = useMemo(() => {
-        if (!referenceBike?.geometry || !refDerived) return [];
-        const ref = referenceBike.geometry;
+        if (!referenceBike?.geometry || !refDerived || !refDisplayGeometry) return [];
+        const ref = refDisplayGeometry;
         const row = (id: string, a: number | null | undefined, b: number | null | undefined, digits = 0) => ({
             id,
             a: a ?? null,
@@ -345,19 +467,19 @@ export default function GeometryScreen() {
             digits,
         });
         return [
-            row('reach', geometry.frame?.reach, ref.frame?.reach),
-            row('stack', geometry.frame?.stack, ref.frame?.stack),
+            row('reach', displayGeometry.frame?.reach, ref.frame?.reach),
+            row('stack', displayGeometry.frame?.stack, ref.frame?.stack),
             row('rad', derived.rad, refDerived.rad),
             row('barY', derived.barY, refDerived.barY),
             row('drop', derived.saddleToBarDrop, refDerived.saddleToBarDrop),
             row('seatedReach', derived.seatedReach, refDerived.seatedReach),
             row('saddleToHand', derived.saddleToHand, refDerived.saddleToHand),
-            row('stem', geometry.cockpit?.stemLength, ref.cockpit?.stemLength),
-            row('rise', geometry.cockpit?.barRise, ref.cockpit?.barRise),
-            row('width', geometry.cockpit?.barWidth, ref.cockpit?.barWidth),
-            row('saddleHeight', geometry.fit?.saddleHeight, ref.fit?.saddleHeight),
+            row('stem', displayGeometry.cockpit?.stemLength, ref.cockpit?.stemLength),
+            row('rise', displayGeometry.cockpit?.barRise, ref.cockpit?.barRise),
+            row('width', displayGeometry.cockpit?.barWidth, ref.cockpit?.barWidth),
+            row('saddleHeight', displayGeometry.fit?.saddleHeight, ref.fit?.saddleHeight),
         ];
-    }, [geometry, derived, referenceBike, refDerived]);
+    }, [displayGeometry, derived, referenceBike, refDerived, refDisplayGeometry]);
 
     const fmtValue = (value: number | null, digits = 0) =>
         value == null ? '–' : value.toLocaleString(i18n.language, { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -376,11 +498,30 @@ export default function GeometryScreen() {
         setSaving(true);
         try {
             const fresh = await syncLoadBikes();
+            const prev = fresh.find(b => b.id === selectedBikeId)?.geometry;
             const cleaned = sanitizeGeometry(buildGeometryFromForm(form));
+            // Roundtrip: values without a form field survive saving (merge, never drop).
+            if (cleaned && prev) {
+                const prevMeasured = prev.measured as Record<string, number | undefined> | undefined;
+                if (prevMeasured) {
+                    const nextMeasured = { ...(cleaned.measured ?? {}) } as Record<string, number | undefined>;
+                    let touched = cleaned.measured != null;
+                    for (const k of ['seatedReach', 'riderBarY', 'riderSaddleHeight'] as const) {
+                        if (nextMeasured[k] == null && prevMeasured[k] != null) {
+                            nextMeasured[k] = prevMeasured[k];
+                            touched = true;
+                        }
+                    }
+                    if (touched) cleaned.measured = nextMeasured as typeof cleaned.measured;
+                }
+                if (prev.meta?.notes && !cleaned.meta?.notes) {
+                    cleaned.meta = { ...(cleaned.meta ?? {}), notes: prev.meta.notes };
+                }
+            }
             // Keep the model live: measured values that equal the computed model
             // are not persisted (only real tape deviations override it).
             if (cleaned) {
-                const stripped = stripComputedMeasured(cleaned.measured, autoMeasured);
+                const stripped = stripComputedMeasured(cleaned.measured, stripAuto);
                 if (stripped) cleaned.measured = stripped;
                 else delete cleaned.measured;
             }
@@ -529,6 +670,7 @@ export default function GeometryScreen() {
                                     dropperTravel={dropperTravel}
                                     crankMode={crankMode}
                                     crankLength={toNum(form.crankLength)}
+                                    inseam={rider.inseam}
                                     width={viewWidth}
                                 />
                             )}
@@ -558,6 +700,9 @@ export default function GeometryScreen() {
                                 <Text style={styles.hint}>
                                     {t('geometry.metrics_assumed_saddle', { mm: assumedSaddleHeight })}
                                 </Text>
+                            )}
+                            {rider.inseam == null && (
+                                <Text style={styles.hint}>{t('geometry.no_inseam_hint')}</Text>
                             )}
                             <View style={styles.metricGrid}>
                                 {([

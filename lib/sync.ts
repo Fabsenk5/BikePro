@@ -268,7 +268,9 @@ export const SETUP_KEY_MIGRATION: Record<string, string> = {
     'Montage': 'mount',
     'Druck': 'pressure',
     'Federweg': 'travel',
-    'Hub': 'stroke',
+    // NOTE: 'Hub' is intentionally NOT mapped. It is the Dropper-Hub on
+    // seatpost components, not the Shock-Stroke ('stroke' on fork/shock).
+    // A type-aware prefill (other agent) sets the correct keys per type.
     'Federhärte': 'spring_rate',
 };
 
@@ -314,8 +316,8 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
                         isWearTracked: c.is_wear_tracked ?? false,
                         currentKm: c.current_km ?? 0,
                         serviceIntervalKm: c.service_interval_km ?? 500,
-                        lastServiceDate: c.last_service_date ?? new Date().toISOString().split('T')[0],
-                        installedDate: c.installed_date ?? new Date().toISOString().split('T')[0],
+                        lastServiceDate: c.last_service_date ?? undefined,
+                        installedDate: c.installed_date ?? undefined,
                         wearItems: c.wear_items ?? [],
                         maxClicks: c.max_clicks ?? undefined,
                         clickLimits: sanitizeClickLimits(c.click_limits),
@@ -342,6 +344,7 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
         // Migrate legacy German setup keys → semantic keys (same as cloud path)
         return bikes.map(b => ({
             ...b,
+            geometry: sanitizeGeometry(b.geometry),
             components: (b.components ?? []).map(c => ({
                 ...c,
                 setupValues: migrateSetupValues(c.setupValues, c.type),
@@ -351,8 +354,14 @@ export async function syncLoadBikes(): Promise<SyncBike[]> {
 }
 
 export async function syncSaveBikes(bikes: SyncBike[]): Promise<boolean> {
+    // Sanitize geometry before persisting (local + cloud) so malformed
+    // form/JSONB values never end up in storage.
+    const sanitized: SyncBike[] = bikes.map(b => ({
+        ...b,
+        geometry: sanitizeGeometry(b.geometry),
+    }));
     // Always save locally
-    await AsyncStorage.setItem(BIKES_KEY, JSON.stringify(bikes));
+    await AsyncStorage.setItem(BIKES_KEY, JSON.stringify(sanitized));
 
     const { available, userId } = await isCloudAvailable();
     if (!available || !userId) return true; // offline mode = ok
@@ -362,7 +371,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<boolean> {
         const supabase = getSupabase()!;
 
         // Upsert all bikes (no destructive deletes — deletions are handled explicitly)
-        const bikeRows = bikes.map(b => ({
+        const bikeRows = sanitized.map(b => ({
             id: b.id, user_id: userId, name: b.name, type: b.type,
             model: b.model, year: b.year, size: b.size, weight: b.weight ?? null,
             geometry: b.geometry ?? null,
@@ -378,7 +387,7 @@ export async function syncSaveBikes(bikes: SyncBike[]): Promise<boolean> {
 
         // Upsert all components (no destructive deletes)
         const compRows: any[] = [];
-        bikes.forEach(b => {
+        sanitized.forEach(b => {
             b.components.forEach(c => {
                 compRows.push(componentToRow(b.id, c, userId));
             });
@@ -968,6 +977,21 @@ async function runMigration(): Promise<void> {
         const tileData = await AsyncStorage.getItem('@bikepro_tile_order');
         if (tileData) {
             cloudOk = (await syncSavePreference('tile_order', '@bikepro_tile_order', JSON.parse(tileData))) && cloudOk;
+        }
+
+        const profileData = await AsyncStorage.getItem('@bikepro_rider_profile');
+        if (profileData) {
+            cloudOk = (await syncSavePreference('rider_profile', '@bikepro_rider_profile', JSON.parse(profileData))) && cloudOk;
+        }
+
+        const primaryBikeData = await AsyncStorage.getItem('@bikepro_primary_bike');
+        if (primaryBikeData) {
+            cloudOk = (await syncSavePreference('primary_bike', '@bikepro_primary_bike', JSON.parse(primaryBikeData))) && cloudOk;
+        }
+
+        const unitsData = await AsyncStorage.getItem('@bikepro_units');
+        if (unitsData) {
+            cloudOk = (await syncSavePreference('units', '@bikepro_units', JSON.parse(unitsData))) && cloudOk;
         }
 
         if (!cloudOk) {

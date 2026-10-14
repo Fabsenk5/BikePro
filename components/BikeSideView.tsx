@@ -9,13 +9,22 @@ import { BPButton } from '@/components/ui';
 import { theme } from '@/constants/Colors';
 import { buildAnimationFrame, buildBikeSketch, CrankMode, RiderMode, SketchPoint, SpringLine, springPoints, wheelRadii } from '@/lib/bikeSketch';
 import { BikeGeometry, ContactGeometry } from '@/lib/geometry';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, G, Line, Polygon, Polyline } from 'react-native-svg';
 
 const ACCENT = '#00BFA5';
 const ANIMATION_MS = 6400;
+// Fixed view frame for every bike and every state (mm, BB-relative): BB at
+// the horizontal centre, ground at a fixed height — so geometries overlay
+// directly and the bike lifts over rocks instead of the ground dropping.
+const VIEW_SIDE = 1300;   // mm to each side of the BB
+const VIEW_TOP = 1700;    // mm above the BB (rider + headroom)
+const VIEW_BOTTOM = -400; // mm below the BB (ground of the biggest wheel)
+const GRID_STEP = 100; // 10 cm grid with the BB (sketch origin) as reference
+/** animation frame budget (~30 fps): rAF updates are skipped inside it */
+const FRAME_BUDGET_MS = 1000 / 30;
 
 interface Props {
     geometry: BikeGeometry;
@@ -56,6 +65,7 @@ export default function BikeSideView({
     const [playing, setPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
     const startedAt = useRef(0);
+    const lastFrame = useRef(0);
     const toggle = () => {
         if (!playing) startedAt.current = Date.now() - progress * ANIMATION_MS;
         setPlaying(p => !p);
@@ -63,13 +73,24 @@ export default function BikeSideView({
     useEffect(() => {
         if (!playing) return;
         let raf = 0;
-        const tick = () => {
-            setProgress(((Date.now() - startedAt.current) % ANIMATION_MS) / ANIMATION_MS);
+        const tick = (ts: number) => {
+            // throttle to ~30 fps: skip state updates inside the frame budget
+            if (ts - lastFrame.current >= FRAME_BUDGET_MS) {
+                lastFrame.current = ts;
+                setProgress(((Date.now() - startedAt.current) % ANIMATION_MS) / ANIMATION_MS);
+            }
             raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(raf);
     }, [playing]);
+    // prefers-reduced-motion (window-guarded): the wheels don't spin
+    const reducedMotion = useMemo(
+        () => typeof window !== 'undefined'
+            && typeof window.matchMedia === 'function'
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        [],
+    );
 
     const animActive = playing || progress > 0;
     const chainstay = geometry.frame?.chainstay ?? 0;
@@ -106,44 +127,63 @@ export default function BikeSideView({
     );
     // Bounds are fixed (see below), so no per-bike base sketches are needed —
     // the zoom and origin stay identical across bikes, modes and animation.
-    if (!sketch) {
-        return <Text style={styles.hint}>{t('geometry.view_no_data')}</Text>;
-    }
 
     const height = Math.round(width * 0.62);
     const pad = 16;
-    // Fixed view frame for every bike and every state: BB at the horizontal
-    // centre, ground at a fixed height — so geometries overlay directly and
-    // the bike lifts over rocks instead of the ground dropping.
-    const VIEW_SIDE = 1300;   // mm to each side of the BB
-    const VIEW_TOP = 1700;    // mm above the BB (rider + headroom)
-    const VIEW_BOTTOM = -400; // mm below the BB (ground of the biggest wheel)
-    const scale = Math.min(
-        (width / 2 - pad) / VIEW_SIDE,
-        (height - pad * 2) / (VIEW_TOP - VIEW_BOTTOM),
+    const scale = useMemo(
+        () => Math.min(
+            (width / 2 - pad) / VIEW_SIDE,
+            (height - pad * 2) / (VIEW_TOP - VIEW_BOTTOM),
+        ),
+        [width, height],
     );
-    const tx = (x: number) => width / 2 + x * scale;
-    const tyGround = (y: number) => height - pad - (y - VIEW_BOTTOM) * scale;
+    const tx = useCallback((x: number) => width / 2 + x * scale, [width, scale]);
+    const tyGround = useCallback(
+        (y: number) => height - pad - (y - VIEW_BOTTOM) * scale,
+        [height, scale],
+    );
     // the bike lifts by the absorbed amount (screen y decreases upwards)
-    const ty = (y: number) => tyGround(y) - absorb * scale;
+    const ty = useCallback((y: number) => tyGround(y) - absorb * scale, [tyGround, absorb, scale]);
 
-    // 10 cm grid with the BB (sketch origin) as reference
-    const GRID_STEP = 100;
-    const gridXs: number[] = [];
-    for (let x = -VIEW_SIDE + GRID_STEP; x < VIEW_SIDE; x += GRID_STEP) gridXs.push(x);
-    const gridYs: number[] = [];
-    for (let y = Math.ceil(VIEW_BOTTOM / GRID_STEP) * GRID_STEP; y <= VIEW_TOP; y += GRID_STEP) gridYs.push(y);
+    const gridXs = useMemo(() => {
+        const xs: number[] = [];
+        for (let x = -VIEW_SIDE + GRID_STEP; x < VIEW_SIDE; x += GRID_STEP) xs.push(x);
+        return xs;
+    }, []);
+    const gridYs = useMemo(() => {
+        const ys: number[] = [];
+        for (let y = Math.ceil(VIEW_BOTTOM / GRID_STEP) * GRID_STEP; y <= VIEW_TOP; y += GRID_STEP) ys.push(y);
+        return ys;
+    }, []);
     const gridColor = theme.colors.border;
+    const grid = useMemo(() => (
+        <>
+            {gridXs.map(x => (
+                <Line
+                    key={`gx-${x}`} x1={tx(x)} y1={tyGround(VIEW_BOTTOM)} x2={tx(x)} y2={tyGround(VIEW_TOP)}
+                    stroke={gridColor} strokeWidth={x === 0 ? 1.5 : 0.7}
+                    opacity={x === 0 ? 0.9 : 0.35}
+                />
+            ))}
+            {gridYs.map(y => (
+                <Line
+                    key={`gy-${y}`} x1={tx(-VIEW_SIDE)} y1={tyGround(y)} x2={tx(VIEW_SIDE)} y2={tyGround(y)}
+                    stroke={gridColor} strokeWidth={y === 0 ? 1.5 : 0.7}
+                    opacity={y === 0 ? 0.9 : 0.35}
+                />
+            ))}
+        </>
+    ), [gridXs, gridYs, gridColor, tx, tyGround]);
 
-    const tube = (a: SketchPoint, b: SketchPoint, color: string, strokeWidth = 3) => (
+    const tube = useCallback((a: SketchPoint, b: SketchPoint, color: string, strokeWidth = 3) => (
         <Line
             x1={tx(a.x)} y1={ty(a.y)} x2={tx(b.x)} y2={ty(b.y)}
             stroke={color} strokeWidth={strokeWidth} strokeLinecap="round"
         />
-    );
+    ), [tx, ty]);
 
     // Zigzag spring: solid body, coil over the travel, solid rest
-    const spring = (line: SpringLine, color: string) => {
+    const spring = useCallback((line: SpringLine, color: string) => {
         const { coil, solids } = springPoints(line.top, line.bottom, line.used, line.travel, line.lead);
         return (
             <>
@@ -157,29 +197,53 @@ export default function BikeSideView({
                 ))}
             </>
         );
-    };
+    }, [tx, ty, tube]);
 
     const frameColor = theme.colors.text;
     const wheelColor = theme.colors.textMuted;
 
+    // Spinning spokes while the rock rolls underneath (static with
+    // prefers-reduced-motion: no rotation)
+    const spokes = useMemo(() => {
+        if (!animActive || !sketch) return null;
+        return ([
+            { axle: sketch.rearAxle, radius: sketch.wheelRadiusRear },
+            { axle: sketch.frontAxle, radius: sketch.wheelRadiusFront },
+        ]).map((wheel, i) => {
+            const spin = reducedMotion ? 0 : spinDistance / wheel.radius;
+            return (
+                <G key={`spokes-${i}`} opacity={0.6}>
+                    {[0, Math.PI / 2].map((offset, j) => {
+                        const dx = Math.cos(spin + offset) * wheel.radius;
+                        const dy = Math.sin(spin + offset) * wheel.radius;
+                        return (
+                            <Line
+                                key={j}
+                                x1={tx(wheel.axle.x - dx)} y1={ty(wheel.axle.y - dy)}
+                                x2={tx(wheel.axle.x + dx)} y2={ty(wheel.axle.y + dy)}
+                                stroke={wheelColor} strokeWidth={1.5}
+                            />
+                        );
+                    })}
+                </G>
+            );
+        });
+    }, [animActive, reducedMotion, spinDistance, sketch, wheelColor, tx, ty]);
+
+    if (!sketch) {
+        return <Text style={styles.hint}>{t('geometry.view_no_data')}</Text>;
+    }
+
     return (
         <View>
-            <Svg width={width} height={height}>
+            <Svg
+                width={width} height={height}
+                accessibilityLabel={`${t('geometry.view_title')} – ${t('geometry.view_mode_side')}`}
+                accessibilityRole="image"
+                role="img"
+            >
                 {/* 10 cm grid, origin at the BB */}
-                {gridXs.map(x => (
-                    <Line
-                        key={`gx-${x}`} x1={tx(x)} y1={tyGround(VIEW_BOTTOM)} x2={tx(x)} y2={tyGround(VIEW_TOP)}
-                        stroke={gridColor} strokeWidth={x === 0 ? 1.5 : 0.7}
-                        opacity={x === 0 ? 0.9 : 0.35}
-                    />
-                ))}
-                {gridYs.map(y => (
-                    <Line
-                        key={`gy-${y}`} x1={tx(-VIEW_SIDE)} y1={tyGround(y)} x2={tx(VIEW_SIDE)} y2={tyGround(y)}
-                        stroke={gridColor} strokeWidth={y === 0 ? 1.5 : 0.7}
-                        opacity={y === 0 ? 0.9 : 0.35}
-                    />
-                ))}
+                {grid}
                 {/* ground — fixed; the bike lifts over rocks instead */}
                 <Line
                     x1={pad} y1={tyGround(sketch.groundY)} x2={width - pad} y2={tyGround(sketch.groundY)}
@@ -201,28 +265,7 @@ export default function BikeSideView({
                 {/* wheels (spokes spin while the rock rolls underneath) */}
                 <Circle cx={tx(sketch.rearAxle.x)} cy={ty(sketch.rearAxle.y)} r={sketch.wheelRadiusRear * scale} stroke={wheelColor} strokeWidth={2} fill="none" />
                 <Circle cx={tx(sketch.frontAxle.x)} cy={ty(sketch.frontAxle.y)} r={sketch.wheelRadiusFront * scale} stroke={wheelColor} strokeWidth={2} fill="none" />
-                {animActive && ([
-                    { axle: sketch.rearAxle, radius: sketch.wheelRadiusRear },
-                    { axle: sketch.frontAxle, radius: sketch.wheelRadiusFront },
-                ]).map((wheel, i) => {
-                    const spin = spinDistance / wheel.radius;
-                    return (
-                        <G key={`spokes-${i}`} opacity={0.6}>
-                            {[0, Math.PI / 2].map((offset, j) => {
-                                const dx = Math.cos(spin + offset) * wheel.radius;
-                                const dy = Math.sin(spin + offset) * wheel.radius;
-                                return (
-                                    <Line
-                                        key={j}
-                                        x1={tx(wheel.axle.x - dx)} y1={ty(wheel.axle.y - dy)}
-                                        x2={tx(wheel.axle.x + dx)} y2={ty(wheel.axle.y + dy)}
-                                        stroke={wheelColor} strokeWidth={1.5}
-                                    />
-                                );
-                            })}
-                        </G>
-                    );
-                })}
+                {spokes}
                 {/* front triangle */}
                 {tube(sketch.bb, sketch.headBottom, frameColor)}
                 {tube(sketch.bb, sketch.seatCluster, frameColor)}
@@ -233,7 +276,10 @@ export default function BikeSideView({
                 {tube(sketch.seatCluster, sketch.rearAxle, frameColor, 2)}
                 {/* fork + shock as springs (orange = used hub) */}
                 {spring(sketch.forkSpring, frameColor)}
-                {spring(sketch.shockSpring, frameColor)}
+                {/* hardtail (no shock travel): the damper degenerates to a solid line */}
+                {shockStroke > 0
+                    ? spring(sketch.shockSpring, frameColor)
+                    : tube(sketch.shockSpring.top, sketch.shockSpring.bottom, frameColor, 2)}
                 {/* stem + bar */}
                 {tube(sketch.headTop, sketch.bar, frameColor, 3)}
                 {tube(
@@ -282,20 +328,22 @@ export default function BikeSideView({
                     r={sketch.riderHeadRadius * scale} stroke={ACCENT} strokeWidth={2} fill="none"
                 />
             </Svg>
-            <BPButton
-                title={playing ? t('geometry.animation_stop') : t('geometry.animation_play')}
-                onPress={toggle}
-                variant="secondary"
-                color={ACCENT}
-                size="sm"
-                style={{ marginBottom: theme.spacing.sm }}
-            />
+            <View accessibilityHint={playing ? t('geometry.animation_stop') : t('geometry.animation_play')}>
+                <BPButton
+                    title={playing ? t('geometry.animation_stop') : t('geometry.animation_play')}
+                    onPress={toggle}
+                    variant="secondary"
+                    color={ACCENT}
+                    size="sm"
+                    style={{ marginBottom: theme.spacing.sm }}
+                />
+            </View>
             {animActive && (
                 <Text style={styles.hint}>
                     {t('geometry.animation_used', {
                         fork: Math.round(Math.max(0, frontLift)),
                         forkMax: Math.round(forkTravel),
-                        shock: Math.round(Math.max(0, rearLift) * (shockStroke / rearTravelMm)),
+                        shock: Math.round(Math.max(0, rearLift) * (rearTravelMm > 0 ? shockStroke / rearTravelMm : 0)),
                         shockMax: Math.round(shockStroke),
                         absorb: Math.round(absorb),
                     })}
@@ -304,14 +352,25 @@ export default function BikeSideView({
             {riderMode === 'seated' && crankMode === 'vertical' && sketch.kneeBendDeg != null && (
                 <Text style={styles.hint}>{t('geometry.knee_bend_caption', { deg: sketch.kneeBendDeg })}</Text>
             )}
-            <Text style={styles.hint}>{t('geometry.torso_angle_caption', { deg: sketch.torsoAngleDeg })}</Text>
-            <Text style={styles.hint}>
-                {t('geometry.springs_legend_side', {
-                    fork: Math.round(forkTravel),
-                    shock: Math.round(shockStroke),
-                    sag: sagPercent,
-                })}
-            </Text>
+            {sketch.torsoAngleSource === 'ik' && (
+                <Text style={styles.hint}>{t('geometry.torso_angle_caption', { deg: sketch.torsoAngleDeg })}</Text>
+            )}
+            {shockStroke > 0 ? (
+                <Text style={styles.hint}>
+                    {t('geometry.springs_legend_side', {
+                        fork: Math.round(forkTravel),
+                        shock: Math.round(shockStroke),
+                        sag: sagPercent,
+                    })}
+                </Text>
+            ) : (
+                <Text style={styles.hint}>
+                    {t('geometry.springs_legend_no_shock', {
+                        fork: Math.round(forkTravel),
+                        sag: sagPercent,
+                    })}
+                </Text>
+            )}
         </View>
     );
 }

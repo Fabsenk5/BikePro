@@ -81,13 +81,23 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             for (const k of [vertical, horizontal]) {
                 expect(k.riderElbow.x, s.name).toBeLessThan((k.riderShoulder.x + k.hand.x) / 2);
             }
-            // bottom pedal: leg nearly straight but not locked out
+            // pedal positions hold with or without an inseam
             expect(vertical.riderPedal.x).toBeCloseTo(0, 6);
             expect(vertical.riderPedal.y).toBeCloseTo(-170, 6);
+            expect(horizontal.riderPedal.x).toBeCloseTo(170, 6);
+            if (s.rider.inseam == null) {
+                // unknown path: straight fallback legs, no bend to report
+                expect(vertical.riderKnee, s.name).toBeNull();
+                expect(vertical.kneeBendDeg, s.name).toBeNull();
+                expect(horizontal.riderKnee, s.name).toBeNull();
+                expect(horizontal.kneeBendDeg, s.name).toBeNull();
+                expect(horizontal.kopsOffsetMm, s.name).toBeNull();
+                continue;
+            }
+            // bottom pedal: leg nearly straight but not locked out
             expect(vertical.kneeBendDeg!, s.name).toBeGreaterThan(10);
             expect(vertical.kneeBendDeg!, s.name).toBeLessThan(50);
             // horizontal pedal: clearly bent knee, knee in front of the hip
-            expect(horizontal.riderPedal.x).toBeCloseTo(170, 6);
             expect(horizontal.kneeBendDeg!, s.name).toBeGreaterThan(40);
             expect(horizontal.riderKnee!.x, s.name).toBeGreaterThan(horizontal.riderHip.x);
         }
@@ -104,13 +114,18 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             });
             expect(front, s.name).not.toBeNull();
             expect(front!.gripHalfSpan).toBeCloseTo(s.geo.cockpit!.barWidth! / 2 - 40, 6);
-            expect(front!.shoulderHalfWidth).toBeCloseTo(s.rider.shoulderWidth! / 2, 6);
             expect(front!.barGroundY).toBeGreaterThan(front!.wheelRadius - 100);
             expect(front!.shoulderY).toBeGreaterThan(front!.barGroundY);
             expect(front!.headCenter.y).toBeGreaterThan(front!.shoulderY);
             expect(front!.tireWidthMm).toBe(63);
-            // modern MTB bars: grip span wider than the shoulders
-            expect(front!.gripHalfSpan * 2, s.name).toBeGreaterThan(s.rider.shoulderWidth!);
+            if (s.rider.shoulderWidth != null) {
+                expect(front!.shoulderHalfWidth).toBeCloseTo(s.rider.shoulderWidth! / 2, 6);
+                // modern MTB bars: grip span wider than the shoulders
+                expect(front!.gripHalfSpan * 2, s.name).toBeGreaterThan(s.rider.shoulderWidth!);
+            } else {
+                // unknown path: shoulders fall back to the assumed width
+                expect(front!.shoulderHalfWidth, s.name).toBeNull();
+            }
         }
     });
 
@@ -127,9 +142,15 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
             expect(standing.saddle.y, s.name).toBeLessThan(seated.saddle.y - 100);
             // standing hips stay above the compressed saddle and reach the pedals
             expect(standing.riderHip.y, s.name).toBeGreaterThan(standing.saddle.y + 80);
-            expect(standing.riderKnee, s.name).not.toBeNull();
-            expect(standing.kneeBendDeg!, s.name).toBeGreaterThan(10);
-            expect(standing.kneeBendDeg!, s.name).toBeLessThan(120);
+            if (s.rider.inseam != null) {
+                expect(standing.riderKnee, s.name).not.toBeNull();
+                expect(standing.kneeBendDeg!, s.name).toBeGreaterThan(10);
+                expect(standing.kneeBendDeg!, s.name).toBeLessThan(120);
+            } else {
+                // unknown path: straight fallback leg, no bend to report
+                expect(standing.riderKnee, s.name).toBeNull();
+                expect(standing.kneeBendDeg, s.name).toBeNull();
+            }
             // springs: used travel stays within the component travel
             expect(standing.forkSpring.used, s.name).toBeGreaterThanOrEqual(0);
             expect(standing.forkSpring.used, s.name).toBeLessThanOrEqual(170);
@@ -192,5 +213,30 @@ describe('bike sketch scenario matrix (plausibility guard)', () => {
         const front = buildFrontSketch(s.geo, derived, { shoulderWidth: null, sagPercent: 20, forkTravel: 170 })!;
         expect(front.shoulderHalfWidth).toBeNull();
         expect(front.tireWidthMm).toBe(60); // default width
+    });
+
+    it('front sketch: crown below the bar from the head-tube geometry', () => {
+        for (const s of GEOMETRY_SCENARIOS) {
+            const derived = computeContactGeometry(s.geo);
+            const front = buildFrontSketch(s.geo, derived, { sagPercent: 20, forkTravel: 170, shockStroke: 60 })!;
+            const frame = s.geo.frame!;
+            const radii = wheelRadii(frame.wheelSize);
+            const bbHeight = radii.front - (frame.bbDrop ?? 30);
+            const headTube = frame.headTube ?? 110;
+            const headAngle = frame.headAngle ?? 65;
+            const expected = bbHeight + (frame.stack! - headTube * Math.sin((headAngle * Math.PI) / 180)) - 34;
+            expect(front.crownGroundY, s.name).toBeCloseTo(expected, 6);
+            expect(front.crownGroundY, s.name).toBeLessThan(front.barGroundY);
+        }
+    });
+
+    it('front sketch: straight legs without inseam, bent knees with it', () => {
+        for (const s of GEOMETRY_SCENARIOS) {
+            const derived = computeContactGeometry(s.geo);
+            const straight = buildFrontSketch(s.geo, derived, { sagPercent: 0, forkTravel: 170 })!;
+            expect(straight.legs.every(l => l.knee === null), s.name).toBe(true);
+            const bent = buildFrontSketch(s.geo, derived, { sagPercent: 0, forkTravel: 170, inseam: 840 })!;
+            expect(bent.legs.every(l => l.knee !== null), s.name).toBe(true);
+        }
     });
 });

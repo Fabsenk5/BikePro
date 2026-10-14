@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+    AssumedKey,
     assumedSaddleSetback,
     BikeGeometry,
     cockpitDefaults,
     computeContactGeometry,
-    evaluateFit,
     DISCIPLINE_REFERENCES,
+    evaluateFit,
     recommendForSymptoms,
     saddleHeightTarget,
     sanitizeGeometry,
@@ -41,6 +42,40 @@ describe('sanitizeGeometry', () => {
         expect(sanitizeGeometry({})).toBeUndefined();
         expect(sanitizeGeometry({ frame: { stack: 'abc' } })).toBeUndefined();
     });
+
+    it('drops absurd values to undefined instead of storing them', () => {
+        // lengths live in 0–3000
+        expect(sanitizeGeometry({ frame: { stack: 9999, reach: 480 } })).toEqual({
+            frame: { reach: 480 },
+        });
+        expect(sanitizeGeometry({ cockpit: { spacers: -5, stemLength: 40 } })).toEqual({
+            cockpit: { stemLength: 40 },
+        });
+        // angles live in 0–180
+        expect(sanitizeGeometry({ frame: { headAngle: 200, reach: 480 } })).toEqual({
+            frame: { reach: 480 },
+        });
+        expect(sanitizeGeometry({ cockpit: { backsweep: 200, stemLength: 40 } })).toEqual({
+            cockpit: { stemLength: 40 },
+        });
+        // saddle height (along-tube) lives in 400–1100
+        expect(sanitizeGeometry({ fit: { saddleHeight: 2000, saddleSetback: 60 } })).toEqual({
+            fit: { saddleSetback: 60 },
+        });
+        expect(sanitizeGeometry({ fit: { saddleHeight: 300 } })).toBeUndefined();
+        // crank length lives in 100–220
+        expect(sanitizeGeometry({ cockpit: { crankLength: 50, stemLength: 40 } })).toEqual({
+            cockpit: { stemLength: 40 },
+        });
+    });
+
+    it('keeps plausible boundary values', () => {
+        expect(sanitizeGeometry({ fit: { saddleHeight: 400 } })).toEqual({ fit: { saddleHeight: 400 } });
+        expect(sanitizeGeometry({ fit: { saddleHeight: 1100 } })).toEqual({ fit: { saddleHeight: 1100 } });
+        expect(sanitizeGeometry({ cockpit: { crankLength: 100 } })).toEqual({ cockpit: { crankLength: 100 } });
+        expect(sanitizeGeometry({ cockpit: { crankLength: 220 } })).toEqual({ cockpit: { crankLength: 220 } });
+        expect(sanitizeGeometry({ frame: { headAngle: 180 } })).toEqual({ frame: { headAngle: 180 } });
+    });
 });
 
 describe('computeContactGeometry', () => {
@@ -75,6 +110,66 @@ describe('computeContactGeometry', () => {
         expect(d.rad).toBeNull();
         expect(d.seatedReach).toBeNull();
     });
+
+    it('projects the spacer tower along the steerer tube', () => {
+        const geo: BikeGeometry = {
+            frame: { stack: 630, reach: 480, headAngle: 64.5 },
+            cockpit: { stemLength: 40, stemAngle: 0, spacers: 15, barRise: 30, barWidth: 780, backsweep: 9, upsweep: 5 },
+        };
+        const d = computeContactGeometry(geo);
+        const headRad = (64.5 * Math.PI) / 180;
+        // bar moves up by spacers·sin(headAngle) and rearward by spacers·cos(headAngle)
+        expect(d.barX).toBeCloseTo(480 + 40 - 15 * Math.cos(headRad), 9);
+        expect(d.barY).toBeCloseTo(630 + 15 * Math.sin(headRad) + 30, 9);
+        expect(d.barX!).toBeLessThan(480 + 40);
+        expect(d.barY!).toBeLessThan(630 + 15 + 30);
+    });
+
+    it('stacks spacers vertically when the head angle is unknown', () => {
+        const geo: BikeGeometry = {
+            frame: { stack: 630, reach: 480 },
+            cockpit: { stemLength: 40, stemAngle: 0, spacers: 15, barRise: 30, barWidth: 780, backsweep: 9, upsweep: 5 },
+        };
+        const d = computeContactGeometry(geo);
+        expect(d.barX).toBeCloseTo(520, 9);
+        expect(d.barY).toBeCloseTo(675, 9);
+    });
+
+    it('leaves hand and RAD unknown without a bar width (no centre fallback)', () => {
+        const { barWidth: _dropped, ...cockpit } = sample.cockpit!;
+        const d = computeContactGeometry({ ...sample, cockpit });
+        expect(d.barX).toBeCloseTo(520, 6);
+        expect(d.barY).toBeCloseTo(675, 6);
+        expect(d.handX).toBeNull();
+        expect(d.handY).toBeNull();
+        expect(d.rad).toBeNull();
+        expect(d.seatedReach).toBeNull();
+        expect(d.saddleToHand).toBeNull();
+        // saddle and drop do not need the grips
+        expect(d.saddleToBarDrop).toBeCloseTo(40.8, 1);
+    });
+
+    it('projects the along-tube saddle height with ×sin(seatAngle)', () => {
+        const steep = computeContactGeometry({ ...sample, frame: { ...sample.frame, seatAngle: 78 } });
+        expect(steep.saddleY).toBeCloseTo(741 * Math.sin((78 * Math.PI) / 180), 9);
+        expect(steep.saddleY).toBeCloseTo(724.8, 1);
+        // default 75° when the frame has no seat angle
+        const def = computeContactGeometry(sample);
+        expect(def.saddleY).toBeCloseTo(741 * Math.sin((75 * Math.PI) / 180), 9);
+    });
+
+    it('lets a ±15 mm tape override win over the model bar height', () => {
+        const base = computeContactGeometry(sample);
+        const up: BikeGeometry = { ...sample, measured: { barY: base.barY! + 15 } };
+        const down: BikeGeometry = { ...sample, measured: { barY: base.barY! - 15 } };
+        const dUp = computeContactGeometry(up);
+        const dDown = computeContactGeometry(down);
+        expect(dUp.barY).toBe(base.barY! + 15);
+        expect(dDown.barY).toBe(base.barY! - 15);
+        // drop = saddle − bar, so it shifts by the mirrored amount
+        expect(dUp.saddleToBarDrop).toBeCloseTo(base.saddleToBarDrop! - 15, 6);
+        expect(dDown.saddleToBarDrop).toBeCloseTo(base.saddleToBarDrop! + 15, 6);
+    });
 });
 
 describe('evaluateFit', () => {
@@ -99,6 +194,51 @@ describe('evaluateFit', () => {
         const geo = { ...sample, fit: { ...sample.fit, saddleHeight: target + 25 } };
         const checks = evaluateFit(geo, computeContactGeometry(geo), DISCIPLINE_REFERENCES.enduro, { inseam: 840 });
         expect(checks.find(c => c.id === 'saddleHeight')).toMatchObject({ status: 'high' });
+    });
+
+    it('scores the enduro drop band from 0 (level bar/saddle is ok)', () => {
+        expect(DISCIPLINE_REFERENCES.enduro.saddleToBarDrop.min).toBe(0);
+    });
+
+    it('stays backward compatible without the assumed set', () => {
+        const d = computeContactGeometry(sample);
+        const ref = DISCIPLINE_REFERENCES.enduro;
+        const rider = { inseam: 840 };
+        expect(evaluateFit(sample, d, ref, rider)).toEqual(evaluateFit(sample, d, ref, rider, new Set()));
+        expect(evaluateFit(sample, d, ref, rider).filter(c => c.status !== 'ok')).toHaveLength(0);
+    });
+
+    it('marks checks with assumed inputs as unknown', () => {
+        const ref = DISCIPLINE_REFERENCES.enduro;
+        const rider = { inseam: 840 };
+        const statusOf = (assumed: AssumedKey[], id: string) => {
+            const d = computeContactGeometry(sample);
+            return evaluateFit(sample, d, ref, rider, new Set<string>(assumed)).find(c => c.id === id)!.status;
+        };
+        // values stay reported, only the status flips
+        const d = computeContactGeometry(sample);
+        const stemCheck = evaluateFit(sample, d, ref, rider, new Set<string>(['cockpit.stemLength'])).find(c => c.id === 'stemLength')!;
+        expect(stemCheck).toMatchObject({ status: 'unknown', value: 40 });
+
+        expect(statusOf(['cockpit.barRise'], 'barRise')).toBe('unknown');
+        expect(statusOf(['cockpit.barRise'], 'stemLength')).toBe('ok');
+        // bar width feeds the grips, so it also clouds RAD — but not the drop
+        expect(statusOf(['cockpit.barWidth'], 'barWidth')).toBe('unknown');
+        expect(statusOf(['cockpit.barWidth'], 'radRatio')).toBe('unknown');
+        expect(statusOf(['cockpit.barWidth'], 'saddleToBarDrop')).toBe('ok');
+        // saddle height feeds the saddle check and the drop
+        expect(statusOf(['fit.saddleHeight'], 'saddleHeight')).toBe('unknown');
+        expect(statusOf(['fit.saddleHeight'], 'saddleToBarDrop')).toBe('unknown');
+        expect(statusOf(['fit.saddleHeight'], 'stemLength')).toBe('ok');
+        // inseam feeds the ratio denominator and the saddle target
+        expect(statusOf(['rider.inseam'], 'radRatio')).toBe('unknown');
+        expect(statusOf(['rider.inseam'], 'saddleHeight')).toBe('unknown');
+        expect(statusOf(['rider.inseam'], 'stemLength')).toBe('ok');
+        // bar-height path inputs cloud the drop
+        expect(statusOf(['cockpit.spacers'], 'saddleToBarDrop')).toBe('unknown');
+        expect(statusOf(['cockpit.stemAngle'], 'saddleToBarDrop')).toBe('unknown');
+        // setback is tracked but judges no band check today
+        expect(statusOf(['fit.saddleSetback'], 'saddleHeight')).toBe('ok');
     });
 
     it('assumes a saddle setback from the seat-tube geometry', () => {
@@ -167,6 +307,46 @@ describe('recommendForSymptoms', () => {
         const d = computeContactGeometry(sample);
         const advice = recommendForSymptoms(['no_pop'], sample, d, { inseam: 840 });
         expect(advice.no_pop.some(a => a.key === 'geometry.advice.check_rad')).toBe(true);
+    });
+
+    it('withholds shorter-stem advice when the stem is already stubby', () => {
+        const d = computeContactGeometry(sample);
+        // sample stem is 40 mm → guarded advice
+        expect(recommendForSymptoms(['too_long'], sample, d, { inseam: 840 }).too_long).toHaveLength(3);
+        const stubby: BikeGeometry = { ...sample, cockpit: { ...sample.cockpit, stemLength: 30 } };
+        expect(recommendForSymptoms(['too_long'], stubby, computeContactGeometry(stubby), { inseam: 840 }).too_long).toEqual([]);
+        const boundary: BikeGeometry = { ...sample, cockpit: { ...sample.cockpit, stemLength: 35 } };
+        expect(recommendForSymptoms(['too_long'], boundary, computeContactGeometry(boundary), { inseam: 840 }).too_long).toEqual([]);
+        // unknown stem → assume the worst, keep advising
+        const unknown: BikeGeometry = { ...sample, cockpit: { ...sample.cockpit, stemLength: undefined } };
+        expect(recommendForSymptoms(['too_long'], unknown, computeContactGeometry(unknown), { inseam: 840 }).too_long).toHaveLength(3);
+    });
+
+    it('withholds lower-bar advice when nothing can come off', () => {
+        const rider = { inseam: 840 };
+        // spacers on board → actionable
+        expect(recommendForSymptoms(['bar_too_high'], sample, computeContactGeometry(sample), rider).bar_too_high).toHaveLength(2);
+        // slammed with a normal rise → nothing to lower
+        const slammed: BikeGeometry = { ...sample, cockpit: { ...sample.cockpit, spacers: 0, barRise: 30 } };
+        expect(recommendForSymptoms(['bar_too_high'], slammed, computeContactGeometry(slammed), rider).bar_too_high).toEqual([]);
+        // slammed but rise over every discipline band → lower-rise bar helps
+        const tower: BikeGeometry = { ...sample, cockpit: { ...sample.cockpit, spacers: 0, barRise: 60 } };
+        expect(recommendForSymptoms(['bar_too_high'], tower, computeContactGeometry(tower), rider).bar_too_high).toHaveLength(2);
+    });
+
+    it('keeps the unsafe advice and notes the short-vs-safe conflict', () => {
+        const d = computeContactGeometry(sample);
+        const rider = { inseam: 840 };
+        const soloShort = recommendForSymptoms(['too_short'], sample, d, rider);
+        expect(soloShort.too_short).toHaveLength(2);
+        const both = recommendForSymptoms(['too_short', 'unsafe_descending'], sample, d, rider);
+        // unsafe advice is kept as-is (safety wins) …
+        expect(both.unsafe_descending).toEqual(
+            recommendForSymptoms(['unsafe_descending'], sample, d, rider).unsafe_descending,
+        );
+        expect(both.unsafe_descending.map(a => a.key)).toContain('geometry.advice.higher_bar');
+        // … and the conflict is noted on the longer-stem side
+        expect(both.too_short.map(a => a.key)).toContain('geometry.advice.conflict_short_unsafe');
     });
 });
 
