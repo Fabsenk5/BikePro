@@ -23,6 +23,13 @@ const VIEW_SIDE = 1300;   // mm to each side of the BB
 const VIEW_TOP = 1700;    // mm above the BB (rider + headroom)
 const VIEW_BOTTOM = -400; // mm below the BB (ground of the biggest wheel)
 const GRID_STEP = 100; // 10 cm grid with the BB (sketch origin) as reference
+// Grid tiers for quick measuring: 10 cm faint, 50 cm medium, 100 cm strong,
+// 0 axes strongest — but never as strong as the axes themselves.
+const gridTier = (v: number): { strokeWidth: number; opacity: number } =>
+    v === 0 ? { strokeWidth: 1.5, opacity: 0.9 }
+    : v % 1000 === 0 ? { strokeWidth: 1.2, opacity: 0.65 }
+    : v % 500 === 0 ? { strokeWidth: 1.0, opacity: 0.5 }
+    : { strokeWidth: 0.7, opacity: 0.35 };
 /** animation frame budget (~30 fps): rAF updates are skipped inside it */
 const FRAME_BUDGET_MS = 1000 / 30;
 
@@ -158,20 +165,26 @@ export default function BikeSideView({
     const gridColor = theme.colors.border;
     const grid = useMemo(() => (
         <>
-            {gridXs.map(x => (
-                <Line
-                    key={`gx-${x}`} x1={tx(x)} y1={tyGround(VIEW_BOTTOM)} x2={tx(x)} y2={tyGround(VIEW_TOP)}
-                    stroke={gridColor} strokeWidth={x === 0 ? 1.5 : 0.7}
-                    opacity={x === 0 ? 0.9 : 0.35}
-                />
-            ))}
-            {gridYs.map(y => (
-                <Line
-                    key={`gy-${y}`} x1={tx(-VIEW_SIDE)} y1={tyGround(y)} x2={tx(VIEW_SIDE)} y2={tyGround(y)}
-                    stroke={gridColor} strokeWidth={y === 0 ? 1.5 : 0.7}
-                    opacity={y === 0 ? 0.9 : 0.35}
-                />
-            ))}
+            {gridXs.map(x => {
+                const tier = gridTier(x);
+                return (
+                    <Line
+                        key={`gx-${x}`} x1={tx(x)} y1={tyGround(VIEW_BOTTOM)} x2={tx(x)} y2={tyGround(VIEW_TOP)}
+                        stroke={gridColor} strokeWidth={tier.strokeWidth}
+                        opacity={tier.opacity}
+                    />
+                );
+            })}
+            {gridYs.map(y => {
+                const tier = gridTier(y);
+                return (
+                    <Line
+                        key={`gy-${y}`} x1={tx(-VIEW_SIDE)} y1={tyGround(y)} x2={tx(VIEW_SIDE)} y2={tyGround(y)}
+                        stroke={gridColor} strokeWidth={tier.strokeWidth}
+                        opacity={tier.opacity}
+                    />
+                );
+            })}
         </>
     ), [gridXs, gridYs, gridColor, tx, tyGround]);
 
