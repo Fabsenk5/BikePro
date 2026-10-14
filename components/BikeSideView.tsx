@@ -354,9 +354,9 @@ export default function BikeSideView({
             {animActive && (
                 <Text style={styles.hint}>
                     {t('geometry.animation_used', {
-                        fork: Math.round(Math.max(0, frontLift)),
+                        fork: Math.round(Math.min(forkTravel, (forkTravel * sagPercent) / 100 + Math.max(0, frontLift))),
                         forkMax: Math.round(forkTravel),
-                        shock: Math.round(Math.max(0, rearLift) * (rearTravelMm > 0 ? shockStroke / rearTravelMm : 0)),
+                        shock: Math.round(Math.min(shockStroke, (shockStroke * sagPercent) / 100 + Math.max(0, rearLift) * (rearTravelMm > 0 ? shockStroke / rearTravelMm : 0))),
                         shockMax: Math.round(shockStroke),
                         absorb: Math.round(absorb),
                     })}
