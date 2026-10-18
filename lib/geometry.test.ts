@@ -377,4 +377,18 @@ describe('stripComputedMeasured', () => {
         expect(stripComputedMeasured({ barY: 675 }, { barY: 675 })).toBeUndefined();
         expect(stripComputedMeasured(undefined, { barY: 675 })).toBeUndefined();
     });
+
+    it('compares against the pure model, never against stored overrides', () => {
+        // Regression: the strip reference must come from a geometry WITHOUT
+        // measured values — computeContactGeometry prefers overrides, so a
+        // reference built with them would delete every stored value on save.
+        const withTape = { ...sample, measured: { barX: 450, saddleToHand: 600 } };
+        const pureModel = computeContactGeometry({ ...withTape, measured: undefined });
+        expect(pureModel.barX).not.toBeCloseTo(450, 0);
+        const stripped = stripComputedMeasured(
+            { barX: 450, saddleToHand: 600 },
+            { barX: pureModel.barX, saddleToHand: pureModel.saddleToHand },
+        );
+        expect(stripped).toEqual({ barX: 450, saddleToHand: 600 });
+    });
 });

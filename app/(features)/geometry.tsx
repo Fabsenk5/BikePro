@@ -373,9 +373,12 @@ export default function GeometryScreen() {
     );
 
     const derived = useMemo(() => computeContactGeometry(displayGeometry), [displayGeometry]);
-    // Raw model (no assumptions) — only used to decide which measured values
-    // are real tape deviations worth persisting.
-    const derivedRaw = useMemo(() => computeContactGeometry(geometry), [geometry]);
+    // Raw model (no assumptions, no stored measured overrides) — only used
+    // to decide which measured values are real tape deviations worth
+    // persisting. NB: measured MUST be excluded here: computeContactGeometry
+    // prefers overrides, so including them would make every stored value look
+    // "equal to the model" and strip it on every save.
+    const derivedRaw = useMemo(() => computeContactGeometry({ ...geometry, measured: undefined }), [geometry]);
 
     // Model values for the measured fields: computed from frame + cockpit + fit.
     // Shown as gray placeholders and used by the model while the field is empty.
