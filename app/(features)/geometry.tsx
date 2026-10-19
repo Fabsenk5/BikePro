@@ -28,7 +28,7 @@ import {
     SymptomId,
     SYMPTOMS,
 } from '@/lib/geometry';
-import { CrankMode, DEFAULT_DROPPER_TRAVEL, RiderMode, wheelRadii } from '@/lib/bikeSketch';
+import { buildBikeSketch, CrankMode, DEFAULT_DROPPER_TRAVEL, RiderMode, wheelRadii } from '@/lib/bikeSketch';
 import { SyncBike, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -373,6 +373,24 @@ export default function GeometryScreen() {
     );
 
     const derived = useMemo(() => computeContactGeometry(displayGeometry), [displayGeometry]);
+    // Actionable comparison figures (not raw inputs): grip span vs shoulders,
+    // front-center as stability indicator, and knee-over-pedal from a
+    // horizontal-cranks sketch (needs inseam + crank length).
+    const gripDelta = useMemo(() => {
+        const barWidth = toNum(form.barWidth);
+        if (barWidth == null || rider.shoulderWidth == null) return null;
+        return barWidth - 80 - rider.shoulderWidth;
+    }, [form.barWidth, rider.shoulderWidth]);
+    const frontCenter = useMemo(() => {
+        const wheelbase = toNum(form.wheelbase);
+        const chainstay = toNum(form.chainstay);
+        return wheelbase != null && chainstay != null ? wheelbase - chainstay : null;
+    }, [form.wheelbase, form.chainstay]);
+    const kopsSketch = useMemo(() => buildBikeSketch(displayGeometry, derived, {
+        sagPercent: 0, forkTravel, shockStroke,
+        torsoLength: rider.torsoLength, inseam: rider.inseam,
+        crankLength: toNum(form.crankLength), crankMode: 'horizontal' as CrankMode,
+    }), [displayGeometry, derived, forkTravel, shockStroke, rider.torsoLength, rider.inseam, form.crankLength]);
     // Raw model (no assumptions, no stored measured overrides) — only used
     // to decide which measured values are real tape deviations worth
     // persisting. NB: measured MUST be excluded here: computeContactGeometry
@@ -709,13 +727,13 @@ export default function GeometryScreen() {
                             )}
                             <View style={styles.metricGrid}>
                                 {([
-                                    ['reach', geometry.frame?.reach, 0],
-                                    ['stack', geometry.frame?.stack, 0],
                                     ['rad', derived.rad, 0],
                                     ['drop', derived.saddleToBarDrop, 0],
                                     ['seatedReach', derived.seatedReach, 0],
                                     ['saddleToHand', derived.saddleToHand, 0],
-                                    ['barY', derived.barY, 0],
+                                    ['gripDelta', gripDelta, 0],
+                                    ['frontCenter', frontCenter, 0],
+                                    ['kops', kopsSketch?.kopsOffsetMm, 0],
                                 ] as [string, number | null | undefined, number][]).map(([id, value, digits]) => (
                                     <View key={id} style={styles.metricCell}>
                                         <Text style={styles.metricValue}>{fmtValue(value ?? null, digits)}</Text>

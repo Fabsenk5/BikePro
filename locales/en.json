@@ -1082,12 +1082,9 @@
         "tab_measured": "Measured",
         "tab_compare": "Compare",
         "metrics_title": "Key metrics",
-        "metric_reach": "Reach",
-        "metric_stack": "Stack",
         "metric_rad": "RAD (BB→grip)",
         "metric_drop": "Saddle→bar",
         "metric_seatedReach": "Seated reach",
-        "metric_barY": "Bar height above BB",
         "discipline_label": "Reference discipline",
         "discipline_tour": "Tour/XC",
         "discipline_trail": "Trail",
@@ -1227,6 +1224,9 @@
         "check_stemLength_hint": "Longer = more stretched, shorter = more playful and direct",
         "check_barRise_hint": "More rise = more upright, less pressure on the hands",
         "check_barWidth_hint": "Wider = more control and calmness descending",
-        "check_saddleHeight_hint": "BB→saddle along seat tube — target 0.883 × inseam"
+        "check_saddleHeight_hint": "BB→saddle along seat tube — target 0.883 × inseam",
+        "metric_gripDelta": "Grip − shoulders",
+        "metric_frontCenter": "Front centre (BB→front)",
+        "metric_kops": "Knee over pedal"
     }
 }

@@ -1082,12 +1082,9 @@
         "tab_measured": "Messwerte",
         "tab_compare": "Vergleich",
         "metrics_title": "Kennzahlen",
-        "metric_reach": "Reach",
-        "metric_stack": "Stack",
         "metric_rad": "RAD (BB→Griff)",
         "metric_drop": "Sattel→Lenker",
         "metric_seatedReach": "Sitz-Reach",
-        "metric_barY": "Lenkerhöhe über Tretlager",
         "discipline_label": "Referenz-Disziplin",
         "discipline_tour": "Tour/XC",
         "discipline_trail": "Trail",
@@ -1227,6 +1224,9 @@
         "check_stemLength_hint": "Länger = gestreckter, kürzer = verspielter und direkter",
         "check_barRise_hint": "Mehr Rise = aufrechter, weniger Druck auf den Händen",
         "check_barWidth_hint": "Breiter = mehr Kontrolle und Ruhe bergab",
-        "check_saddleHeight_hint": "Tretlager→Sattel entlang Sitzrohr — Ziel 0,883 × Innenbein"
+        "check_saddleHeight_hint": "Tretlager→Sattel entlang Sitzrohr — Ziel 0,883 × Innenbein",
+        "metric_gripDelta": "Griff − Schulter",
+        "metric_frontCenter": "Front-Center (BB→VR)",
+        "metric_kops": "Knie über Pedal"
     }
 }
