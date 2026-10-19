@@ -126,4 +126,16 @@ describe('handlebar database integrity', () => {
         const ids = HANDLEBARS.map(b => b.id);
         expect(new Set(ids).size).toBe(ids.length);
     });
+
+    it('covers high-rise bars (50 mm and up)', () => {
+        const highRisers = HANDLEBARS.filter(b => b.risesMm.some(r => r >= 50));
+        expect(highRisers.length).toBeGreaterThanOrEqual(4);
+        // high-rise lines carry the tall options explicitly
+        const renthalHR = HANDLEBARS.find(b => b.id === 'renthal-fatbar-35-highrise')!;
+        expect(renthalHR.risesMm).toEqual([50, 60, 70]);
+        expect(renthalHR.widthsMm).toEqual([820]);
+        expect(renthalHR.priceEur).toBe(95.5);
+        const highside = HANDLEBARS.find(b => b.id === 'deity-highside-760')!;
+        expect(highside.risesMm).toContain(80);
+    });
 });
