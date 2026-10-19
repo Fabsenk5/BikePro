@@ -19,6 +19,7 @@ import {
     DISCIPLINE_REFERENCES,
     evaluateFit,
     FitCheck,
+    groundExpectations,
     recommendForSymptoms,
     RiderBody,
     saddleHeightTarget,
@@ -27,6 +28,7 @@ import {
     stripComputedMeasured,
     SymptomId,
     SYMPTOMS,
+    validateMeasurements,
 } from '@/lib/geometry';
 import { buildBikeSketch, CrankMode, DEFAULT_DROPPER_TRAVEL, ProposalAxis, proposeCockpit, poseTorsoDeg, RiderMode, wheelRadii } from '@/lib/bikeSketch';
 import { HANDLEBARS } from '@/constants/handlebars';
@@ -54,6 +56,7 @@ interface GeometryForm {
     saddleHeight: string; saddleSetback: string;
     // measured
     mBarX: string; mBarY: string; mSaddleToHand: string; mDrop: string; mBbHeight: string;
+    mGripGroundY: string; mSaddleGroundY: string; mSitOffset: string; mGripForward: string; mGripSpanFront: string;
     // meta
     source: string;
 }
@@ -63,6 +66,7 @@ const EMPTY_FORM: GeometryForm = {
     barRise: '', backsweep: '', upsweep: '', barWidth: '', stemLength: '', stemAngle: '', spacers: '', crankLength: '', dropperTravel: '', seatpostExposed: '',
     saddleHeight: '', saddleSetback: '',
     mBarX: '', mBarY: '', mSaddleToHand: '', mDrop: '', mBbHeight: '',
+    mGripGroundY: '', mSaddleGroundY: '', mSitOffset: '', mGripForward: '', mGripSpanFront: '',
     source: '',
 };
 
@@ -158,6 +162,9 @@ const buildGeometryFromForm = (f: GeometryForm): BikeGeometry => ({
     measured: {
         barX: toNum(f.mBarX), barY: toNum(f.mBarY), saddleToHand: toNum(f.mSaddleToHand),
         saddleToBarDrop: toNum(f.mDrop), bbHeight: toNum(f.mBbHeight),
+        gripGroundY: toNum(f.mGripGroundY), saddleGroundY: toNum(f.mSaddleGroundY),
+        sitOffset: toNum(f.mSitOffset), gripForward: toNum(f.mGripForward),
+        gripSpanFront: toNum(f.mGripSpanFront),
     },
     meta: { source: f.source.trim() || undefined },
 });
@@ -257,6 +264,9 @@ export default function GeometryScreen() {
             set('mBarX', geo.measured.barX); set('mBarY', geo.measured.barY);
             set('mSaddleToHand', geo.measured.saddleToHand); set('mDrop', geo.measured.saddleToBarDrop);
             set('mBbHeight', geo.measured.bbHeight);
+            set('mGripGroundY', geo.measured.gripGroundY); set('mSaddleGroundY', geo.measured.saddleGroundY);
+            set('mSitOffset', geo.measured.sitOffset); set('mGripForward', geo.measured.gripForward);
+            set('mGripSpanFront', geo.measured.gripSpanFront);
         }
         if (geo?.meta?.source) f.source = geo.meta.source;
 
@@ -434,31 +444,63 @@ export default function GeometryScreen() {
 
     // Model values for the measured fields: computed from frame + cockpit + fit.
     // Shown as gray placeholders and used by the model while the field is empty.
-    const autoMeasured = useMemo(() => {
+    const groundPlaceholders = useMemo(() => {
         const frontRadius = wheelRadii(geometry.frame?.wheelSize).front;
         const bbDrop = geometry.frame?.bbDrop ?? 30;
+        const bbAuto = geometry.frame?.wheelSize ? frontRadius - bbDrop : null;
         return {
-            barX: derived.barX,
-            barY: derived.barY,
-            seatedReach: derived.seatedReach,
-            saddleToHand: derived.saddleToHand,
-            saddleToBarDrop: derived.saddleToBarDrop,
-            bbHeight: geometry.frame?.wheelSize ? frontRadius - bbDrop : null,
+            bbAuto,
+            ground: groundExpectations(displayGeometry, derived, toNum(form.mBbHeight) ?? bbAuto),
         };
-    }, [geometry, derived]);
+    }, [geometry, derived, displayGeometry, form.mBbHeight]);
+    const autoMeasured = useMemo(() => ({
+        barX: derived.barX,
+        barY: derived.barY,
+        seatedReach: derived.seatedReach,
+        saddleToHand: derived.saddleToHand,
+        saddleToBarDrop: derived.saddleToBarDrop,
+        bbHeight: groundPlaceholders.bbAuto,
+        ...groundPlaceholders.ground,
+    }), [derived, groundPlaceholders]);
+    // Ground-based validation: tape values (live from the form) against the
+    // hardware chain. Validation-only — these fields never override the model.
+    // Both helpers are pure arithmetic over ≤6 keys, so they run unmemoized.
+    const bbForExpect = toNum(form.mBbHeight) ?? (geometry.frame?.wheelSize
+        ? wheelRadii(geometry.frame.wheelSize).front - (geometry.frame?.bbDrop ?? 30)
+        : null);
+    const groundExpected = groundExpectations(displayGeometry, derived, bbForExpect);
+    const groundFlags = validateMeasurements(
+        {
+            gripGroundY: toNum(form.mGripGroundY),
+            saddleGroundY: toNum(form.mSaddleGroundY),
+            sitOffset: toNum(form.mSitOffset),
+            gripForward: toNum(form.mGripForward),
+            gripSpanFront: toNum(form.mGripSpanFront),
+        },
+        groundExpected,
+        bbForExpect,
+    );
     // Strip reference from the RAW geometry so assumptions never leak into storage.
+    const groundStripAuto = useMemo(
+        () => groundExpectations(geometry, derivedRaw, geometry.frame?.wheelSize
+            ? wheelRadii(geometry.frame.wheelSize).front - (geometry.frame?.bbDrop ?? 30)
+            : null),
+        [geometry, derivedRaw],
+    );
     const stripAuto = useMemo(() => {
         const frontRadius = wheelRadii(geometry.frame?.wheelSize).front;
         const bbDrop = geometry.frame?.bbDrop ?? 30;
+        const bbRaw = geometry.frame?.wheelSize ? frontRadius - bbDrop : null;
         return {
             barX: derivedRaw.barX,
             barY: derivedRaw.barY,
             seatedReach: derivedRaw.seatedReach,
             saddleToHand: derivedRaw.saddleToHand,
             saddleToBarDrop: derivedRaw.saddleToBarDrop,
-            bbHeight: geometry.frame?.wheelSize ? frontRadius - bbDrop : null,
+            bbHeight: bbRaw,
+            ...groundStripAuto,
         };
-    }, [geometry, derivedRaw]);
+    }, [geometry, derivedRaw, groundStripAuto]);
 
     // Which inputs are assumptions (raw null) + missing inseam — passed to the
     // fit engine so it can down-weight assumed values (contract with lib/geometry).
@@ -1033,6 +1075,18 @@ export default function GeometryScreen() {
                             {field('mBbHeight', 'geometry.field_measured_bb_height', { placeholder: autoStr(autoMeasured.bbHeight) })}
                         </View>
                         <Text style={styles.hint}>{t('geometry.measured_hint_bb')}</Text>
+                        <View style={styles.inputRow}>
+                            {field('mGripGroundY', 'geometry.field_measured_grip_ground', { placeholder: autoStr(autoMeasured.gripGroundY) })}
+                            {field('mSaddleGroundY', 'geometry.field_measured_saddle_ground', { placeholder: autoStr(autoMeasured.saddleGroundY) })}
+                        </View>
+                        <View style={styles.inputRow}>
+                            {field('mSitOffset', 'geometry.field_measured_sit_offset', { placeholder: autoStr(autoMeasured.sitOffset) })}
+                            {field('mGripForward', 'geometry.field_measured_grip_forward', { placeholder: autoStr(autoMeasured.gripForward) })}
+                        </View>
+                        <View style={styles.inputRow}>
+                            {field('mGripSpanFront', 'geometry.field_measured_grip_span_front', { placeholder: autoStr(autoMeasured.gripSpanFront) })}
+                        </View>
+                        <Text style={styles.hint}>{t('geometry.measured_hint_ground')}</Text>
                         <BPButton
                             title={t('geometry.measured_apply')}
                             onPress={() => setForm(prev => ({
@@ -1042,6 +1096,11 @@ export default function GeometryScreen() {
                                 mSaddleToHand: autoStr(autoMeasured.saddleToHand) ?? '',
                                 mDrop: autoStr(autoMeasured.saddleToBarDrop) ?? '',
                                 mBbHeight: autoStr(autoMeasured.bbHeight) ?? '',
+                                mGripGroundY: autoStr(autoMeasured.gripGroundY) ?? '',
+                                mSaddleGroundY: autoStr(autoMeasured.saddleGroundY) ?? '',
+                                mSitOffset: autoStr(autoMeasured.sitOffset) ?? '',
+                                mGripForward: autoStr(autoMeasured.gripForward) ?? '',
+                                mGripSpanFront: autoStr(autoMeasured.gripSpanFront) ?? '',
                             }))}
                             variant="secondary"
                             color={ACCENT}
@@ -1056,6 +1115,27 @@ export default function GeometryScreen() {
                             size="sm"
                             style={{ marginTop: theme.spacing.sm }}
                         />
+                        {groundFlags.length > 0 && (
+                            <View style={styles.measureFlags}>
+                                <Text style={styles.measureFlagsTitle}>{t('geometry.measure_title')}</Text>
+                                {groundFlags.every(f => f.status === 'ok') ? (
+                                    <Text style={styles.hint}>{t('geometry.measure_all_ok')}</Text>
+                                ) : (
+                                    groundFlags.filter(f => f.status !== 'ok').map(f => (
+                                        <Text key={f.id} style={styles.hint}>
+                                            {f.status === 'impossible' ? '🚫 ' : '⚠️ '}
+                                            {t('geometry.measure_flag', {
+                                                label: t(`geometry.measure_label_${f.id}`),
+                                                m: Math.round(f.measured),
+                                                e: f.expected != null ? Math.round(f.expected) : '–',
+                                                d: f.deltaMm != null ? Math.round(f.deltaMm) : '–',
+                                            })}{' '}
+                                            {t(`geometry.measure_hint_${f.id}`)}
+                                        </Text>
+                                    ))
+                                )}
+                            </View>
+                        )}
                     </BPCard>
                 )}
 
@@ -1144,6 +1224,8 @@ const styles = StyleSheet.create({
     chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
     adviceBlock: { marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border + '60' },
     adviceTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '800', marginBottom: 4 },
+    measureFlags: { marginTop: theme.spacing.md, paddingTop: theme.spacing.sm, borderTopWidth: 1, borderTopColor: theme.colors.border + '60' },
+    measureFlagsTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '800', marginBottom: 4 },
     adviceText: { color: theme.colors.textSecondary, fontSize: 13, lineHeight: 20 },
     compareRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: theme.colors.border + '40' },
     compareHeader: { borderBottomColor: theme.colors.border, marginBottom: 2 },

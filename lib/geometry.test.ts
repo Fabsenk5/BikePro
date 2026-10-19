@@ -1,3 +1,4 @@
+import { HIP_BEHIND_NOSE } from './bikeSketch';
 import { describe, expect, it } from 'vitest';
 import {
     AssumedKey,
@@ -7,11 +8,14 @@ import {
     computeContactGeometry,
     DISCIPLINE_REFERENCES,
     evaluateFit,
+    groundExpectations,
     recommendForSymptoms,
     saddleHeightTarget,
     sanitizeGeometry,
     seatpostSaddleHeight,
+    SIT_POINT_BEHIND_NOSE_MM,
     stripComputedMeasured,
+    validateMeasurements,
 } from './geometry';
 
 const sample: BikeGeometry = {
@@ -390,5 +394,61 @@ describe('stripComputedMeasured', () => {
             { barX: pureModel.barX, saddleToHand: pureModel.saddleToHand },
         );
         expect(stripped).toEqual({ barX: 450, saddleToHand: 600 });
+    });
+});
+
+describe('groundExpectations + validateMeasurements', () => {
+    const exp = groundExpectations(sample, computeContactGeometry(sample), 351);
+    const expectedSit = 60 + SIT_POINT_BEHIND_NOSE_MM;
+
+    it('derives ground expectations from the hardware chain', () => {
+        const d = computeContactGeometry(sample);
+        expect(exp.gripGroundY).toBeCloseTo(351 + d.handY!, 6);
+        expect(exp.saddleGroundY).toBeCloseTo(351 + d.saddleY!, 6);
+        expect(exp.sitOffset).toBeCloseTo(expectedSit, 6);
+        expect(exp.gripForward).toBeCloseTo(d.handX!, 6);
+        expect(exp.gripSpanFront).toBeCloseTo(780 / 2 - 40, 6);
+    });
+
+    it('passes consistent tape values, flags deviations beyond tolerance', () => {
+        const good = {
+            gripGroundY: exp.gripGroundY! + 5,
+            saddleGroundY: exp.saddleGroundY! - 5,
+            sitOffset: exp.sitOffset! + 10,
+            gripForward: exp.gripForward! - 10,
+            gripSpanFront: exp.gripSpanFront!,
+        };
+        expect(validateMeasurements(good, exp, 351).every(f => f.status === 'ok')).toBe(true);
+        const bad = validateMeasurements({ ...good, gripForward: exp.gripForward! + 30 }, exp, 351);
+        const flag = bad.find(f => f.id === 'gripForward')!;
+        expect(flag.status).toBe('off');
+        expect(flag.deltaMm).toBeCloseTo(30, 6);
+    });
+
+    it('flags physically impossible values regardless of tolerance', () => {
+        const flags = validateMeasurements(
+            { gripGroundY: 300, saddleGroundY: 351, sitOffset: -50, gripForward: -10, gripSpanFront: 0 },
+            exp,
+            351,
+        );
+        expect(flags.every(f => f.status === 'impossible')).toBe(true);
+        expect(flags).toHaveLength(5);
+    });
+
+    it('returns nothing without tape values and skips unknown expectations', () => {
+        expect(validateMeasurements(undefined, exp, 351)).toEqual([]);
+        expect(validateMeasurements({}, exp, 351)).toEqual([]);
+        const partial = validateMeasurements(
+            { gripForward: exp.gripForward! },
+            { ...exp, gripForward: null },
+            351,
+        );
+        expect(partial).toEqual([]);
+    });
+});
+
+describe('shared sit-point constant', () => {
+    it('matches the sketch hip placement', () => {
+        expect(HIP_BEHIND_NOSE).toBe(SIT_POINT_BEHIND_NOSE_MM);
     });
 });

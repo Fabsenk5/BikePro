@@ -13,6 +13,11 @@
  */
 
 export const GRIP_INSET_MM = 40; // half hand width — grips sit inboard of the bar ends
+/**
+ * Sit point behind the saddle nose (sit bones ≈ here). Shared with the sketch
+ * hip placement (HIP_BEHIND_NOSE in bikeSketch.ts) — keep in sync (tested).
+ */
+export const SIT_POINT_BEHIND_NOSE_MM = 60;
 
 export interface GeometryFrame {
     stack?: number;
@@ -75,6 +80,16 @@ export interface GeometryMeasured {
     saddleToHand?: number;
     saddleToBarDrop?: number;
     bbHeight?: number;
+    /** grip centre height above ground (mm, vertical) — validation input */
+    gripGroundY?: number;
+    /** saddle sit-point height above ground (mm, vertical) — validation input */
+    saddleGroundY?: number;
+    /** sit-point offset behind BB (mm, horizontal, positive) — validation input */
+    sitOffset?: number;
+    /** grip centre forward of BB (mm, horizontal) — validation input */
+    gripForward?: number;
+    /** lateral grip-centre to steerer distance, front view (mm) — validation input */
+    gripSpanFront?: number;
     /**
      * Reserved: sagged bar height with rider on the bike. Parsed and kept,
      * but not consumed by the contact-point model yet.
@@ -106,6 +121,8 @@ export interface BikeGeometry {
 type NumRange = readonly [number, number];
 const LENGTH: NumRange = [0, 3000];
 const ANGLE: NumRange = [0, 180];
+// horizontal offsets can overshoot (negative = wrong side of the BB)
+const OFFSET: NumRange = [-500, 2000];
 
 const FRAME_RANGES: Record<keyof Omit<GeometryFrame, 'size' | 'wheelSize'>, NumRange> = {
     stack: LENGTH,
@@ -143,6 +160,11 @@ const MEASURED_RANGES: Record<keyof GeometryMeasured, NumRange> = {
     bbHeight: LENGTH,
     riderBarY: LENGTH,
     riderSaddleHeight: LENGTH,
+    gripGroundY: LENGTH,
+    saddleGroundY: LENGTH,
+    sitOffset: OFFSET,
+    gripForward: OFFSET,
+    gripSpanFront: LENGTH,
 };
 
 const FRAME_NUMBERS = Object.keys(FRAME_RANGES) as (keyof typeof FRAME_RANGES)[];
@@ -326,6 +348,11 @@ export function stripComputedMeasured(
         saddleToHand?: number | null;
         saddleToBarDrop?: number | null;
         bbHeight?: number | null;
+        gripGroundY?: number | null;
+        saddleGroundY?: number | null;
+        sitOffset?: number | null;
+        gripForward?: number | null;
+        gripSpanFront?: number | null;
     },
     tolerance = 1,
 ): GeometryMeasured | undefined {
@@ -339,7 +366,104 @@ export function stripComputedMeasured(
     if (same(out.saddleToHand, auto.saddleToHand)) delete out.saddleToHand;
     if (same(out.saddleToBarDrop, auto.saddleToBarDrop)) delete out.saddleToBarDrop;
     if (same(out.bbHeight, auto.bbHeight)) delete out.bbHeight;
+    if (same(out.gripGroundY, auto.gripGroundY)) delete out.gripGroundY;
+    if (same(out.saddleGroundY, auto.saddleGroundY)) delete out.saddleGroundY;
+    if (same(out.sitOffset, auto.sitOffset)) delete out.sitOffset;
+    if (same(out.gripForward, auto.gripForward)) delete out.gripForward;
+    if (same(out.gripSpanFront, auto.gripSpanFront)) delete out.gripSpanFront;
     return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/**
+ * Hardware-derived expectations for the ground-based tape measurements, all
+ * in mm: grip/saddle height above ground, sit-point offset behind the BB
+ * (sit bones ≈ HIP_BEHIND_NOSE behind the nose), grip forward of the BB, and
+ * lateral grip-to-steerer distance in front view (= grip half span).
+ * Null wherever the hardware chain is incomplete — then nothing is validated.
+ */
+export interface GroundExpectations {
+    gripGroundY: number | null;
+    saddleGroundY: number | null;
+    sitOffset: number | null;
+    gripForward: number | null;
+    gripSpanFront: number | null;
+}
+
+export function groundExpectations(
+    geo: BikeGeometry,
+    derived: ContactGeometry,
+    bbHeightMm: number | null,
+): GroundExpectations {
+    const sitX = derived.saddleX != null ? derived.saddleX - SIT_POINT_BEHIND_NOSE_MM : null;
+    const barWidth = geo.cockpit?.barWidth;
+    return {
+        gripGroundY: bbHeightMm != null && derived.handY != null ? bbHeightMm + derived.handY : null,
+        saddleGroundY: bbHeightMm != null && derived.saddleY != null ? bbHeightMm + derived.saddleY : null,
+        sitOffset: sitX != null ? -sitX : null,
+        gripForward: derived.handX,
+        gripSpanFront: barWidth != null ? Math.max(0, barWidth / 2 - GRIP_INSET_MM) : null,
+    };
+}
+
+export type MeasureFlagStatus = 'ok' | 'off' | 'impossible';
+
+export interface MeasureFlag {
+    id: 'gripGroundY' | 'saddleGroundY' | 'sitOffset' | 'gripForward' | 'gripSpanFront';
+    status: MeasureFlagStatus;
+    measured: number;
+    expected: number | null;
+    /** measured − expected in mm, null without expectation */
+    deltaMm: number | null;
+}
+
+/**
+ * Cross-checks ground-based tape measurements against the hardware model.
+ * `toleranceMm` covers tape error (±10 mm default). Anything beyond is
+ * flagged `off` (something in the hardware chain doesn't add up); physically
+ * impossible values are flagged `impossible` regardless of tolerance.
+ */
+export function validateMeasurements(
+    measured:
+        | {
+            gripGroundY?: number | null;
+            saddleGroundY?: number | null;
+            sitOffset?: number | null;
+            gripForward?: number | null;
+            gripSpanFront?: number | null;
+        }
+        | undefined,
+    expected: GroundExpectations,
+    bbHeightMm: number | null,
+    toleranceMm = 10,
+): MeasureFlag[] {
+    const out: MeasureFlag[] = [];
+    const check = (
+        id: MeasureFlag['id'],
+        value: number | null | undefined,
+        reference: number | null,
+        impossible: boolean,
+    ) => {
+        if (value == null) return;
+        if (impossible) {
+            out.push({ id, status: 'impossible', measured: value, expected: reference, deltaMm: reference != null ? value - reference : null });
+            return;
+        }
+        if (reference == null) return;
+        out.push({
+            id,
+            status: Math.abs(value - reference) <= toleranceMm ? 'ok' : 'off',
+            measured: value,
+            expected: reference,
+            deltaMm: value - reference,
+        });
+    };
+    const m = measured ?? {};
+    check('gripGroundY', m.gripGroundY, expected.gripGroundY, bbHeightMm != null && m.gripGroundY != null && m.gripGroundY <= bbHeightMm);
+    check('saddleGroundY', m.saddleGroundY, expected.saddleGroundY, bbHeightMm != null && m.saddleGroundY != null && m.saddleGroundY <= bbHeightMm);
+    check('sitOffset', m.sitOffset, expected.sitOffset, m.sitOffset != null && m.sitOffset < -5);
+    check('gripForward', m.gripForward, expected.gripForward, m.gripForward != null && m.gripForward <= 0);
+    check('gripSpanFront', m.gripSpanFront, expected.gripSpanFront, m.gripSpanFront != null && m.gripSpanFront <= 0);
+    return out;
 }
 
 // ─── Discipline references (heuristic bands, test-guarded) ───

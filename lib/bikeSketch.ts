@@ -6,7 +6,7 @@
  * between the rear and front axle — the wheels stay on the ground, so the
  * fork/shock visually compress.
  */
-import { assumedSaddleSetback, BikeGeometry, ContactGeometry, GRIP_INSET_MM } from './geometry';
+import { assumedSaddleSetback, BikeGeometry, ContactGeometry, GRIP_INSET_MM, SIT_POINT_BEHIND_NOSE_MM } from './geometry';
 
 export interface SketchPoint {
     x: number;
@@ -102,8 +102,9 @@ const TORSO_ANGLE_SEATED = 55;
 const TORSO_ANGLE_STANDING = 60;
 const TORSO_ANGLE_ATTACK_FLAT = 36;
 const TORSO_ANGLE_ATTACK_STEEP = 22;
-/** Hip joint sits this far behind the saddle nose (above the rail clamp). */
-const HIP_BEHIND_NOSE = 60;
+/** Hip joint sits this far behind the saddle nose (above the rail clamp).
+ * Shared definition lives in geometry.ts (SIT_POINT_BEHIND_NOSE_MM). */
+export const HIP_BEHIND_NOSE = SIT_POINT_BEHIND_NOSE_MM;
 /** Dropper travel assumed when the component does not state a hub. */
 export const DEFAULT_DROPPER_TRAVEL = 170;
 /** Saddle stays at least this high above the seat cluster when the dropper is compressed. */
