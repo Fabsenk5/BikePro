@@ -1202,7 +1202,7 @@
         "view_front_hint": "Richtwert: Griffe etwa auf Schulterbreite bis +40 mm — breiter = mehr Kontrolle, schmaler = effizienter.",
         "crank_horizontal": "Pedal horizontal",
         "crank_vertical": "Pedal unten",
-        "knee_bend_caption": "Kniebeugung unten: {{deg}}° — Richtwert 25–35° bei korrekter Sattelhöhe",
+        "knee_bend_caption": "Kniebeugung: {{bottom}}° unten / {{top}}° oben — Richtwert unten 25–35° bei korrekter Sattelhöhe",
         "torso_angle_caption": "Rückenwinkel: {{deg}}° (aus Körpermaßen und Lenkerposition abgeleitet)",
         "animation_play": "▶ Animation abspielen",
         "animation_stop": "⏸ Animation stoppen",

@@ -1202,7 +1202,7 @@
         "view_front_hint": "Guideline: grips around shoulder width up to +40 mm — wider = more control, narrower = more efficient.",
         "crank_horizontal": "Pedal horizontal",
         "crank_vertical": "Pedal at bottom",
-        "knee_bend_caption": "Knee bend at bottom: {{deg}}° — guideline 25–35° at correct saddle height",
+        "knee_bend_caption": "Knee bend: {{bottom}}° at bottom / {{top}}° at top — guideline 25–35° at bottom at correct saddle height",
         "torso_angle_caption": "Back angle: {{deg}}° (derived from body measurements and bar position)",
         "animation_play": "▶ Play animation",
         "animation_stop": "⏸ Stop animation",

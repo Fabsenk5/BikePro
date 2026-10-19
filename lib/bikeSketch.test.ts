@@ -115,9 +115,24 @@ describe('rider pose', () => {
         const s = buildBikeSketch(geo, derived, { sagPercent: 0, forkTravel: 170, shockStroke: 60 })!;
         expect(s.riderKnee).toBeNull();
         expect(s.kneeBendDeg).toBeNull();
+        expect(s.legRangeDeg).toBeNull();
         expect(s.kopsOffsetMm).toBeNull();
         // default crank mode is horizontal
         expect(s.riderPedal.x).toBeCloseTo(170, 6);
+    });
+
+    it('reports the leg extension range over the full revolution', () => {
+        const s = buildBikeSketch(geo, derived, {
+            sagPercent: 0, forkTravel: 170, shockStroke: 60, ...pose, crankMode: 'vertical',
+        })!;
+        expect(s.legRangeDeg).not.toBeNull();
+        // bottom dead centre: nearly straight (same value as the caption)
+        expect(s.legRangeDeg!.bottom).toBeCloseTo(s.kneeBendDeg!, 6);
+        expect(s.legRangeDeg!.bottom).toBeGreaterThan(15);
+        expect(s.legRangeDeg!.bottom).toBeLessThan(45);
+        // top dead centre: clearly bent — that's the rider's leg reserve
+        expect(s.legRangeDeg!.top).toBeGreaterThan(s.legRangeDeg!.bottom + 20);
+        expect(s.legRangeDeg!.top).toBeLessThan(150);
     });
 });
 

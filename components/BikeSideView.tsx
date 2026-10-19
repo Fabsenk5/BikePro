@@ -384,8 +384,8 @@ export default function BikeSideView({
                     })}
                 </Text>
             )}
-            {riderMode === 'seated' && crankMode === 'vertical' && sketch.kneeBendDeg != null && (
-                <Text style={styles.hint}>{t('geometry.knee_bend_caption', { deg: sketch.kneeBendDeg })}</Text>
+            {riderMode === 'seated' && crankMode === 'vertical' && sketch.kneeBendDeg != null && sketch.legRangeDeg != null && (
+                <Text style={styles.hint}>{t('geometry.knee_bend_caption', { bottom: sketch.legRangeDeg.bottom, top: sketch.legRangeDeg.top })}</Text>
             )}
             {sketch.torsoAngleSource === 'ik' && (
                 <Text style={styles.hint}>{t('geometry.torso_angle_caption', { deg: sketch.torsoAngleDeg })}</Text>

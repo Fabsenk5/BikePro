@@ -52,6 +52,8 @@ export interface BikeSketch {
     saddleClamp: SketchPoint;
     /** knee bend in degrees (0 = straight) at the current pedal position */
     kneeBendDeg: number | null;
+    /** knee bend at bottom/top dead centre over the full crank revolution */
+    legRangeDeg: { bottom: number; top: number } | null;
     /** knee-over-pedal horizontal offset (positive = knee ahead) — horizontal mode */
     kopsOffsetMm: number | null;
     wheelRadiusRear: number;
@@ -702,6 +704,14 @@ export function buildBikeSketch(
     const knee = riderLegs[0].knee;
     const pedal = riderLegs[0].pedal;
     const kneeBendDeg = inseam ? kneeBend(inseam * THIGH_RATIO, inseam * SHIN_RATIO, distance(hip, pedal)) : null;
+    // Leg extension range over the whole revolution: same hip, pedal at the
+    // bottom and top dead centres — what the crank length really changes.
+    const legRangeDeg = inseam
+        ? {
+            bottom: kneeBend(inseam * THIGH_RATIO, inseam * SHIN_RATIO, distance(hip, { x: bb.x, y: bb.y - crank })),
+            top: kneeBend(inseam * THIGH_RATIO, inseam * SHIN_RATIO, distance(hip, { x: bb.x, y: bb.y + crank })),
+        }
+        : null;
     const kopsOffsetMm = crankMode === 'horizontal' && knee ? knee.x - pedal.x : null;
 
     // Sag: linear pitch between the axles (wheels stay on the ground)
@@ -783,6 +793,7 @@ export function buildBikeSketch(
         })),
         saddleClamp: drop(saddleClamp),
         kneeBendDeg,
+        legRangeDeg,
         kopsOffsetMm,
         wheelRadiusRear: radii.rear,
         wheelRadiusFront: radii.front,
