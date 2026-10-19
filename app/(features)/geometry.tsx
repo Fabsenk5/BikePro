@@ -28,7 +28,8 @@ import {
     SymptomId,
     SYMPTOMS,
 } from '@/lib/geometry';
-import { buildBikeSketch, CrankMode, DEFAULT_DROPPER_TRAVEL, RiderMode, wheelRadii } from '@/lib/bikeSketch';
+import { buildBikeSketch, CrankMode, DEFAULT_DROPPER_TRAVEL, ProposalAxis, proposeCockpit, poseTorsoDeg, RiderMode, wheelRadii } from '@/lib/bikeSketch';
+import { HANDLEBARS } from '@/constants/handlebars';
 import { SyncBike, syncLoadBikes, syncLoadPrimaryBikeId, syncLoadProfile, syncSaveBikes } from '@/lib/sync';
 import { travelStrokeDefaults } from '@/lib/suspensionDefaults';
 import { useRefreshOnForeground } from '@/lib/useRefreshOnForeground';
@@ -176,6 +177,8 @@ export default function GeometryScreen() {
     const [viewMode, setViewMode] = useState<'side' | 'front'>('side');
     const [crankMode, setCrankMode] = useState<CrankMode>('horizontal');
     const [riderMode, setRiderMode] = useState<RiderMode>('seated');
+    const [propAxis, setPropAxis] = useState<ProposalAxis>('height');
+    const [propDelta, setPropDelta] = useState(0);
     const { width: windowWidth } = useWindowDimensions();
     const viewWidth = Math.max(260, Math.min(windowWidth, 960) - 2 * 24 - 2 * 16);
 
@@ -391,6 +394,37 @@ export default function GeometryScreen() {
         torsoLength: rider.torsoLength, inseam: rider.inseam,
         crankLength: toNum(form.crankLength), crankMode: 'horizontal' as CrankMode,
     }), [displayGeometry, derived, forkTravel, shockStroke, rider.torsoLength, rider.inseam, form.crankLength]);
+    // Proposal mode (inverse fit): grip target for a desired back angle.
+    // Saddle stays fixed (fit convention); shows purchasable hardware deltas.
+    const propCurrentDeg = useMemo(() => poseTorsoDeg(displayGeometry, derived, {
+        torsoLength: rider.torsoLength, armLength: rider.armLength, riderMode, dropperTravel,
+    }), [displayGeometry, derived, rider.torsoLength, rider.armLength, riderMode, dropperTravel]);
+    const proposal = useMemo(() => {
+        if (propCurrentDeg == null) return null;
+        return proposeCockpit(
+            displayGeometry,
+            derived,
+            {
+                torsoLength: rider.torsoLength, armLength: rider.armLength,
+                riderMode, dropperTravel,
+                spacersMm: displayGeometry.cockpit?.spacers,
+                riseMm: displayGeometry.cockpit?.barRise,
+                stemMm: displayGeometry.cockpit?.stemLength,
+            },
+            propCurrentDeg + propDelta,
+            propAxis,
+        );
+    }, [displayGeometry, derived, rider.torsoLength, rider.armLength, riderMode, dropperTravel, propCurrentDeg, propDelta, propAxis]);
+    const propRiseMatches = useMemo(() => {
+        if (!proposal || proposal.axis !== 'height') return [];
+        const out: string[] = [];
+        for (const b of HANDLEBARS) {
+            const close = b.risesMm.filter(r => Math.abs(r - proposal.riseMm) <= 5);
+            if (close.length > 0) out.push(`${b.brand} ${b.model} (${close.join('/')})`);
+            if (out.length >= 3) break;
+        }
+        return out;
+    }, [proposal]);
     // Raw model (no assumptions, no stored measured overrides) — only used
     // to decide which measured values are real tape deviations worth
     // persisting. NB: measured MUST be excluded here: computeContactGeometry
@@ -712,6 +746,79 @@ export default function GeometryScreen() {
                                 <Text style={styles.hint}>
                                     {t('geometry.dropper_default_hint', { mm: DEFAULT_DROPPER_TRAVEL })}
                                 </Text>
+                            )}
+                        </BPCard>
+
+                        <BPCard style={styles.card}>
+                            <Text style={styles.cardTitle}>💡 {t('geometry.proposal_title')}</Text>
+                            <Text style={styles.hint}>{t('geometry.proposal_hint')}</Text>
+                            {propCurrentDeg == null ? (
+                                <Text style={styles.hint}>{t('geometry.proposal_no_hand')}</Text>
+                            ) : (
+                                <>
+                                    <BPSegmentedControl
+                                        options={[
+                                            { label: t('geometry.proposal_axis_height'), value: 'height' },
+                                            { label: t('geometry.proposal_axis_reach'), value: 'reach' },
+                                        ]}
+                                        value={propAxis}
+                                        onChange={v => setPropAxis(v as ProposalAxis)}
+                                        accentColor={ACCENT}
+                                        containerStyle={{ marginBottom: theme.spacing.sm }}
+                                    />
+                                    <BPSlider
+                                        label={t('geometry.proposal_target_label')}
+                                        value={propDelta}
+                                        min={-10}
+                                        max={10}
+                                        step={1}
+                                        unit="°"
+                                        accentColor={ACCENT}
+                                        onValueChange={setPropDelta}
+                                        formatValue={v => `${propCurrentDeg != null ? propCurrentDeg + v : v}°`}
+                                    />
+                                    <Text style={styles.hint}>
+                                        {t('geometry.proposal_current_target', { current: propCurrentDeg, target: propCurrentDeg + propDelta })}
+                                    </Text>
+                                    {proposal && (
+                                        <>
+                                            {proposal.axis === 'height' ? (
+                                                <Text style={styles.hint}>
+                                                    {t('geometry.proposal_height_result', {
+                                                        spacers: proposal.spacerPieces,
+                                                        rise: proposal.riseMm,
+                                                        achieved: proposal.achievedDeg,
+                                                    })}
+                                                </Text>
+                                            ) : (
+                                                <Text style={styles.hint}>
+                                                    {t('geometry.proposal_reach_result', {
+                                                        stem: proposal.stemMm ?? '–',
+                                                        achieved: proposal.achievedDeg,
+                                                    })}
+                                                </Text>
+                                            )}
+                                            {!proposal.reachable && (
+                                                <Text style={styles.hint}>{t('geometry.proposal_unreachable')}</Text>
+                                            )}
+                                            {propRiseMatches.length > 0 && (
+                                                <>
+                                                    <Text style={styles.hint}>
+                                                        {t('geometry.proposal_bars_title')}: {propRiseMatches.join(' · ')}
+                                                    </Text>
+                                                    <BPButton
+                                                        title={t('geometry.proposal_open_finder')}
+                                                        onPress={() => router.push('/(features)/bar-finder')}
+                                                        variant="secondary"
+                                                        color={ACCENT}
+                                                        size="sm"
+                                                        style={{ marginTop: theme.spacing.sm }}
+                                                    />
+                                                </>
+                                            )}
+                                        </>
+                                    )}
+                                </>
                             )}
                         </BPCard>
 

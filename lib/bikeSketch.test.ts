@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAnimationFrame, buildBikeSketch, buildFrontSketch, springPoints, wheelRadii } from './bikeSketch';
+import { buildAnimationFrame, buildBikeSketch, buildFrontSketch, poseTorsoDeg, proposeCockpit, riderPoseBase, springPoints, wheelRadii } from './bikeSketch';
 import { computeContactGeometry } from './geometry';
 
 const geo = {
@@ -440,6 +440,76 @@ describe('cockpit detail', () => {
         const f3 = buildFrontSketch(noSweep, computeContactGeometry(noSweep), { sagPercent: 0, forkTravel: 170 })!;
         // grips still sit at the bar line without upsweep data
         expect(f3.gripRise).toBe(0);
+    });
+});
+
+describe('riderPoseBase', () => {
+    it('matches the sketch pose exactly at zero sag', () => {
+        for (const riderMode of ['seated', 'standing', 'attack-flat', 'attack-steep'] as const) {
+            const pose = riderPoseBase(geo, derived, { riderMode, torsoLength: 550, armLength: 640 })!;
+            const s = buildBikeSketch(geo, derived, {
+                sagPercent: 0, forkTravel: 170, shockStroke: 60,
+                torsoLength: 550, armLength: 640, riderMode, inseam: 840, crankMode: 'horizontal',
+            })!;
+            expect(pose.hip).toEqual(s.riderHip);
+            expect(pose.hand).toEqual(s.hand);
+            expect(pose.torso).toBe(550);
+            expect(pose.arm).toBe(640);
+        }
+    });
+
+    it('returns null without a hand position', () => {
+        const noBar = { ...geo, cockpit: {} };
+        expect(riderPoseBase(noBar, computeContactGeometry(noBar), {})).toBeNull();
+    });
+});
+
+describe('proposeCockpit', () => {
+    const input = { torsoLength: 550, armLength: 640, riderMode: 'seated' as const, spacersMm: 20, riseMm: 30, stemMm: 40 };
+
+    it('converges to the target angle with purchasable hardware', () => {
+        const p = proposeCockpit(geo, derived, input, 55, 'height')!;
+        expect(p.currentDeg).toBeGreaterThan(50);
+        expect(p.achievedDeg).toBeGreaterThanOrEqual(53);
+        expect(p.achievedDeg).toBeLessThanOrEqual(57);
+        expect(p.reachable).toBe(true);
+        expect(Number.isInteger(p.spacerPieces)).toBe(true);
+        expect(Number.isInteger(p.riseMm)).toBe(true);
+        expect(p.stemMm).toBeNull();
+        // spacer pieces + rise always add up to the needed bar height
+        expect(p.spacerPieces * 10 + p.riseMm).toBe(20 + 30 + p.dBarY);
+    });
+
+    it('snaps reach proposals to standard stem lengths', () => {
+        const p0 = proposeCockpit(geo, derived, input, 58, 'reach')!;
+        const p = proposeCockpit(geo, derived, input, p0.currentDeg, 'reach')!;
+        expect(p.dBarX).toBe(0);
+        expect(p.stemMm).toBe(40);
+        expect(p.achievedDeg).toBe(p.currentDeg);
+        expect(p.reachable).toBe(true);
+        expect([35, 40, 45, 50, 60, 70, 80]).toContain(p.stemMm);
+    });
+
+    it('reports unreachable targets honestly', () => {
+        const p = proposeCockpit(geo, derived, input, 80, 'height')!;
+        expect(p.reachable).toBe(false);
+    });
+
+    it('returns null without a hand position', () => {
+        const noBar = { ...geo, cockpit: {} };
+        expect(proposeCockpit(noBar, computeContactGeometry(noBar), input, 45, 'height')).toBeNull();
+        expect(poseTorsoDeg(noBar, computeContactGeometry(noBar), input)).toBeNull();
+    });
+
+    it('poseTorsoDeg matches the sketch angle at zero sag', () => {
+        for (const riderMode of ['seated', 'standing', 'attack-flat', 'attack-steep'] as const) {
+            const deg = poseTorsoDeg(geo, derived, { riderMode, torsoLength: 550, armLength: 640 });
+            const s = buildBikeSketch(geo, derived, {
+                sagPercent: 0, forkTravel: 170, shockStroke: 60,
+                torsoLength: 550, armLength: 640, riderMode, inseam: 840, crankMode: 'horizontal',
+            })!;
+            expect(deg).toBe(s.torsoAngleDeg);
+        }
     });
 });
 

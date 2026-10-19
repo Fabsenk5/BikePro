@@ -1227,7 +1227,19 @@
         "check_saddleHeight_hint": "BB→saddle along seat tube — target 0.883 × inseam",
         "metric_gripDelta": "Grip − shoulders",
         "metric_frontCenter": "Front centre (BB→front)",
-        "metric_kops": "Knee over pedal"
+        "metric_kops": "Knee over pedal",
+        "proposal_title": "Proposal: adjust cockpit",
+        "proposal_hint": "Saddle stays fixed — grip position and matching hardware are proposed for the target back angle in the current pose.",
+        "proposal_axis_height": "Height (spacers/rise)",
+        "proposal_axis_reach": "Reach (stem)",
+        "proposal_target_label": "Target back angle",
+        "proposal_current_target": "Current {current}° → target {target}°",
+        "proposal_height_result": "Spacers: {spacers} pcs · Rise: {rise} mm · Achieved: {achieved}°",
+        "proposal_reach_result": "Stem: {stem} mm · Achieved: {achieved}°",
+        "proposal_unreachable": "Limit reached — hardware can't get closer.",
+        "proposal_bars_title": "Matching rise options from the DB",
+        "proposal_open_finder": "View in bar finder",
+        "proposal_no_hand": "Complete the bar position (stem/bars) for proposals."
     },
     "barfinder": {
         "title": "Bar Finder",

@@ -195,6 +195,187 @@ const FAR_ARM_OFFSET = { x: -18, y: -28 };
  * rider's proportions instead of a fixed value. `armFactor` < 1 models more
  * strongly bent arms (attack position).
  */
+export interface RiderPoseInput {
+    torsoLength?: number | null;
+    armLength?: number | null;
+    riderMode?: RiderMode;
+    dropperTravel?: number | null;
+}
+
+export interface RiderPoseBase {
+    hip: SketchPoint;
+    hand: SketchPoint;
+    torso: number;
+    arm: number;
+    armFactor: number;
+}
+
+/**
+ * Shared rider-pose root (hip + hand + segment lengths) for the sketch and
+ * the cockpit proposal solver — one definition, no drift. Mirrors the
+ * buildBikeSketch pose math exactly (verified by test); returns null when no
+ * hand position is known (bar data incomplete).
+ */
+export function riderPoseBase(
+    geo: BikeGeometry,
+    derived: ContactGeometry,
+    input: RiderPoseInput,
+): RiderPoseBase | null {
+    if (derived.handX == null || derived.handY == null) return null;
+    const frame = geo.frame ?? {};
+    const seatAngle = frame.seatAngle ?? 75;
+    const seatRad = (seatAngle * Math.PI) / 180;
+    const seatTube = frame.seatTube ?? 440;
+    const seatCluster: SketchPoint = {
+        x: -seatTube * Math.cos(seatRad),
+        y: seatTube * Math.sin(seatRad),
+    };
+    const saddleAlongTube = derived.saddleY != null ? derived.saddleY / Math.sin(seatRad) : null;
+    const saddleSeated: SketchPoint = derived.saddleY != null
+        ? {
+            x: derived.saddleX ?? -assumedSaddleSetback(saddleAlongTube ?? 0, seatAngle),
+            y: derived.saddleY,
+        }
+        : seatCluster;
+    const riderMode = input.riderMode ?? 'seated';
+    const dropperTravel = input.dropperTravel ?? DEFAULT_DROPPER_TRAVEL;
+    const seatDir: SketchPoint = { x: -Math.cos(seatRad), y: Math.sin(seatRad) };
+    let saddle = saddleSeated;
+    if (riderMode !== 'seated') {
+        const dropped = {
+            x: saddleSeated.x - seatDir.x * dropperTravel,
+            y: saddleSeated.y - seatDir.y * dropperTravel,
+        };
+        const minY = seatCluster.y + SADDLE_MIN_ABOVE_CLUSTER;
+        saddle = dropped.y < minY
+            ? { x: seatCluster.x + ((minY - seatCluster.y) / seatDir.y) * seatDir.x, y: minY }
+            : dropped;
+    }
+    const torso = input.torsoLength ?? DEFAULT_TORSO;
+    const arm = input.armLength ?? DEFAULT_ARM;
+    const seatedHip: SketchPoint = {
+        x: saddleSeated.x - (derived.saddleY != null ? HIP_BEHIND_NOSE : 0),
+        y: saddleSeated.y + HIP_ABOVE_SADDLE,
+    };
+    const hipOffset = riderHipOffset(riderMode);
+    const hip: SketchPoint = riderMode === 'seated'
+        ? { x: saddle.x - HIP_BEHIND_NOSE, y: saddle.y + HIP_ABOVE_SADDLE }
+        : { x: -hipOffset.back, y: seatedHip.y + hipOffset.rise };
+    return {
+        hip,
+        hand: { x: derived.handX, y: derived.handY },
+        torso,
+        arm,
+        armFactor: riderArmFactor(riderMode),
+    };
+}
+
+export type ProposalAxis = 'height' | 'reach';
+
+/**
+ * Current back angle for a pose — same inputs as the sketch, no sag involved.
+ * Used for the proposal target default and display.
+ */
+export function poseTorsoDeg(
+    geo: BikeGeometry,
+    derived: ContactGeometry,
+    input: RiderPoseInput,
+): number | null {
+    const pose = riderPoseBase(geo, derived, input);
+    if (!pose) return null;
+    return torsoReach(pose.hip, pose.hand, pose.torso, pose.arm, pose.armFactor).angleDeg;
+}
+
+/** Standard MTB stem lengths (mm) the reach proposal snaps to. */
+export const STEM_LENGTHS = [35, 40, 45, 50, 60, 70, 80];
+/** One headset spacer step (mm) — matches the spacer-pieces convention. */
+export const SPACER_MM = 10;
+/** Sane upper bound for a spacer tower (mm). */
+export const MAX_SPACER_MM = 60;
+
+export interface CockpitProposal {
+    targetDeg: number;
+    axis: ProposalAxis;
+    currentDeg: number;
+    /** signed bar displacement that hits the target (mm) */
+    dBarX: number;
+    dBarY: number;
+    /** height mode: recommended TOTAL spacers (pieces) and rise (mm) */
+    spacerPieces: number;
+    riseMm: number;
+    /** reach mode: recommended stem length (mm), null in height mode */
+    stemMm: number | null;
+    /** back angle with the rounded hardware */
+    achievedDeg: number;
+    /** false when even ±150 mm can't get within 2° of the target */
+    reachable: boolean;
+}
+
+/**
+ * Inverse fit solver: given a target back angle, find the grip displacement
+ * along one axis (grid search ±150 mm, no monotonicity assumed), then map it
+ * to purchasable hardware — spacers in 10 mm pieces first, remainder to rise
+ * (height), or nearest standard stem length (reach). The achieved angle is
+ * recomputed with the rounded hardware so the UI never promises more than
+ * the parts deliver. Saddle stays fixed (fit convention: saddle first).
+ */
+export function proposeCockpit(
+    geo: BikeGeometry,
+    derived: ContactGeometry,
+    input: RiderPoseInput & { spacersMm?: number | null; riseMm?: number | null; stemMm?: number | null },
+    targetDeg: number,
+    axis: ProposalAxis,
+): CockpitProposal | null {
+    const pose = riderPoseBase(geo, derived, input);
+    if (!pose) return null;
+    const { hip, hand, torso, arm, armFactor } = pose;
+    const currentDeg = torsoReach(hip, hand, torso, arm, armFactor).angleDeg;
+    let bestD = 0;
+    let bestErr = Math.abs(currentDeg - targetDeg);
+    for (let d = -150; d <= 150; d += 2) {
+        const h = axis === 'height' ? { x: hand.x, y: hand.y + d } : { x: hand.x + d, y: hand.y };
+        const a = torsoReach(hip, h, torso, arm, armFactor).angleDeg;
+        const err = Math.abs(a - targetDeg);
+        if (err < bestErr - 1e-9 || (err === bestErr && Math.abs(d) < Math.abs(bestD))) {
+            bestErr = err;
+            bestD = d;
+        }
+    }
+    const dBarX = axis === 'reach' ? bestD : 0;
+    const dBarY = axis === 'height' ? bestD : 0;
+    const spacers = input.spacersMm ?? 0;
+    const rise = input.riseMm ?? 30;
+    const stem = input.stemMm ?? 40;
+    let spacerPieces = Math.round(spacers / SPACER_MM);
+    let riseMm = rise;
+    let stemMm: number | null = null;
+    if (axis === 'height') {
+        const total = spacers + rise + dBarY;
+        spacerPieces = Math.min(MAX_SPACER_MM / SPACER_MM, Math.max(0, Math.round(total / SPACER_MM)));
+        riseMm = Math.round(total - spacerPieces * SPACER_MM);
+        if (riseMm < 0) {
+            spacerPieces = Math.max(0, spacerPieces - 1);
+            riseMm = Math.round(total - spacerPieces * SPACER_MM);
+        }
+        if (riseMm < 0) {
+            spacerPieces = 0;
+            riseMm = Math.max(0, Math.round(total));
+        }
+    } else {
+        spacerPieces = Math.round(spacers / SPACER_MM);
+        stemMm = STEM_LENGTHS.reduce((a, b) => (Math.abs(b - (stem + dBarX)) < Math.abs(a - (stem + dBarX)) ? b : a));
+    }
+    const achievedHand = axis === 'height'
+        ? { x: hand.x, y: hand.y + (spacerPieces * SPACER_MM + riseMm - spacers - rise) }
+        : { x: hand.x + ((stemMm ?? stem) - stem), y: hand.y };
+    const achievedDeg = torsoReach(hip, achievedHand, torso, arm, armFactor).angleDeg;
+    return {
+        targetDeg, axis, currentDeg, dBarX, dBarY,
+        spacerPieces, riseMm, stemMm, achievedDeg,
+        reachable: Math.abs(achievedDeg - targetDeg) <= 2,
+    };
+}
+
 export function torsoReach(
     hip: SketchPoint,
     hand: SketchPoint,

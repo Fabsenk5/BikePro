@@ -1227,7 +1227,19 @@
         "check_saddleHeight_hint": "Tretlager→Sattel entlang Sitzrohr — Ziel 0,883 × Innenbein",
         "metric_gripDelta": "Griff − Schulter",
         "metric_frontCenter": "Front-Center (BB→VR)",
-        "metric_kops": "Knie über Pedal"
+        "metric_kops": "Knie über Pedal",
+        "proposal_title": "Vorschlag: Cockpit anpassen",
+        "proposal_hint": "Sattel bleibt fix — für den Ziel-Rückenwinkel in der aktuellen Haltung werden Griffposition und passende Hardware vorgeschlagen.",
+        "proposal_axis_height": "Höhe (Spacer/Rise)",
+        "proposal_axis_reach": "Weite (Vorbau)",
+        "proposal_target_label": "Ziel-Rückenwinkel",
+        "proposal_current_target": "Aktuell {current}° → Ziel {target}°",
+        "proposal_height_result": "Spacer: {spacers} Stück · Rise: {rise} mm · Erreicht: {achieved}°",
+        "proposal_reach_result": "Vorbau: {stem} mm · Erreicht: {achieved}°",
+        "proposal_unreachable": "Limit erreicht — näher geht's mit dieser Hardware nicht.",
+        "proposal_bars_title": "Passende Rise-Optionen aus der DB",
+        "proposal_open_finder": "Im Lenker-Finder ansehen",
+        "proposal_no_hand": "Für Vorschläge Lenkerposition vervollständigen (Vorbau/Lenker)."
     },
     "barfinder": {
         "title": "Lenker-Finder",
