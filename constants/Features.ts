@@ -113,4 +113,13 @@ export const features: Feature[] = [
         accentColor: '#00BFA5',
         ready: true,
     },
+    {
+        id: 'bar-finder',
+        title: 'Lenker-Finder',
+        subtitle: 'Cockpit-Vergleich',
+        icon: '🚲',
+        route: '/(features)/bar-finder',
+        accentColor: '#FF9800',
+        ready: true,
+    },
 ];

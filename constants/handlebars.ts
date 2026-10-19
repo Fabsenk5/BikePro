@@ -1,0 +1,391 @@
+/**
+ * Curated MTB handlebar database (Lenker-Finder / Bar Finder).
+ *
+ * Every spec below was verified against manufacturer or shop listings on
+ * 2026-10-19 (see `source`). Fields that could NOT be verified are null/empty
+ * on purpose — unverified manufacturer data is never invented here.
+ * Prices are volatile: `priceEur` is only set when an EUR figure was seen,
+ * otherwise check the `shopUrl` before buying. `shopUrl` reserves the slot
+ * for a future comparison/affiliate link.
+ * Users can add their own bars in the app (stored separately, `custom: true`).
+ */
+
+export type BarTag = 'flex' | 'stiff' | 'cut' | 'light' | 'ergo' | 'damped';
+export type BarMaterial = 'carbon' | 'alloy';
+
+export interface HandlebarEntry {
+    id: string;
+    brand: string;
+    model: string;
+    /** sold widths in mm */
+    widthsMm: number[];
+    /** rise options in mm */
+    risesMm: number[];
+    backsweepDeg: number;
+    upsweepDeg: number;
+    /** clamp diameters in mm */
+    clampsMm: number[];
+    /** weighed variant in weightNote, null when unknown */
+    weightG: number | null;
+    weightNote?: string;
+    /** EUR UVP when seen, else null (check shop) */
+    priceEur: number | null;
+    /** ISO date the entry was last verified */
+    priceChecked?: string;
+    colors: string[];
+    material: BarMaterial;
+    tags: BarTag[];
+    /** short unique selling point, both languages */
+    usp: { de: string; en: string };
+    /** manufacturer or shop URL seen during research */
+    source?: string;
+    /** reserved slot for a future comparison/affiliate link */
+    shopUrl?: string | null;
+    /** ISO date the specs were verified */
+    verified: string;
+    custom?: boolean;
+}
+
+const V = '2026-10-19';
+
+export const HANDLEBARS: HandlebarEntry[] = [
+    {
+        id: 'oneup-v2-carbon',
+        brand: 'OneUp',
+        model: 'V2 Carbon',
+        widthsMm: [760, 800],
+        risesMm: [20, 35, 50],
+        backsweepDeg: 8,
+        upsweepDeg: 5,
+        clampsMm: [35],
+        weightG: 235,
+        weightNote: '800×35 (Hersteller)',
+        priceEur: null,
+        colors: [],
+        material: 'carbon',
+        tags: ['flex'],
+        usp: {
+            de: '33 % nachgiebiger als V1, DH-/E-Bike-zertifiziert',
+            en: '33% more compliant than V1, DH/e-bike certified',
+        },
+        source: 'https://www.oneupcomponents.com/products/v2-carbon-handlebar',
+        shopUrl: 'https://www.oneupcomponents.com/products/v2-carbon-handlebar',
+        verified: V,
+    },
+    {
+        id: 'renthal-fatbar-carbon-35',
+        brand: 'Renthal',
+        model: 'Fatbar Carbon 35',
+        widthsMm: [800],
+        risesMm: [10, 20, 30, 40],
+        backsweepDeg: 7,
+        upsweepDeg: 5,
+        clampsMm: [35],
+        weightG: 225,
+        priceEur: null,
+        colors: ['Schwarz'],
+        material: 'carbon',
+        tags: ['stiff'],
+        usp: {
+            de: 'DH-Race-Referenz, ride-getunt (Stärke/Steifigkeit/Dämpfung)',
+            en: 'DH race benchmark, ride-tuned (strength/stiffness/damping)',
+        },
+        source: 'https://www.renthal.com/products/fatbar-carbon35-30mm',
+        shopUrl: 'https://www.renthal.com/products/fatbar-carbon35-30mm',
+        verified: V,
+    },
+    {
+        id: 'renthal-fatbar-alloy',
+        brand: 'Renthal',
+        model: 'Fatbar Alloy V3',
+        widthsMm: [800],
+        risesMm: [10, 20, 30, 40],
+        backsweepDeg: 7,
+        upsweepDeg: 5,
+        clampsMm: [31.8, 35],
+        weightG: 315,
+        priceEur: null,
+        colors: ['Schwarz', 'Gold'],
+        material: 'alloy',
+        tags: ['stiff'],
+        usp: {
+            de: 'Alu-Klassiker mit großer Rise-Auswahl, 31.8 und 35',
+            en: 'Alloy classic with wide rise range, 31.8 and 35',
+        },
+        source: 'https://www.renthal.com/collections/fatbar-handlebars-cycle',
+        shopUrl: 'https://www.renthal.com/collections/fatbar-handlebars-cycle',
+        verified: V,
+    },
+    {
+        id: 'deity-skywire',
+        brand: 'Deity',
+        model: 'Skywire Carbon 35',
+        widthsMm: [800],
+        risesMm: [15, 25],
+        backsweepDeg: 9,
+        upsweepDeg: 5,
+        clampsMm: [35],
+        weightG: 222,
+        weightNote: '15 mm',
+        priceEur: null,
+        colors: [],
+        material: 'carbon',
+        tags: ['flex'],
+        usp: {
+            de: 'Dämpfung trotz 35-mm-Klemmung, mit Schnittmarken',
+            en: 'Damping despite 35 mm clamp, with cut marks',
+        },
+        source: 'https://www.deitycomponents.com/store/p306/SKYWIRE_CARBON_35_25MM_HANDLEBAR_STORE.html',
+        shopUrl: 'https://www.deitycomponents.com/store/p306/SKYWIRE_CARBON_35_25MM_HANDLEBAR_STORE.html',
+        verified: V,
+    },
+    {
+        id: 'deity-blacklabel-800',
+        brand: 'Deity',
+        model: 'Blacklabel 800',
+        widthsMm: [800],
+        risesMm: [15, 25, 38],
+        backsweepDeg: 9,
+        upsweepDeg: 5,
+        clampsMm: [31.8],
+        weightG: null,
+        priceEur: null,
+        colors: ['Schwarz', 'Schwarz/Rot'],
+        material: 'alloy',
+        tags: ['stiff'],
+        usp: {
+            de: 'WC-DH-erprobt, Gradient Butting, viele Rise-Optionen',
+            en: 'World-Cup DH proven, gradient butting, many rise options',
+        },
+        source: 'https://www.deitycomponents.com/blacklabel_handlebar_25mm.html',
+        shopUrl: 'https://www.deitycomponents.com/blacklabel_handlebar_25mm.html',
+        verified: V,
+    },
+    {
+        id: 'raceface-next-r',
+        brand: 'Race Face',
+        model: 'Next R 35',
+        widthsMm: [800],
+        risesMm: [10, 20, 35],
+        backsweepDeg: 8,
+        upsweepDeg: 5,
+        clampsMm: [35],
+        weightG: 213,
+        weightNote: '800×20 (Test)',
+        priceEur: null,
+        colors: ['Schwarz'],
+        material: 'carbon',
+        tags: ['light', 'stiff'],
+        usp: {
+            de: 'DH-Stärke bei Enduro-Gewicht',
+            en: 'DH strength at enduro weight',
+        },
+        source: 'https://www.jensonusa.com/race-face-next-r-carbon-35-handlebar',
+        shopUrl: 'https://www.jensonusa.com/race-face-next-r-carbon-35-handlebar',
+        verified: V,
+    },
+    {
+        id: 'raceface-turbine-r-35',
+        brand: 'Race Face',
+        model: 'Turbine R 35',
+        widthsMm: [800],
+        risesMm: [10, 20, 35],
+        backsweepDeg: 8,
+        upsweepDeg: 5,
+        clampsMm: [35],
+        weightG: 300,
+        weightNote: '800×20 (Test)',
+        priceEur: null,
+        colors: [],
+        material: 'alloy',
+        tags: ['stiff'],
+        usp: {
+            de: '7075-Alu für aggressives All-Mountain',
+            en: '7075 alloy for aggressive all-mountain',
+        },
+        source: 'https://www.jensonusa.com/race-face-turbine-r-alloy-35-handlebar',
+        shopUrl: 'https://www.jensonusa.com/race-face-turbine-r-alloy-35-handlebar',
+        verified: V,
+    },
+    {
+        id: 'burgtec-ridewide-carbon',
+        brand: 'Burgtec',
+        model: 'Ride Wide Carbon',
+        widthsMm: [800],
+        risesMm: [20, 30],
+        backsweepDeg: 9,
+        upsweepDeg: 5,
+        clampsMm: [31.8, 35],
+        weightG: 280,
+        weightNote: 'DH-Version',
+        priceEur: null,
+        colors: ['Schwarz'],
+        material: 'carbon',
+        tags: ['stiff', 'cut'],
+        usp: {
+            de: 'Syndicate-erprobt, Schnittmarkierungen',
+            en: 'Syndicate proven, cut marks',
+        },
+        source: 'https://burgtec.co.uk/shop/ride-wide-carbon-enduro-handlebar/',
+        shopUrl: 'https://burgtec.co.uk/shop/ride-wide-carbon-enduro-handlebar/',
+        verified: V,
+    },
+    {
+        id: 'spank-spike-800',
+        brand: 'Spank',
+        model: 'Spike 800 Vibrocore',
+        widthsMm: [800],
+        risesMm: [15, 30, 50, 75],
+        backsweepDeg: 8,
+        upsweepDeg: 4,
+        clampsMm: [31.8],
+        weightG: 350,
+        weightNote: '30 mm',
+        priceEur: null,
+        colors: [],
+        material: 'alloy',
+        tags: ['damped', 'cut'],
+        usp: {
+            de: 'Vibrocore-Schaum gegen Arm-Pump, bis 740 kürzbar',
+            en: 'Vibrocore foam against arm pump, cuttable to 740',
+        },
+        source: 'https://spank-ind.com/products/spike-800-vibrocore-tm-bar',
+        shopUrl: 'https://spank-ind.com/products/spike-800-vibrocore-tm-bar',
+        verified: V,
+    },
+    {
+        id: 'nukeproof-horizon-v2-carbon',
+        brand: 'Nukeproof',
+        model: 'Horizon V2 Carbon',
+        widthsMm: [780, 800],
+        risesMm: [12, 25, 38],
+        backsweepDeg: 9,
+        upsweepDeg: 5,
+        clampsMm: [31.8, 35],
+        weightG: 232,
+        weightNote: '780×25 (Hersteller)',
+        priceEur: null,
+        colors: [],
+        material: 'carbon',
+        tags: ['light'],
+        usp: {
+            de: 'Carbon zum fairen Kurs, Lifetime-Garantie',
+            en: 'Fair-priced carbon, lifetime warranty',
+        },
+        source: 'https://www.evanscycles.com/brand/nukeproof/horizon-v2-carbon-riser-bar-318mm-702317',
+        shopUrl: 'https://www.evanscycles.com/brand/nukeproof/horizon-v2-carbon-riser-bar-318mm-702317',
+        verified: V,
+    },
+    {
+        id: 'chromag-bza',
+        brand: 'Chromag',
+        model: 'BZA Carbon',
+        widthsMm: [800],
+        risesMm: [15, 25, 35],
+        backsweepDeg: 9,
+        upsweepDeg: 5,
+        clampsMm: [35],
+        weightG: 235,
+        priceEur: null,
+        colors: ['Schwarz', 'Schwarz/Grau', 'Schwarz/Rot'],
+        material: 'carbon',
+        tags: ['stiff'],
+        usp: {
+            de: 'Extrem steif, Zedler-geprüft',
+            en: 'Extremely stiff, Zedler tested',
+        },
+        source: 'https://chromagbikes.com/products/bza-closeout',
+        shopUrl: 'https://chromagbikes.com/products/bza-closeout',
+        verified: V,
+    },
+    {
+        id: 'chromag-osx',
+        brand: 'Chromag',
+        model: 'Fubars OSX',
+        widthsMm: [800],
+        risesMm: [25],
+        backsweepDeg: 8,
+        upsweepDeg: 5,
+        clampsMm: [31.8, 35],
+        weightG: 325,
+        priceEur: null,
+        colors: ['Schwarz', 'Schwarz/Rot', 'Blau', 'Gold', 'Orange', 'Lila'],
+        material: 'alloy',
+        tags: ['stiff'],
+        usp: {
+            de: '20 Jahre bewährt, große Farbauswahl',
+            en: '20 years proven, many colours',
+        },
+        source: 'https://www.jensonusa.com/chromag-osx-bar-318-handlebars',
+        shopUrl: 'https://www.jensonusa.com/chromag-osx-bar-318-handlebars',
+        verified: V,
+    },
+    {
+        id: 'title-ah1',
+        brand: 'Title',
+        model: 'AH1',
+        widthsMm: [800],
+        risesMm: [25, 38, 50],
+        backsweepDeg: 8,
+        upsweepDeg: 5,
+        clampsMm: [31.8, 35],
+        weightG: 328,
+        weightNote: '31.8×38',
+        priceEur: null,
+        colors: ['Schwarz', 'Chrome', 'Grau'],
+        material: 'alloy',
+        tags: ['stiff', 'cut'],
+        usp: {
+            de: 'EFBE TRI-TEST, für Freeride/DH zertifiziert',
+            en: 'EFBE TRI-TEST, freeride/DH certified',
+        },
+        source: 'https://www.titlemtb.com/products/ah1-31-8-handlebars?variant=45025131856131',
+        shopUrl: 'https://www.titlemtb.com/products/ah1-31-8-handlebars?variant=45025131856131',
+        verified: V,
+    },
+    {
+        id: 'sqlab-30x-12',
+        brand: 'SQlab',
+        model: '30X 12°',
+        widthsMm: [780],
+        risesMm: [15, 30, 45],
+        backsweepDeg: 12,
+        upsweepDeg: 4,
+        clampsMm: [31.8],
+        weightG: 235,
+        weightNote: 'Hersteller (16°-Variante)',
+        priceEur: null,
+        colors: [],
+        material: 'carbon',
+        tags: ['ergo'],
+        usp: {
+            de: '12° Backsweep entlastet Handgelenk/Schulter (auch 9°/16°)',
+            en: '12° backsweep relieves wrists/shoulders (also 9°/16°)',
+        },
+        source: 'https://www.sq-lab.com/en/products/enduro-handlebar-3ox-12-57230-2323',
+        shopUrl: 'https://www.sq-lab.com/en/products/enduro-handlebar-3ox-12-57230-2323',
+        verified: V,
+    },
+    {
+        id: 'truvativ-descendant-carbon-35',
+        brand: 'Truvativ',
+        model: 'Descendant Carbon DH 35',
+        widthsMm: [800],
+        risesMm: [20, 25],
+        backsweepDeg: 9,
+        upsweepDeg: 5,
+        clampsMm: [35],
+        weightG: 320,
+        priceEur: null,
+        colors: ['Schwarz'],
+        material: 'carbon',
+        tags: ['stiff', 'cut'],
+        usp: {
+            de: 'Trimmbar (40 mm), geräuschdämpfendes Laminat',
+            en: 'Trimmable (40 mm), noise-damping laminate',
+        },
+        source: 'https://www.sram.com/en/truvativ/models/hb-desc-rcd5-b1',
+        shopUrl: 'https://www.sram.com/en/truvativ/models/hb-desc-rcd5-b1',
+        verified: V,
+    },
+];

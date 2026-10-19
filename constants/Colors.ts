@@ -80,4 +80,5 @@ export const featureColors: Record<string, string> = {
   'component-tracker': '#26A69A',
   'setup-guide': '#7C4DFF',
   'geometry': '#00BFA5',
+  'bar-finder': '#FF9800',
 };
