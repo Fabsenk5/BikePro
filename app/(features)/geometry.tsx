@@ -961,29 +961,32 @@ export default function GeometryScreen() {
                     <BPCard style={styles.card}>
                         <Text style={styles.cardTitle}>📐 {t('geometry.frame_title')}</Text>
                         <Text style={styles.hint}>{t('geometry.frame_hint')}</Text>
+                        <Text style={styles.sectionTitle}>{t('geometry.frame_section_front')}</Text>
                         <View style={styles.inputRow}>
                             {field('stack', 'geometry.field_stack')}
                             {field('reach', 'geometry.field_reach')}
                         </View>
                         <View style={styles.inputRow}>
                             {field('headAngle', 'geometry.field_head_angle', { suffix: '°', decimal: true })}
+                            {field('headTube', 'geometry.field_head_tube')}
+                        </View>
+                        <Text style={styles.sectionTitle}>{t('geometry.frame_section_rear')}</Text>
+                        <View style={styles.inputRow}>
                             {field('seatAngle', 'geometry.field_seat_angle', { suffix: '°', decimal: true })}
+                            {field('seatTube', 'geometry.field_seat_tube')}
                         </View>
                         <View style={styles.inputRow}>
                             {field('chainstay', 'geometry.field_chainstay')}
                             {field('wheelbase', 'geometry.field_wheelbase')}
                         </View>
+                        <Text style={styles.sectionTitle}>{t('geometry.frame_section_general')}</Text>
                         <View style={styles.inputRow}>
                             {field('bbDrop', 'geometry.field_bb_drop')}
-                            {field('seatTube', 'geometry.field_seat_tube')}
-                        </View>
-                        <View style={styles.inputRow}>
-                            {field('headTube', 'geometry.field_head_tube')}
+                            {field('size', 'geometry.field_size', { suffix: '', placeholder: 'L', numeric: false })}
                         </View>
                         {toNum(form.bbDrop) != null && toNum(form.bbDrop)! > 100 && (
                             <Text style={styles.warning}>{t('geometry.bbdrop_warning')}</Text>
                         )}
-                        {field('size', 'geometry.field_size', { suffix: '', placeholder: 'L', numeric: false })}
                         <BPPicker
                             label={t('geometry.field_wheel_size')}
                             options={[
@@ -1005,20 +1008,28 @@ export default function GeometryScreen() {
                         <Text style={styles.cardTitle}>🔧 {t('geometry.cockpit_title')}</Text>
                         <Text style={styles.hint}>{t('geometry.tracker_hint')}</Text>
                         <Text style={styles.hint}>{t('geometry.cockpit_assumptions_hint')}</Text>
+                        <Text style={styles.sectionTitle}>{t('geometry.cockpit_section_bar')}</Text>
                         <View style={styles.inputRow}>
+                            {field('barWidth', 'geometry.field_bar_width', { placeholder: String(cockpitAssumed.barWidth) })}
                             {field('barRise', 'geometry.field_bar_rise', { placeholder: String(cockpitAssumed.barRise) })}
+                        </View>
+                        <View style={styles.inputRow}>
                             {field('backsweep', 'geometry.field_backsweep', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.backsweep) })}
                             {field('upsweep', 'geometry.field_upsweep', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.upsweep) })}
                         </View>
+                        <Text style={styles.sectionTitle}>{t('geometry.cockpit_section_stem')}</Text>
                         <View style={styles.inputRow}>
-                            {field('barWidth', 'geometry.field_bar_width', { placeholder: String(cockpitAssumed.barWidth) })}
                             {field('stemLength', 'geometry.field_stem_length', { placeholder: String(cockpitAssumed.stemLength) })}
+                            {field('stemAngle', 'geometry.field_stem_angle', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.stemAngle) })}
                         </View>
                         <View style={styles.inputRow}>
-                            {field('stemAngle', 'geometry.field_stem_angle', { suffix: '°', decimal: true, placeholder: String(cockpitAssumed.stemAngle) })}
                             {field('spacers', 'geometry.field_spacers', { suffix: t('geometry.unit_pieces') })}
+                        </View>
+                        <Text style={styles.sectionTitle}>{t('geometry.cockpit_section_crank')}</Text>
+                        <View style={styles.inputRow}>
                             {field('crankLength', 'geometry.field_crank_length', { placeholder: String(cockpitAssumed.crankLength) })}
                         </View>
+                        <Text style={styles.sectionTitle}>{t('geometry.cockpit_section_saddle')}</Text>
                         <View style={styles.inputRow}>
                             {field('saddleHeight', 'geometry.field_saddle_height', { placeholder: assumedSaddleHeight != null ? String(assumedSaddleHeight) : '—' })}
                             {field('saddleSetback', 'geometry.field_saddle_setback', { placeholder: assumedSetback != null ? String(assumedSetback) : '—' })}
@@ -1061,32 +1072,37 @@ export default function GeometryScreen() {
                     <BPCard style={styles.card}>
                         <Text style={styles.cardTitle}>📏 {t('geometry.measured_title')}</Text>
                         <Text style={styles.hint}>{t('geometry.measured_hint')}</Text>
+                        <Text style={styles.sectionTitle}>{t('geometry.measured_section_front')}</Text>
+                        <View style={styles.inputRow}>
+                            {field('mGripGroundY', 'geometry.field_measured_grip_ground', { placeholder: autoStr(autoMeasured.gripGroundY) })}
+                            {field('mGripForward', 'geometry.field_measured_grip_forward', { placeholder: autoStr(autoMeasured.gripForward) })}
+                        </View>
+                        <Text style={styles.hint}>{t('geometry.measured_hint_grip_points')}</Text>
                         <View style={styles.inputRow}>
                             {field('mBarY', 'geometry.field_measured_bary', { placeholder: autoStr(autoMeasured.barY) })}
                             {field('mBarX', 'geometry.field_measured_barx', { placeholder: autoStr(autoMeasured.barX) })}
                         </View>
                         <Text style={styles.hint}>{t('geometry.measured_hint_bar')}</Text>
+                        <Text style={styles.sectionTitle}>{t('geometry.measured_section_saddle')}</Text>
+                        <View style={styles.inputRow}>
+                            {field('mSaddleGroundY', 'geometry.field_measured_saddle_ground', { placeholder: autoStr(autoMeasured.saddleGroundY) })}
+                            {field('mSitOffset', 'geometry.field_measured_sit_offset', { placeholder: autoStr(autoMeasured.sitOffset) })}
+                        </View>
+                        <Text style={styles.hint}>{t('geometry.measured_hint_saddle_points')}</Text>
                         <View style={styles.inputRow}>
                             {field('mSaddleToHand', 'geometry.field_measured_saddle_hand', { placeholder: autoStr(autoMeasured.saddleToHand) })}
                             {field('mDrop', 'geometry.field_measured_drop', { placeholder: autoStr(autoMeasured.saddleToBarDrop) })}
                         </View>
                         <Text style={styles.hint}>{t('geometry.measured_hint_saddle')}</Text>
+                        <Text style={styles.sectionTitle}>{t('geometry.measured_section_base')}</Text>
                         <View style={styles.inputRow}>
                             {field('mBbHeight', 'geometry.field_measured_bb_height', { placeholder: autoStr(autoMeasured.bbHeight) })}
                         </View>
                         <Text style={styles.hint}>{t('geometry.measured_hint_bb')}</Text>
                         <View style={styles.inputRow}>
-                            {field('mGripGroundY', 'geometry.field_measured_grip_ground', { placeholder: autoStr(autoMeasured.gripGroundY) })}
-                            {field('mSaddleGroundY', 'geometry.field_measured_saddle_ground', { placeholder: autoStr(autoMeasured.saddleGroundY) })}
-                        </View>
-                        <View style={styles.inputRow}>
-                            {field('mSitOffset', 'geometry.field_measured_sit_offset', { placeholder: autoStr(autoMeasured.sitOffset) })}
-                            {field('mGripForward', 'geometry.field_measured_grip_forward', { placeholder: autoStr(autoMeasured.gripForward) })}
-                        </View>
-                        <View style={styles.inputRow}>
                             {field('mGripSpanFront', 'geometry.field_measured_grip_span_front', { placeholder: autoStr(autoMeasured.gripSpanFront) })}
                         </View>
-                        <Text style={styles.hint}>{t('geometry.measured_hint_ground')}</Text>
+                        <Text style={styles.hint}>{t('geometry.measured_hint_frontal')}</Text>
                         <BPButton
                             title={t('geometry.measured_apply')}
                             onPress={() => setForm(prev => ({
@@ -1203,6 +1219,7 @@ const styles = StyleSheet.create({
     emptyAction: { paddingHorizontal: theme.spacing.lg },
     card: { padding: theme.spacing.md, marginBottom: theme.spacing.md },
     cardTitle: { color: theme.colors.text, fontSize: 16, fontWeight: '700', marginBottom: theme.spacing.md },
+    sectionTitle: { color: theme.colors.text, fontSize: 13, fontWeight: '700', marginTop: theme.spacing.sm, marginBottom: 4 },
     hint: { color: theme.colors.textMuted, fontSize: 12, marginBottom: theme.spacing.sm, lineHeight: 17 },
     warning: { color: theme.colors.accentOrange, fontSize: 12, marginBottom: theme.spacing.sm, lineHeight: 17 },
     inputRow: { flexDirection: 'row', gap: theme.spacing.sm },
