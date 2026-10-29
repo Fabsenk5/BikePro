@@ -335,14 +335,18 @@ export default function BodyScanScreen() {
                                 accentColor={ACCENT}
                             />
                             {needsReferenceCorners ? (
-                                <Text style={styles.hint}>
-                                    {t('bodyscan.ref_tap_hint', {
-                                        n: corners.length + 1,
-                                        label: t(`bodyscan.corner_${CORNER_LABELS[Math.min(corners.length, 3)]}`),
-                                        w: REFERENCE_DIMS_MM[reference as Exclude<ReferenceType, 'height'>].w,
-                                        h: REFERENCE_DIMS_MM[reference as Exclude<ReferenceType, 'height'>].h,
-                                    })}
-                                </Text>
+                                <>
+                                    <Text style={styles.hint}>{t('bodyscan.ref_place_hint')}</Text>
+                                    <Text style={styles.hint}>{t('bodyscan.ref_paper_hint')}</Text>
+                                    <Text style={styles.hint}>
+                                        {t('bodyscan.ref_tap_hint', {
+                                            n: corners.length + 1,
+                                            label: t(`bodyscan.corner_${CORNER_LABELS[Math.min(corners.length, 3)]}`),
+                                            w: REFERENCE_DIMS_MM[reference as Exclude<ReferenceType, 'height'>].w,
+                                            h: REFERENCE_DIMS_MM[reference as Exclude<ReferenceType, 'height'>].h,
+                                        })}
+                                    </Text>
+                                </>
                             ) : (
                                 <>
                                     <Text style={styles.hint}>{t('bodyscan.height_hint')}</Text>
