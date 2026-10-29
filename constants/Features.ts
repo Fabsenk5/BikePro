@@ -122,4 +122,13 @@ export const features: Feature[] = [
         accentColor: '#FF9800',
         ready: true,
     },
+    {
+        id: 'body-scan',
+        title: 'Body Scan',
+        subtitle: 'Foto-Körperanalyse',
+        icon: '🧍',
+        route: '/(features)/body-scan',
+        accentColor: '#E040FB',
+        ready: true,
+    },
 ];
